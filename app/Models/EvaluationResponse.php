@@ -12,7 +12,8 @@ class EvaluationResponse extends Model
     protected $fillable = [
         'queue_transaction_id',
         'question_id',
-        'answer_value'
+        'answer_value',
+        'rating_value'
     ];
 
     /**

@@ -46,8 +46,8 @@ class Counter extends Model
     /**
      * Get the user currently assigned to this counter (if any)
      */
-    public function currentUser()
-    {
-        return $this->hasOne(User::class);
-    }
+    // public function currentUser()
+    // {
+    //     return $this->hasOne(User::class);
+    // }
 }

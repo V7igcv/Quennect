@@ -16,7 +16,10 @@ return new class extends Migration
             $table->foreignId('queue_transaction_id')->constrained('queue_transactions')->onDelete('cascade');
             $table->foreignId('question_id')->constrained('evaluation_questions')->onDelete('cascade');
             $table->string('answer_value', 50); // For LIKERT: STRONGLY_DISAGREE, DISAGREE, etc.
+            $table->unsignedTinyInteger('rating_value')->nullable(); // For LIKERT: 1-5, null for multiple choice
             $table->timestamps();
+
+            $table->unique(['queue_transaction_id', 'question_id']);
         });
     }
 

@@ -16,6 +16,8 @@ return new class extends Migration
             $table->foreignId('queue_transaction_id')->constrained('queue_transactions')->onDelete('cascade');
             $table->foreignId('priority_sector_id')->constrained('priority_sectors')->onDelete('cascade');
             $table->timestamps();
+
+            $table->unique(['queue_transaction_id', 'priority_sector_id']);
         });
     }
 

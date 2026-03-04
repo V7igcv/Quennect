@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\TransactionStatus;
 
 class QueueTransaction extends Model
 {
@@ -23,7 +24,8 @@ class QueueTransaction extends Model
         'counter_id',
         'called_at',
         'completed_at',
-        'skipped_at'
+        'skipped_at',
+        'average_satisfaction_rating',
     ];
 
     protected $casts = [
@@ -32,6 +34,7 @@ class QueueTransaction extends Model
         'called_at' => 'datetime',
         'completed_at' => 'datetime',
         'skipped_at' => 'datetime',
+        'status' => TransactionStatus::class,
     ];
 
     /**
@@ -157,5 +160,23 @@ class QueueTransaction extends Model
             return $this->called_at->diffInMinutes($this->completed_at);
         }
         return null;
+    }
+
+    public function computeAverageSatisfactionRating(): ?float
+    {
+        $average = $this->evaluationResponses()
+            ->likert()
+            ->whereNotNull('rating_value')
+            ->avg('rating_value');
+
+        if ($average !== null) {
+            $average = round($average, 2);
+        }
+
+        $this->update([
+            'average_satisfaction_rating' => $average
+        ]);
+
+        return $average;
     }
 }

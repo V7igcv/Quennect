@@ -27,11 +27,12 @@ return new class extends Migration
             $table->foreignId('counter_id')->nullable()->constrained('counters')->onDelete('set null');
             $table->timestamp('called_at')->nullable();
             $table->timestamp('completed_at')->nullable();
+            $table->decimal('average_satisfaction_rating', 3, 2)->nullable();
             $table->timestamp('skipped_at')->nullable();
             $table->timestamps();
             
             // Ensure daily reset per office
-            $table->unique(['office_id', 'queue_date', 'queue_number'], 'unique_daily_queue');
+            $table->unique(['office_id', 'queue_date', 'is_priority', 'queue_number'], 'unique_daily_queue');
             
             // Indexes for faster queries
             $table->index(['office_id', 'status', 'queue_date']);
