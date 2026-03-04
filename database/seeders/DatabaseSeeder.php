@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             PrioritySectorSeeder::class,
             EvaluationQuestionSeeder::class,
             OfficeSeeder::class, // This will also seed services and counters
+            UpdateOfficesSeeder::class, // NEW seeder for updates
             RoleSeeder::class,
         ]);
     }

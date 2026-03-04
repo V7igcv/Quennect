@@ -2,47 +2,86 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
-        'name',
-        'email',
-        'password',
+        'username',
+        'password_hash',
+        'office_id',
+        'role_id',
+        'last_login_at'
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
-        'password',
+        'password_hash',
         'remember_token',
     ];
 
+    protected $casts = [
+        'last_login_at' => 'datetime',
+    ];
+
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Get the office this user belongs to
      */
-    protected function casts(): array
+    public function office()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->belongsTo(Office::class);
     }
+
+    /**
+     * Get the role of this user
+     */
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Get the password for authentication
+     */
+    public function getAuthPassword()
+    {
+        return $this->password_hash;
+    }
+
+    /**
+     * Get the username for authentication
+     */
+    public function getAuthIdentifierName()
+    {
+        return 'username';
+    }
+
+    /**
+     * Helper methods for role checking
+     */
+    public function hasRole($roleName)
+    {
+        return $this->role && $this->role->name === $roleName;
+    }
+
+    public function isSuperadmin()
+    {
+        return $this->hasRole('SUPERADMIN');
+    }
+
+    public function isFrontdesk()
+    {
+        return $this->hasRole('FRONTDESK');
+    }
+
+    /**
+     * Scope to get active users
+     */
+    // public function scopeActive($query)
+    // {
+    //     return $query->where('is_active', true);
+    // }
 }
