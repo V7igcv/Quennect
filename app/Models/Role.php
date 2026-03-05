@@ -45,4 +45,12 @@ class Role extends Model
     {
         return $this->name === 'FRONTDESK';
     }
+
+    /**
+     * Get role by name
+     */
+    public static function getRoleId(string $name): ?int
+    {
+        return self::where('name', $name)->value('id');
+    }
 }

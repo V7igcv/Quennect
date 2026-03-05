@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             OfficeSeeder::class, // This will also seed services and counters
             UpdateOfficesSeeder::class, // NEW seeder for updates
             RoleSeeder::class,
+            UserSeeder::class,
         ]);
     }
 }

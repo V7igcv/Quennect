@@ -5,11 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
+    protected $table = 'users';
+    
     protected $fillable = [
         'username',
         'password_hash',
@@ -25,6 +28,8 @@ class User extends Authenticatable
 
     protected $casts = [
         'last_login_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     /**
@@ -62,19 +67,31 @@ class User extends Authenticatable
     /**
      * Helper methods for role checking
      */
-    public function hasRole($roleName)
+    public function hasRole($roleName): bool
     {
         return $this->role && $this->role->name === $roleName;
     }
 
-    public function isSuperadmin()
+    public function isSuperadmin(): bool
     {
         return $this->hasRole('SUPERADMIN');
     }
 
-    public function isFrontdesk()
+    public function isFrontdesk(): bool
     {
-        return $this->hasRole('FRONTDESK');
+        return $this->hasRole('OFFICE FRONTDESK');
+    }
+
+    /**
+     * Check if user can access a specific office
+     */
+    public function canAccessOffice(Office $office): bool
+    {
+        if ($this->isSuperadmin()) {
+            return true;
+        }
+        
+        return $this->isFrontdesk() && $this->office_id === $office->id;
     }
 
     /**

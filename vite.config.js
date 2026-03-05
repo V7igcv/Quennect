@@ -19,6 +19,11 @@ export default defineConfig({
             },
         }),
     ],
+    resolve: {
+        alias: {
+            '@': '/resources/js',
+        },
+    },
     server: {
         watch: {
             ignored: ['**/storage/framework/views/**'],
