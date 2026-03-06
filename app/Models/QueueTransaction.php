@@ -10,6 +10,8 @@ class QueueTransaction extends Model
 {
     use HasFactory;
 
+    protected $table = 'queue_transactions';
+
     protected $fillable = [
         'office_id',
         'queue_date',
@@ -34,7 +36,7 @@ class QueueTransaction extends Model
         'called_at' => 'datetime',
         'completed_at' => 'datetime',
         'skipped_at' => 'datetime',
-        'status' => TransactionStatus::class,
+        'status' => TransactionStatus::class,  // ✅ Enum casting
     ];
 
     /**
@@ -63,7 +65,6 @@ class QueueTransaction extends Model
 
     /**
      * Get all services for this transaction
-     * (Many-to-many relationship)
      */
     public function services()
     {
@@ -73,7 +74,6 @@ class QueueTransaction extends Model
 
     /**
      * Get all priority sectors for this transaction
-     * (Many-to-many relationship)
      */
     public function prioritySectors()
     {
@@ -90,26 +90,27 @@ class QueueTransaction extends Model
     }
 
     /**
-     * Scopes for different statuses
+     * ==================== FIXED SCOPES ====================
+     * Gamit ang Enum para walang conflict
      */
     public function scopeWaiting($query)
     {
-        return $query->where('status', 'WAITING');
+        return $query->where('status', TransactionStatus::WAITING);
     }
 
     public function scopeServing($query)
     {
-        return $query->where('status', 'SERVING');
+        return $query->where('status', TransactionStatus::SERVING);
     }
 
     public function scopeCompleted($query)
     {
-        return $query->where('status', 'COMPLETED');
+        return $query->where('status', TransactionStatus::COMPLETED);
     }
 
     public function scopeSkipped($query)
     {
-        return $query->where('status', 'SKIPPED');
+        return $query->where('status', TransactionStatus::SKIPPED);
     }
 
     public function scopePriority($query)
@@ -124,12 +125,12 @@ class QueueTransaction extends Model
 
     public function scopeForDate($query, $date)
     {
-        return $query->where('queue_date', $date);
+        return $query->whereDate('queue_date', $date);
     }
 
     public function scopeToday($query)
     {
-        return $query->where('queue_date', now()->toDateString());
+        return $query->whereDate('queue_date', now()->toDateString());
     }
 
     /**
@@ -138,6 +139,14 @@ class QueueTransaction extends Model
     public function getDisplayQueueNumberAttribute()
     {
         return $this->full_queue_number;
+    }
+
+    /**
+     * Get status as string (for frontend)
+     */
+    public function getStatusStringAttribute(): string
+    {
+        return strtolower($this->status->value);
     }
 
     /**
@@ -162,10 +171,13 @@ class QueueTransaction extends Model
         return null;
     }
 
+    /**
+     * Calculate average satisfaction rating
+     */
     public function computeAverageSatisfactionRating(): ?float
     {
+        // ✅ REMOVED the ->likert() call
         $average = $this->evaluationResponses()
-            ->likert()
             ->whereNotNull('rating_value')
             ->avg('rating_value');
 
@@ -178,5 +190,34 @@ class QueueTransaction extends Model
         ]);
 
         return $average;
+    }
+
+    /**
+     * Generate next queue number (with race condition prevention)
+     */
+    public static function generateNextNumber(int $officeId, bool $isPriority): array
+    {
+        $office = Office::findOrFail($officeId);
+        $today = now()->toDateString();
+        
+        return \DB::transaction(function () use ($officeId, $today, $isPriority, $office) {
+            $lastTransaction = self::where('office_id', $officeId)
+                ->whereDate('queue_date', $today)
+                ->where('is_priority', $isPriority)
+                ->lockForUpdate()
+                ->orderBy('queue_number', 'desc')
+                ->first();
+
+            $nextNumber = $lastTransaction ? $lastTransaction->queue_number + 1 : 1;
+            $formattedNumber = str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $priorityPrefix = $isPriority ? 'P' : '';
+            $fullQueueNumber = $office->office_acronym . '-' . $priorityPrefix . $formattedNumber;
+
+            return [
+                'queue_number' => $nextNumber,
+                'full_queue_number' => $fullQueueNumber,
+                'queue_prefix' => $office->office_acronym . '-'
+            ];
+        });
     }
 }

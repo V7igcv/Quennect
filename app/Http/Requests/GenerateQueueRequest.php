@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\Kiosk;
+namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -9,7 +9,6 @@ class GenerateQueueRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     * Kiosk is public, so always true
      */
     public function authorize(): bool
     {
@@ -31,13 +30,13 @@ class GenerateQueueRequest extends FormRequest
                 'required',
                 'string',
                 'max:150',
-                'regex:/^[a-zA-Z\s\.,\-]+$/' // Allows letters, spaces, dots, commas, hyphens
+                'regex:/^[a-zA-Z\s\.,\-]+$/'
             ],
             'contact_number' => [
                 'required',
                 'string',
                 'max:20',
-                'regex:/^(09|\+639)\d{9}$/' // Philippine mobile number format
+                'regex:/^(09|\+639)\d{9}$/'
             ],
             'barangay_id' => [
                 'required',
@@ -61,10 +60,9 @@ class GenerateQueueRequest extends FormRequest
                 })
             ],
             'priority_sector_ids' => [
-                'required_if:lane_type,priority',
-                'prohibited_if:lane_type,regular',
+                'sometimes',
                 'array',
-                'min:1'
+                'nullable'
             ],
             'priority_sector_ids.*' => [
                 'integer',
@@ -74,7 +72,7 @@ class GenerateQueueRequest extends FormRequest
     }
 
     /**
-     * Custom error messages in Filipino
+     * Get custom messages for validator errors.
      */
     public function messages(): array
     {
@@ -86,51 +84,61 @@ class GenerateQueueRequest extends FormRequest
             'contact_number.required' => 'Ilagay po ang inyong contact number.',
             'contact_number.regex' => 'Gumamit po ng tamang format: 09123456789 o +639123456789.',
             'barangay_id.required' => 'Pumili po ng inyong barangay.',
+            'barangay_id.exists' => 'Hindi available ang napiling barangay.',
             'lane_type.required' => 'Pumili po ng uri ng lane.',
             'lane_type.in' => 'Regular o Priority lamang po ang pagpipilian.',
             'service_ids.required' => 'Pumili po ng kahit isang serbisyo.',
             'service_ids.min' => 'Pumili po ng kahit isang serbisyo.',
-            'service_ids.*.exists' => 'Hindi available ang napiling serbisyo.',
-            'priority_sector_ids.required_if' => 'Pumili po ng inyong sektor.',
-            'priority_sector_ids.prohibited_if' => 'Hindi po kailangan ng priority sector para sa regular lane.'
+            'service_ids.*.exists' => 'Hindi available ang napiling serbisyo para sa opisina na ito.',
+            'priority_sector_ids.*.exists' => 'Hindi available ang napiling priority sector.'
         ];
     }
 
     /**
-     * Prepare the data for validation
+     * Prepare the data for validation.
      */
     protected function prepareForValidation(): void
     {
-        // Convert lane_type to is_priority boolean
+        // I-merge ang is_priority based sa lane_type
         if ($this->has('lane_type')) {
             $this->merge([
                 'is_priority' => $this->lane_type === 'priority'
             ]);
         }
+        
+        // I-merge ang priority_sector_ids kung walang laman
+        if (!$this->has('priority_sector_ids')) {
+            $this->merge([
+                'priority_sector_ids' => []
+            ]);
+        }
     }
 
     /**
-     * Configure the validator instance
+     * Get the validated data from the request.
      */
-    public function withValidator($validator): void
+    public function validated($key = null, $default = null)
     {
-        $validator->after(function ($validator) {
-            // Check if office has available services
-            $officeId = $this->office_id;
-            $serviceIds = $this->service_ids ?? [];
+        $validated = parent::validated();
+        
+        // Siguraduhing may is_priority
+        if (!isset($validated['is_priority']) && $this->has('lane_type')) {
+            $validated['is_priority'] = $this->lane_type === 'priority';
+        }
+        
+        // Siguraduhing may priority_sector_ids
+        if (!isset($validated['priority_sector_ids'])) {
+            $validated['priority_sector_ids'] = [];
+        }
+        
+        return $key ? ($validated[$key] ?? $default) : $validated;
+    }
 
-            if ($officeId && !empty($serviceIds)) {
-                $validServices = \App\Models\Service::where('office_id', $officeId)
-                    ->whereIn('id', $serviceIds)
-                    ->count();
-
-                if ($validServices !== count($serviceIds)) {
-                    $validator->errors()->add(
-                        'service_ids',
-                        'Ang ilang serbisyo ay hindi kabilang sa napiling opisina.'
-                    );
-                }
-            }
-        });
+    /**
+     * Handle a passed validation attempt.
+     */
+    protected function passedValidation(): void
+    {
+        $this->replace($this->validated());
     }
 }

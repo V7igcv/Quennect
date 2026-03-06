@@ -2,12 +2,33 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-
+use App\Http\Controllers\OfficeController;
+use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\BarangayController;
+use App\Http\Controllers\PrioritySectorController;
+use App\Http\Controllers\QueueController;
+use App\Http\Controllers\PrintController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 */
+
+ // Public routes for Kiosk
+    Route::get('/offices', [OfficeController::class, 'index']);
+    Route::get('/offices/{office}', [OfficeController::class, 'show']);
+    Route::get('/offices/{office}/services', [ServiceController::class, 'getByOffice']);
+    Route::get('/services/{service}', [ServiceController::class, 'show']);
+    Route::get('/barangays', [BarangayController::class, 'index']);
+    Route::get('/priority-sectors', [PrioritySectorController::class, 'index']);
+
+    // Queue routes
+    Route::post('/queue', [QueueController::class, 'store']);
+    Route::get('/queue/{queueNumber}', [QueueController::class, 'show']);
+    Route::get('/offices/{office}/queue/today', [QueueController::class, 'getTodayQueue']);
+
+    // Print route
+    Route::patch('/queue/{id}/printed', [PrintController::class, 'markAsPrinted']);
 
 // Public routes (no authentication required)
 Route::post('/login', [AuthController::class, 'login'])
@@ -21,7 +42,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     // Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::get('/verify', [AuthController::class, 'verify']);
-    
+
+   
+        
     // // Superadmin only routes
     // Route::middleware('role:SUPERADMIN')->prefix('admin')->group(function () {
     //     // We'll add these later
@@ -38,3 +61,6 @@ Route::middleware('auth:sanctum')->group(function () {
     //     Route::post('/queue/{queue}/complete', [QueueController::class, 'complete']);
     // });
 });
+
+
+        
