@@ -13,10 +13,6 @@ class Role extends Model
         'name',
     ];
 
-    // protected $casts = [
-    //     'is_active' => 'boolean',
-    // ];
-
     /**
      * Get all users with this role
      */
@@ -24,14 +20,6 @@ class Role extends Model
     {
         return $this->hasMany(User::class);
     }
-
-    /**
-     * Scope to get only active roles
-     */
-    // public function scopeActive($query)
-    // {
-    //     return $query->where('is_active', true);
-    // }
 
     /**
      * Check if this is a specific role

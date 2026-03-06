@@ -56,16 +56,6 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Check if user's office is active (for front desk)
-        // if ($user->isFrontdesk()) {
-        //     if (!$user->office || !$user->office->is_active) {
-        //         return response()->json([
-        //             'success' => false,
-        //             'message' => 'Your office is currently disabled. Please contact superadmin.'
-        //         ], 403);
-        //     }
-        // }
-
         // Check if this is the only front desk for the office (business rule enforcement)
         if ($user->isFrontdesk()) {
             $existingActiveSession = User::where('office_id', $user->office_id)
@@ -158,53 +148,6 @@ class AuthController extends Controller
             ]
         ]);
     }
-
-    // /**
-    //  * Change password
-    //  * 
-    //  * @param Request $request
-    //  * @return JsonResponse
-    //  */
-    // public function changePassword(Request $request): JsonResponse
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'current_password' => 'required|string',
-    //         'new_password' => 'required|string|min:8|confirmed',
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Validation error',
-    //             'errors' => $validator->errors()
-    //         ], 422);
-    //     }
-
-    //     $user = $request->user();
-
-    //     // Verify current password
-    //     if (!Hash::check($request->current_password, $user->password_hash)) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Current password is incorrect'
-    //         ], 400);
-    //     }
-
-    //     // Update password
-    //     $user->update([
-    //         'password_hash' => Hash::make($request->new_password)
-    //     ]);
-
-    //     // Optional: Revoke all other tokens
-    //     $user->tokens()
-    //         ->where('id', '!=', $user->currentAccessToken()->id)
-    //         ->delete();
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Password changed successfully. Please login again with your new password.'
-    //     ]);
-    // }
 
     /**
      * Verify token validity

@@ -93,12 +93,4 @@ class User extends Authenticatable
         
         return $this->isFrontdesk() && $this->office_id === $office->id;
     }
-
-    /**
-     * Scope to get active users
-     */
-    // public function scopeActive($query)
-    // {
-    //     return $query->where('is_active', true);
-    // }
 }
