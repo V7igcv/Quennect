@@ -1,81 +1,127 @@
 <template>
-  <div class="min-h-screen bg-gray-100">
-    <!-- Navigation -->
-    <nav class="bg-white shadow-sm">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-          <div class="flex">
-            <div class="flex-shrink-0 flex items-center">
-              <h1 class="text-xl font-bold text-gray-900">Quennect - Super Admin</h1>
-            </div>
-            <div class="ml-10 flex items-center space-x-4">
-              <router-link 
-                to="/superadmin" 
-                class="px-3 py-2 rounded-md text-sm font-medium"
-                :class="[$route.path === '/superadmin' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100']"
-              >
-                Dashboard
-              </router-link>
-              <router-link 
-                to="/superadmin/offices" 
-                class="px-3 py-2 rounded-md text-sm font-medium"
-                :class="[$route.path === '/superadmin/offices' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100']"
-              >
-                Offices
-              </router-link>
-              <router-link 
-                to="/superadmin/users" 
-                class="px-3 py-2 rounded-md text-sm font-medium"
-                :class="[$route.path === '/superadmin/users' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100']"
-              >
-                Users
-              </router-link>
-            </div>
-          </div>
-          
-          <!-- User Menu -->
-          <div class="flex items-center">
-            <span class="text-sm text-gray-700 mr-4">{{ username }}</span>
-            <button 
-              @click="logout" 
-              class="bg-red-600 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
+  <div class="min-h-screen bg-[#FCFCFC]">
+    <!-- Sidebar -->
+    <SuperadminSidebar 
+      :is-collapsed="sidebarCollapsed"
+      :user-data="currentUser"
+      @toggle-collapse="toggleSidebar"
+      @logout="handleLogout"
+    />
+    
+    <!-- Main content -->
+    <div class="transition-all duration-300" :class="sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
+      <!-- Header -->
+      <Header />
+      
+      <!-- Mobile sidebar overlay (for small screens) -->
+      <div 
+        v-if="mobileSidebarOpen" 
+        class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+        @click="mobileSidebarOpen = false"
+      ></div>
+      
+      <!-- Mobile sidebar (for small screens) -->
+      <div 
+        v-if="mobileSidebarOpen" 
+        class="fixed inset-y-0 left-0 z-40 lg:hidden"
+      >
+        <SuperadminSidebar 
+          :is-collapsed="false"
+          :user-data="currentUser"
+          @toggle-collapse="mobileSidebarOpen = false"
+          @logout="handleLogout"
+        />
       </div>
-    </nav>
-
-    <!-- Page Content -->
-    <main class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-      <slot />
-    </main>
+      
+      <!-- Page Content -->
+      <main class="p-6">
+        <router-view />
+      </main>
+    </div>
   </div>
 </template>
 
 <script>
+import { ref, onMounted } from 'vue' // Add onMounted
+import { useRouter } from 'vue-router'
+import Header from '../components/common/Header.vue'
+import SuperadminSidebar from '../components/superadmin/SuperadminSidebar.vue'
 import { authService } from '../services/auth'
 
 export default {
   name: 'SuperadminLayout',
-  data() {
-    return {
-      username: ''
+  components: {
+    Header,
+    SuperadminSidebar
+  },
+  setup() {
+    const router = useRouter()
+    const sidebarCollapsed = ref(false)
+    const mobileSidebarOpen = ref(false)
+
+    // Initialize with stored user data immediately - this prevents "Loading..." flash
+    const currentUser = ref(authService.getCurrentUser())
+
+    const fetchUserData = async () => {
+      // Only fetch if we have a token (user is authenticated)
+      if (!authService.isAuthenticated()) {
+        return
+      }
+
+      isRefreshing.value = true
+      try {
+        // This will get fresh data from the server
+        const freshUserData = await authService.getUser()
+        
+        // Update localStorage with fresh data
+        localStorage.setItem('user', JSON.stringify(freshUserData))
+        
+        // Update the reactive reference
+        currentUser.value = freshUserData
+        
+        console.log('User data refreshed:', freshUserData) // For debugging
+      } catch (error) {
+        console.error('Failed to refresh user data:', error)
+        
+        // If we get a 401, redirect to login
+        if (error.response?.status === 401) {
+          router.push('/login')
+        }
+      } finally {
+        isRefreshing.value = false
+      }
     }
-  },
-  mounted() {
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    this.username = user.username || ''
-  },
-  methods: {
-    async logout() {
+
+    // Fetch fresh data on mount (but the UI already has the stored data)
+    onMounted(() => {
+      fetchUserData()
+    })
+    
+    const toggleSidebar = () => {
+      sidebarCollapsed.value = !sidebarCollapsed.value
+    }
+    
+    const toggleMobileSidebar = () => {
+      mobileSidebarOpen.value = !mobileSidebarOpen.value
+    }
+    
+    const handleLogout = async () => {
       try {
         await authService.logout()
-        this.$router.push('/login')
+        router.push('/login')
       } catch (error) {
         console.error('Logout failed:', error)
+        router.push('/login')
       }
+    }
+    
+    return {
+      sidebarCollapsed,
+      mobileSidebarOpen,
+      currentUser,
+      toggleSidebar,
+      toggleMobileSidebar,
+      handleLogout
     }
   }
 }

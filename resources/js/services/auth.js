@@ -33,7 +33,7 @@ export const authService = {
   
   async getUser() {
     const response = await api.get('/user')
-    return response.data
+    return response.data.data
   },
   
   async verify() {
