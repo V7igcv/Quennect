@@ -8,7 +8,7 @@
     </div>
     
     <!-- Login card -->
-    <div class="relative z-10 bg-white p-15 rounded-xl shadow-xl w-150">
+    <div class="relative z-10 bg-white/70 py-15 px-25 rounded-xl shadow-xl w-160">
       <!-- Header with Logo -->
       <div class="text-center mb-8">
         <div class="h-20 w-20 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">

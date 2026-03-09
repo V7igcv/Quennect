@@ -1,5 +1,5 @@
 <template>
-  <header class="bg-[#0F5C5C] text-white px-2 py-3 ">
+  <header class="bg-[#0F5C5C] text-white px-2 py-3 sticky top-0 z-50">
     <div class="flex justify-end gap-10 p-4">
       <!-- Left side: Date -->
       <div class="flex items-center gap-3">
