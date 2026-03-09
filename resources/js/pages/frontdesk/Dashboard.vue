@@ -5,7 +5,7 @@
     <!-- Stat Cards -->
     <div class="grid grid-cols-4 gap-6">
 
-      <StatCard
+      <StatCard class="border-l-4 border-orange-300"
         title="Waiting"
         :value="24"
         :icon="Clock"
@@ -14,7 +14,7 @@
         numberColor="text-orange-500"
       />
 
-      <StatCard
+      <StatCard class="border-l-4 border-green-400"
         title="Serving"
         :value="2"
         :icon="User"
@@ -23,7 +23,7 @@
         numberColor="text-green-600"
       />
 
-      <StatCard
+      <StatCard class="border-l-4 border-blue-400"
         title="Completed"
         :value="36"
         :icon="CheckCircle"
@@ -32,7 +32,7 @@
         numberColor="text-blue-600"
       />
 
-      <StatCard
+      <StatCard class="border-l-4 border-red-400"
         title="Skipped"
         :value="1"
         :icon="XCircle"
@@ -57,7 +57,7 @@
               <TableRow>
                 <TableHead>Queue No.</TableHead>
                 <TableHead>Service</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Lane Type</TableHead>
                 <TableHead>Time</TableHead>
                 <TableHead>Counter</TableHead>
                 <TableHead>Actions</TableHead>
@@ -70,16 +70,18 @@
               <TableRow>
                 <TableCell>CPDO - 001</TableCell>
                 <TableCell>SN, ST, IM</TableCell>
-                <TableCell>Serving</TableCell>
+                <TableCell>Regular</TableCell>
                 <TableCell>5:00 am</TableCell>
                 <TableCell>1</TableCell>
 
                 <TableCell class="flex gap-2">
-                  <Button class="bg-[#2563EB] hover:bg-[#1D4ED8] text-white">
-                    Complete
+                  <Button size="sm" class="bg-[#16A34A] hover:bg-[#15803D] text-white">
+                    <Megaphone />
+                    Call
                   </Button>
 
-                  <Button variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                  <Button size="sm" variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                    <X />
                     Skip
                   </Button>
                 </TableCell>
@@ -89,16 +91,18 @@
               <TableRow>
                 <TableCell>CPDO - 002</TableCell>
                 <TableCell>SN, ST, IM</TableCell>
-                <TableCell>Serving</TableCell>
+                <TableCell>Regular</TableCell>
                 <TableCell>5:00 am</TableCell>
                 <TableCell>2</TableCell>
 
                 <TableCell class="flex gap-2">
-                  <Button class="bg-[#2563EB] hover:bg-[#1D4ED8] text-white">
-                    Complete
+                  <Button size="sm" class="bg-[#16A34A] hover:bg-[#15803D] text-white">
+                    <Megaphone />
+                    Call
                   </Button>
 
-                  <Button variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                  <Button size="sm" variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                    <X />
                     Skip
                   </Button>
                 </TableCell>
@@ -108,16 +112,18 @@
               <TableRow>
                 <TableCell>CPDO - P001</TableCell>
                 <TableCell>SN, ST, IM</TableCell>
-                <TableCell>Waiting</TableCell>
+                <TableCell>Priority</TableCell>
                 <TableCell>5:00 am</TableCell>
                 <TableCell>-</TableCell>
 
                 <TableCell class="flex gap-2">
-                  <Button class="bg-[#16A34A] hover:bg-[#15803D] text-white">
+                  <Button size="sm" class="bg-[#16A34A] hover:bg-[#15803D] text-white">
+                    <Megaphone />
                     Call
                   </Button>
 
-                  <Button variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                  <Button size="sm" variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                    <X />
                     Skip
                   </Button>
                 </TableCell>
@@ -127,16 +133,18 @@
               <TableRow>
                 <TableCell>CPDO - 003</TableCell>
                 <TableCell>SN, ST, IM</TableCell>
-                <TableCell>Waiting</TableCell>
+                <TableCell>Regular</TableCell>
                 <TableCell>5:00 am</TableCell>
                 <TableCell>-</TableCell>
 
                 <TableCell class="flex gap-2">
-                  <Button class="bg-[#16A34A] hover:bg-[#15803D] text-white">
+                  <Button size="sm" class="bg-[#16A34A] hover:bg-[#15803D] text-white">
+                    <Megaphone />
                     Call
                   </Button>
 
-                  <Button variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                  <Button size="sm" variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                    <X />
                     Skip
                   </Button>
                 </TableCell>
@@ -146,16 +154,18 @@
               <TableRow>
                 <TableCell>CPDO - 004</TableCell>
                 <TableCell>SN, ST, IM</TableCell>
-                <TableCell>Waiting</TableCell>
+                <TableCell>Regular</TableCell>
                 <TableCell>5:00 am</TableCell>
                 <TableCell>-</TableCell>
 
                 <TableCell class="flex gap-2">
-                  <Button class="bg-[#16A34A] hover:bg-[#15803D] text-white">
+                  <Button size="sm" class="bg-[#16A34A] hover:bg-[#15803D] text-white">
+                    <Megaphone />
                     Call
                   </Button>
 
-                  <Button variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                  <Button size="sm" variant="destructive" class="bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                    <X />
                     Skip
                   </Button>
                 </TableCell>
@@ -232,52 +242,88 @@
         </div>
         <div class="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-4">
           <!-- Counter Card -->
-          <div class="bg-[#D7F2ED] rounded-md border border-[#5DD2BE] p-4">
+          <div class="bg-[#dbf1ed] rounded-md border border-[#66d1bf] p-4">
             <div class="flex justify-between">
+              <div class="flex gap-3">
               <p class="text-sm text-[#2E2E2E] font-semibold">
                 Counter 1
               </p>
+              <p class="text-xs text-[#474C55] font-regular italic">
+                Available
+              </p>              
+              </div>
+
               <button class="text-gray-600 hover:text-gray-800 p-1 rounded-md hover:bg-gray-200">
                 <MoreHorizontal class="w-4 h-4" />
               </button>
             </div>
-            <p class="text-lg text-[#1F4E79] font-bold py-2">
+            
+            <p class="text-2xl text-[#1F4E79] font-bold py-3">
               CPDO - 001
             </p>
-            <p class="text-sm text-[#474C55] font-medium">
-              Available
-            </p>
+
+            <div class="flex gap-2">
+              <Button size="sm" class="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white">
+                <Check />
+                Complete
+              </Button>
+
+              <Button size="sm" variant="destructive" class="flex-1 bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                <X />
+                Skip
+              </Button>
+            </div>
           </div>
           <div class="bg-[#D7F2ED] rounded-md border border-[#5DD2BE] p-4">
             <div class="flex justify-between">
+              <div class="flex gap-3">
               <p class="text-sm text-[#2E2E2E] font-semibold">
-                Counter 1
+                Counter 2
               </p>
+              <p class="text-xs text-[#474C55] font-regular italic">
+                Available
+              </p>              
+              </div>
+
               <button class="text-gray-600 hover:text-gray-800 p-1 rounded-md hover:bg-gray-200">
                 <MoreHorizontal class="w-4 h-4" />
               </button>
             </div>
-            <p class="text-lg text-[#1F4E79] font-bold py-2">
+            
+            <p class="text-2xl text-[#1F4E79] font-bold py-3">
               CPDO - 001
             </p>
-            <p class="text-sm text-[#474C55] font-medium">
-              Available
-            </p>
+
+            <div class="flex gap-2">
+              <Button size="sm" class="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white">
+                <Check />
+                Complete
+              </Button>
+
+              <Button size="sm" variant="destructive" class="flex-1 bg-[#DC2626] hover:bg-[#B91C1C] text-white">
+                <X />
+                Skip
+              </Button>
+            </div>
           </div>
           <div class="bg-[#D7F2ED] rounded-md border border-[#5DD2BE] p-4">
             <div class="flex justify-between">
+              <div class="flex gap-3">
               <p class="text-sm text-[#2E2E2E] font-semibold">
-                Counter 1
+                Counter 3
               </p>
+              <p class="text-xs text-[#474C55] font-regular italic">
+                Available
+              </p>              
+              </div>
+
               <button class="text-gray-600 hover:text-gray-800 p-1 rounded-md hover:bg-gray-200">
                 <MoreHorizontal class="w-4 h-4" />
               </button>
             </div>
-            <p class="text-lg text-[#1F4E79] font-bold py-2">
-              CPDO - 001
-            </p>
-            <p class="text-sm text-[#474C55] font-medium">
-              Available
+            
+            <p class="text-2xl italic text-[#6B7280] font-medium py-3">
+              Idle
             </p>
           </div>
         </div>
@@ -290,7 +336,7 @@
 <script setup>
 import StatCard from '@/components/common/StatCard.vue'
 
-import { Clock, User, CheckCircle, XCircle, MoreHorizontal } from 'lucide-vue-next'
+import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone } from 'lucide-vue-next'
 
 import {
   Table,
