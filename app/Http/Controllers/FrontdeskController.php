@@ -1,0 +1,314 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\QueueTransaction;
+use App\Models\Counter;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+class FrontdeskController extends Controller
+{
+    /**
+     * Get dashboard statistics (Waiting, Serving, Completed, Skipped)
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getDashboardStats()
+    {
+        $user = Auth::user();
+        
+        if (!$user->office_id) {
+            return response()->json([
+                'message' => 'User is not assigned to any office.'
+            ], 403);
+        }
+
+        $today = now()->toDateString();
+
+        $stats = [
+            'waiting' => QueueTransaction::where('office_id', $user->office_id)
+                ->whereDate('queue_date', $today)
+                ->where('status', 'WAITING')
+                ->count(),
+            
+            'serving' => QueueTransaction::where('office_id', $user->office_id)
+                ->whereDate('queue_date', $today)
+                ->where('status', 'SERVING')
+                ->count(),
+            
+            'completed' => QueueTransaction::where('office_id', $user->office_id)
+                ->whereDate('queue_date', $today)
+                ->where('status', 'COMPLETED')
+                ->count(),
+            
+            'skipped' => QueueTransaction::where('office_id', $user->office_id)
+                ->whereDate('queue_date', $today)
+                ->where('status', 'SKIPPED')
+                ->count(),
+        ];
+
+        return response()->json($stats);
+    }
+
+    /**
+     * Get queue table data (currently waiting)
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getQueueTable()
+    {
+        $user = Auth::user();
+        
+        if (!$user->office_id) {
+            return response()->json([
+                'message' => 'User is not assigned to any office.'
+            ], 403);
+        }
+
+        $today = now()->toDateString();
+
+        $queueEntries = QueueTransaction::with(['services' => function($query) {
+                $query->select('services.id', 'services.service_code');
+            }])
+            ->where('office_id', $user->office_id)
+            ->whereDate('queue_date', $today)
+            ->where('status', 'WAITING')
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function($queue) {
+                return [
+                    'id' => $queue->id,
+                    'queue_number' => $queue->full_queue_number,
+                    'services' => $queue->services->pluck('service_code')->implode(', '),
+                    'lane_type' => $queue->is_priority ? 'Priority' : 'Regular',
+                    'time' => $queue->created_at->format('h:i A'),
+                    'client_name' => $queue->client_name,
+                    'contact_number' => $queue->contact_number,
+                ];
+            });
+
+        return response()->json($queueEntries);
+    }
+
+    /**
+     * Call a queue number (move from WAITING to SERVING)
+     * 
+     * @param Request $request
+     * @param int $queueId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function callQueue(Request $request, $queueId)
+    {
+        $request->validate([
+            'counter_id' => 'required|exists:counters,id'
+        ]);
+
+        $user = Auth::user();
+
+        try {
+            DB::beginTransaction();
+
+            // Find the queue transaction
+            $queue = QueueTransaction::where('id', $queueId)
+                ->where('office_id', $user->office_id)
+                ->where('status', 'WAITING')
+                ->first();
+
+            if (!$queue) {
+                return response()->json([
+                    'message' => 'Queue not found or already called.'
+                ], 404);
+            }
+
+            // Check if counter exists, is enabled, and belongs to the user's office
+            $counter = Counter::where('id', $request->counter_id)
+                ->where('office_id', $user->office_id)
+                ->where('is_enabled', true)  // Changed from 'status' to 'is_enabled'
+                ->first();
+
+            if (!$counter) {
+                return response()->json([
+                    'message' => 'Counter is not available or disabled.'
+                ], 400);
+            }
+
+            // Check if counter is currently serving another queue
+            $servingQueue = QueueTransaction::where('counter_id', $counter->id)
+                ->where('status', 'SERVING')
+                ->whereDate('queue_date', now()->toDateString())
+                ->first();
+
+            if ($servingQueue) {
+                return response()->json([
+                    'message' => 'Counter is currently serving another queue.',
+                    'current_queue' => $servingQueue->full_queue_number
+                ], 400);
+            }
+
+            // Update queue transaction
+            $queue->status = 'SERVING';
+            $queue->counter_id = $counter->id;
+            $queue->called_at = now();
+            $queue->save();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Queue called successfully',
+                'queue' => [
+                    'id' => $queue->id,
+                    'queue_number' => $queue->full_queue_number,
+                    'counter_number' => $counter->counter_number
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Error calling queue',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Skip a queue number (from waiting list)
+     * 
+     * @param int $queueId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function skipFromTable($queueId)
+    {
+        $user = Auth::user();
+
+        try {
+            DB::beginTransaction();
+
+            $queue = QueueTransaction::where('id', $queueId)
+                ->where('office_id', $user->office_id)
+                ->where('status', 'WAITING')
+                ->first();
+
+            if (!$queue) {
+                return response()->json([
+                    'message' => 'Queue not found or already processed.'
+                ], 404);
+            }
+
+            $queue->status = 'SKIPPED';
+            $queue->skipped_at = now();
+            $queue->save();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Queue skipped successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Error skipping queue',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Skip a queue number from counter card
+     * 
+     * @param int $queueId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function skipFromCounter($queueId)
+    {
+        $user = Auth::user();
+
+        try {
+            DB::beginTransaction();
+
+            $queue = QueueTransaction::where('id', $queueId)
+                ->where('office_id', $user->office_id)
+                ->where('status', 'SERVING')
+                ->first();
+
+            if (!$queue) {
+                return response()->json([
+                    'message' => 'Queue not found or not currently being served.'
+                ], 404);
+            }
+
+            $queue->status = 'SKIPPED';
+            $queue->skipped_at = now();
+            $queue->counter_id = null; // Remove counter assignment
+            $queue->save();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Queue skipped successfully from counter'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Error skipping queue',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Complete a queue transaction (move from SERVING to COMPLETED)
+     * 
+     * @param int $queueId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function completeTransaction($queueId)
+    {
+        $user = Auth::user();
+
+        try {
+            DB::beginTransaction();
+
+            // Find the queue transaction that is currently being served
+            $queue = QueueTransaction::where('id', $queueId)
+                ->where('office_id', $user->office_id)
+                ->where('status', 'SERVING')
+                ->first();
+
+            if (!$queue) {
+                return response()->json([
+                    'message' => 'Queue not found or not currently being served.'
+                ], 404);
+            }
+
+            // Update queue transaction
+            $queue->status = 'COMPLETED';
+            $queue->completed_at = now();
+            $queue->save();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Transaction completed successfully',
+                'data' => [
+                    'id' => $queue->id,
+                    'queue_number' => $queue->full_queue_number,
+                    'client_name' => $queue->client_name,
+                    'contact_number' => $queue->contact_number,
+                    'completed_at' => $queue->completed_at->format('h:i A')
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Error completing transaction',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+}
