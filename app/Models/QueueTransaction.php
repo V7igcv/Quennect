@@ -86,7 +86,48 @@ class QueueTransaction extends Model
      */
     public function evaluationResponses()
     {
-        return $this->hasMany(EvaluationResponse::class);
+        return $this->hasMany(EvaluationResponse::class, 'queue_transaction_id');
+    }
+
+    /**
+     * Check if transaction has evaluation
+     */
+    public function hasEvaluation()
+    {
+        return $this->evaluationResponses()->exists();
+    }
+
+    /**
+     * Get multiple choice responses
+     */
+    public function getMultipleChoiceResponsesAttribute()
+    {
+        return $this->evaluationResponses()
+            ->whereHas('question', function($q) {
+                $q->where('question_type', 'MULTIPLE_CHOICE');
+            })
+            ->get()
+            ->mapWithKeys(function($response) {
+                return [$response->question_id => $response->answer_value];
+            });
+    }
+
+    /**
+     * Get likert responses
+     */
+    public function getLikertResponsesAttribute()
+    {
+        return $this->evaluationResponses()
+            ->whereHas('question', function($q) {
+                $q->where('question_type', 'LIKERT');
+            })
+            ->get()
+            ->mapWithKeys(function($response) {
+                return [$response->question_id => [
+                    'value' => $response->rating_value,
+                    'label' => $response->rating_label
+                ]];
+            });
     }
 
     /**

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FrontdeskController;
 use App\Http\Controllers\CounterController;
+use App\Http\Controllers\EvaluationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,5 +57,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/counters', [CounterController::class, 'store']);
     Route::put('/counters/{id}/status', [CounterController::class, 'updateStatus']);
     Route::delete('/counters/{id}', [CounterController::class, 'destroy']);
+
+    // Evaluation Routes
+    Route::get('/evaluation/questions', [EvaluationController::class, 'getQuestions']);
+    Route::get('/evaluation/transaction/{queueId}', [EvaluationController::class, 'getTransactionForEvaluation']);
+    Route::post('/evaluation/submit/{queueId}', [EvaluationController::class, 'submitEvaluation']);
+    Route::get('/evaluation/results/{queueId}', [EvaluationController::class, 'getEvaluationResults']);
+    
     });
+
 });
