@@ -1,5 +1,24 @@
 <template>
   <div class="min-h-screen bg-white text-gray-900 flex flex-col">
+    <!-- Loading Overlay -->
+    <div v-if="isLoading" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0F5C5C] mx-auto mb-4"></div>
+        <p class="text-gray-600">Loading monitor data...</p>
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    <div v-if="error && !isLoading" class="fixed inset-0 bg-red-50 flex items-center justify-center z-50">
+      <div class="text-center max-w-md mx-4">
+        <div class="text-red-500 text-6xl mb-4">⚠️</div>
+        <h3 class="text-xl font-semibold text-red-700 mb-2">Connection Error</h3>
+        <p class="text-red-600 mb-4">{{ error }}</p>
+        <button @click="fetchMonitorData" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+          Retry
+        </button>
+      </div>
+    </div>
     <!-- Header -->
     <header class="bg-[#0F5C5C] text-white py-4 px-8">
       <div class="flex items-center justify-center gap-3 mb-2">
@@ -19,7 +38,7 @@
           <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10.5 1.5H3a1.5 1.5 0 00-1.5 1.5v14a1.5 1.5 0 001.5 1.5h14a1.5 1.5 0 001.5-1.5V9.5m-1-8h-8m8 0v8m0-8L10.5 9.5"></path>
           </svg>
-          City Planning and Development Office (CPDO)
+          {{ officeName }}
         </h2>
       </div>
 
@@ -100,43 +119,81 @@
 </template>
 
 <script>
+import monitorService from '@/services/monitor'
+
 export default {
   name: 'MonitorLayout',
+  props: {
+    officeId: {
+      type: [String, Number],
+      required: true
+    }
+  },
   data() {
     return {
       currentTime: new Date().toLocaleTimeString(),
       formattedDate: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-      // Sample data
-      currentServing: [
-        { queue_number: 'CPDO - 001', counter: '1' },
-        { queue_number: 'CPDO - 001', counter: '2' },
-        { queue_number: 'CPDO - 001', counter: '3' }
-      ],
-      nowServing: { queue_number: 'CPDO - P001', counter: '1' },
-      waitingQueues: [
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' },
-        { queue_number: 'CPDO - 001' }
-      ]
+      
+      // Monitor data
+      office: null,
+      currentServing: [],
+      nowServing: null,
+      waitingQueues: [],
+      
+      // Loading states
+      isLoading: true,
+      error: null,
+      
+      // Polling
+      pollInterval: null
     }
   },
-  mounted() {
+  computed: {
+    officeName() {
+      return this.office ? `${this.office.name} (${this.office.acronym})` : 'Loading...'
+    }
+  },
+  async mounted() {
     // Update time every second
     this.timer = setInterval(() => {
       this.currentTime = new Date().toLocaleTimeString()
     }, 1000)
+    
+    // Initial data fetch
+    await this.fetchMonitorData()
+    
+    // Set up polling for real-time updates (every 5 seconds)
+    this.pollInterval = setInterval(async () => {
+      await this.fetchMonitorData()
+    }, 5000)
   },
   beforeUnmount() {
     clearInterval(this.timer)
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval)
+    }
+  },
+  methods: {
+    async fetchMonitorData() {
+      try {
+        this.error = null
+        const response = await monitorService.getMonitorData(this.officeId)
+        
+        if (response.success) {
+          this.office = response.data.office
+          this.currentServing = response.data.current_serving
+          this.nowServing = response.data.now_serving
+          this.waitingQueues = response.data.waiting_list
+        } else {
+          this.error = 'Failed to load monitor data'
+        }
+      } catch (error) {
+        console.error('Error fetching monitor data:', error)
+        this.error = 'Error loading monitor data'
+      } finally {
+        this.isLoading = false
+      }
+    }
   }
 }
 </script>

@@ -5,7 +5,6 @@ import { authService } from '../services/auth'
 import KioskLayout from '../layouts/KioskLayout.vue'
 import FrontdeskLayout from '../layouts/FrontdeskLayout.vue'
 import SuperadminLayout from '../layouts/SuperadminLayout.vue'
-import MonitorLayout from '../layouts/MonitorLayout.vue'
 
 const routes = [
   {
@@ -98,15 +97,9 @@ const routes = [
   
   // Monitor routes (public)
   {
-    path: '/monitor',
-    component: MonitorLayout,
-    children: [
-      {
-        path: 'display',
-        name: 'monitor.display',
-        component: () => import('../pages/monitor/Display.vue')
-      }
-    ]
+    path: '/monitor/:officeId/display',
+    name: 'monitor.display',
+    component: () => import('../pages/monitor/Display.vue')
   },
   
   // Redirect root based on auth status
