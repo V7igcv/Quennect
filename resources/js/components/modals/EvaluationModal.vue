@@ -116,8 +116,12 @@
             </TableRow>
         </TableHeader>
         <TableBody>
-            <!-- SQD0 -->
-            <TableRow v-for="question in likertQuestions" :key="question.id" class="hover:bg-gray-50">
+            <TableRow v-if="likertQuestions.length === 0" class="hover:bg-gray-50">
+              <TableCell colspan="7" class="text-center py-8 text-gray-500">
+                Loading questions...
+              </TableCell>
+            </TableRow>
+            <TableRow v-for="question in likertQuestions" :key="question.id" v-else class="hover:bg-gray-50">
             <TableCell class="font-medium text-[#2E2E2E]">{{ question.label }}</TableCell>
             <TableCell class="text-center p-1">
                 <label class="flex items-center justify-center w-full h-full min-h-[50px] cursor-pointer hover:bg-gray-100 rounded">
@@ -179,7 +183,7 @@
                 <input 
                     type="radio" 
                     :name="question.id" 
-                    :value="6" 
+                    value="NA" 
                     v-model="likertRatings[question.id]"
                     class="w-4 h-4 cursor-pointer"
                 >
@@ -232,7 +236,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { X } from 'lucide-vue-next'
 import {
   Table,
@@ -261,11 +265,15 @@ const props = defineProps({
   contactNumber: {
     type: String,
     default: '09999999999'
+  },
+  likertQuestions: {
+    type: Array,
+    default: () => []
   }
 })
 
 // Emits
-const emit = defineEmits(['update:modelValue', 'submit'])
+const emit = defineEmits(['update:modelValue', 'submit', 'alert'])
 
 // Refs
 const modalContent = ref(null)
@@ -292,17 +300,12 @@ const likertRatings = ref({
 })
 
 // Likert questions
-const likertQuestions = [
-  { id: 'sqd0', label: 'SQD0. I am satisfied with the service that I availed' },
-  { id: 'sqd1', label: 'SQD1. I am satisfied with the service that I availed' },
-  { id: 'sqd2', label: 'SQD2. I am satisfied with the service that I availed' },
-  { id: 'sqd3', label: 'SQD3. I am satisfied with the service that I availed' },
-  { id: 'sqd4', label: 'SQD4. I am satisfied with the service that I availed' },
-  { id: 'sqd5', label: 'SQD5. I am satisfied with the service that I availed' },
-  { id: 'sqd6', label: 'SQD6. I am satisfied with the service that I availed' },
-  { id: 'sqd7', label: 'SQD7. I am satisfied with the service that I availed' },
-  { id: 'sqd8', label: 'SQD8. I am satisfied with the service that I availed' }
-]
+const likertQuestions = computed(() => 
+  props.likertQuestions.map((q, index) => ({ 
+    id: `sqd${index}`, 
+    label: q.question_text 
+  }))
+)
 
 // Options for CC1
 const cc1Options = [
@@ -354,7 +357,23 @@ const resetForm = () => {
 }
 
 const goToNextPage = () => {
-  // Optional: Add validation here to ensure CC questions are answered
+  // Validate CC questions before proceeding
+  if (!cc1.value) {
+    emit('alert', { title: 'Validation Error', message: 'Please answer CC1 question.' })
+    return
+  }
+
+  // Check if CC2 and CC3 are required based on CC1 answer
+  if (cc1.value !== '4' && !cc2.value) {
+    emit('alert', { title: 'Validation Error', message: 'Please answer CC2 question.' })
+    return
+  }
+
+  if (cc1.value !== '4' && !cc3.value) {
+    emit('alert', { title: 'Validation Error', message: 'Please answer CC3 question.' })
+    return
+  }
+
   currentPage.value = 2
 }
 
@@ -363,6 +382,34 @@ const goToPreviousPage = () => {
 }
 
 const handleSubmit = () => {
+  // Basic validation
+  if (!cc1.value) {
+    emit('alert', { title: 'Validation Error', message: 'Please answer CC1 question.' })
+    currentPage.value = 1
+    return
+  }
+
+  // Check if CC2 and CC3 are required based on CC1 answer
+  if (cc1.value !== '4' && !cc2.value) {
+    emit('alert', { title: 'Validation Error', message: 'Please answer CC2 question.' })
+    currentPage.value = 1
+    return
+  }
+
+  if (cc1.value !== '4' && !cc3.value) {
+    emit('alert', { title: 'Validation Error', message: 'Please answer CC3 question.' })
+    currentPage.value = 1
+    return
+  }
+
+  // Check if all likert questions are answered
+  const unansweredLikert = Object.values(likertRatings.value).some(rating => !rating)
+  if (unansweredLikert) {
+    emit('alert', { title: 'Validation Error', message: 'Please answer all service quality questions.' })
+    currentPage.value = 2
+    return
+  }
+
   // Combine all form data
   const formData = {
     // Page 1 data
