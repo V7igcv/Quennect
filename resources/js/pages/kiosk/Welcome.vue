@@ -116,10 +116,10 @@ button {
 
 @keyframes glowBlink {
   0%, 100% {
-    filter: drop-shadow(0 0 10px #0F5C5C);
+    filter: drop-shadow(0 0 10px #6edada);
   }
   50% {
-    filter: drop-shadow(0 0 45px #0F5C5C);
+    filter: drop-shadow(0 0 45px #82f3f3);
   }
 }
 
