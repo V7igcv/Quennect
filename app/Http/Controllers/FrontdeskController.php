@@ -4,12 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\QueueTransaction;
 use App\Models\Counter;
+use App\Services\QueueService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class FrontdeskController extends Controller
 {
+
+    protected $queueService;
+
+    public function __construct(QueueService $queueService)
+    {
+        $this->queueService = $queueService;
+    }
+
     /**
      * Get dashboard statistics (Waiting, Serving, Completed, Skipped)
      * 
@@ -17,39 +27,58 @@ class FrontdeskController extends Controller
      */
     public function getDashboardStats()
     {
-        $user = Auth::user();
-        
-        if (!$user->office_id) {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+            
+            if (!$user->office_id) {
+                return response()->json([
+                    'message' => 'User is not assigned to any office.'
+                ], 403);
+            }
+
+            $today = $this->queueService->getTodayDate();
+
+            $stats = [
+                'waiting' => QueueTransaction::where('office_id', $user->office_id)
+                    ->whereDate('queue_date', $today)
+                    ->where('status', 'WAITING')
+                    ->count(),
+                
+                'serving' => QueueTransaction::where('office_id', $user->office_id)
+                    ->whereDate('queue_date', $today)
+                    ->where('status', 'SERVING')
+                    ->count(),
+                
+                'completed' => QueueTransaction::where('office_id', $user->office_id)
+                    ->whereDate('queue_date', $today)
+                    ->where('status', 'COMPLETED')
+                    ->count(),
+                
+                'skipped' => QueueTransaction::where('office_id', $user->office_id)
+                    ->whereDate('queue_date', $today)
+                    ->where('status', 'SKIPPED')
+                    ->count(),
+            ];
+
             return response()->json([
-                'message' => 'User is not assigned to any office.'
-            ], 403);
+                'success' => true,
+                'data' => $stats,
+                'date' => $today
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Dashboard stats error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Error fetching dashboard stats',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        $today = now()->toDateString();
-
-        $stats = [
-            'waiting' => QueueTransaction::where('office_id', $user->office_id)
-                ->whereDate('queue_date', $today)
-                ->where('status', 'WAITING')
-                ->count(),
-            
-            'serving' => QueueTransaction::where('office_id', $user->office_id)
-                ->whereDate('queue_date', $today)
-                ->where('status', 'SERVING')
-                ->count(),
-            
-            'completed' => QueueTransaction::where('office_id', $user->office_id)
-                ->whereDate('queue_date', $today)
-                ->where('status', 'COMPLETED')
-                ->count(),
-            
-            'skipped' => QueueTransaction::where('office_id', $user->office_id)
-                ->whereDate('queue_date', $today)
-                ->where('status', 'SKIPPED')
-                ->count(),
-        ];
-
-        return response()->json($stats);
     }
 
     /**
@@ -59,37 +88,56 @@ class FrontdeskController extends Controller
      */
     public function getQueueTable()
     {
-        $user = Auth::user();
-        
-        if (!$user->office_id) {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+            
+            if (!$user->office_id) {
+                return response()->json([
+                    'message' => 'User is not assigned to any office.'
+                ], 403);
+            }
+
+            $today = $this->queueService->getTodayDate();
+
+            $queueEntries = QueueTransaction::with(['services' => function($query) {
+                    $query->select('services.id', 'services.service_code');
+                }])
+                ->where('office_id', $user->office_id)
+                ->whereDate('queue_date', $today)
+                ->where('status', 'WAITING')
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->map(function($queue) {
+                    return [
+                        'id' => $queue->id,
+                        'queue_number' => $queue->full_queue_number,
+                        'services' => $queue->services->pluck('service_code')->implode(', '),
+                        'lane_type' => $queue->is_priority ? 'Priority' : 'Regular',
+                        'time' => $queue->created_at->format('h:i A'),
+                        'client_name' => $queue->client_name,
+                        'contact_number' => $queue->contact_number,
+                    ];
+                });
+
             return response()->json([
-                'message' => 'User is not assigned to any office.'
-            ], 403);
+                'success' => true,
+                'data' => $queueEntries,
+                'date' => $today
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Queue table error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Error fetching queue table',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        $today = now()->toDateString();
-
-        $queueEntries = QueueTransaction::with(['services' => function($query) {
-                $query->select('services.id', 'services.service_code');
-            }])
-            ->where('office_id', $user->office_id)
-            ->whereDate('queue_date', $today)
-            ->where('status', 'WAITING')
-            ->orderBy('created_at', 'asc')
-            ->get()
-            ->map(function($queue) {
-                return [
-                    'id' => $queue->id,
-                    'queue_number' => $queue->full_queue_number,
-                    'services' => $queue->services->pluck('service_code')->implode(', '),
-                    'lane_type' => $queue->is_priority ? 'Priority' : 'Regular',
-                    'time' => $queue->created_at->format('h:i A'),
-                    'client_name' => $queue->client_name,
-                    'contact_number' => $queue->contact_number,
-                ];
-            });
-
-        return response()->json($queueEntries);
     }
 
     /**

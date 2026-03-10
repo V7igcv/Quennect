@@ -4,13 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Models\Counter;
 use App\Models\QueueTransaction;
+use App\Services\QueueService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log;
 
 class CounterController extends Controller
 {
+
+    protected $queueService;
+
+    public function __construct(QueueService $queueService)
+    {
+        $this->queueService = $queueService;
+    }
+
     /**
      * Get all counters for the current user's office
      * 
@@ -18,44 +28,62 @@ class CounterController extends Controller
      */
     public function index()
     {
-        $user = Auth::user();
-        
-        if (!$user->office_id) {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+            
+            if (!$user->office_id) {
+                return response()->json([
+                    'message' => 'User is not assigned to any office.'
+                ], 403);
+            }
+
+            $today = $this->queueService->getTodayDate();
+
+            $counters = Counter::where('office_id', $user->office_id)
+                ->orderBy('counter_number', 'asc')
+                ->get()
+                ->map(function($counter) use ($today) {
+                    // Check if this counter is currently serving a queue
+                    $currentQueue = QueueTransaction::where('counter_id', $counter->id)
+                        ->where('status', 'SERVING')
+                        ->whereDate('queue_date', $today)
+                        ->first();
+
+                    return [
+                        'id' => $counter->id,
+                        'counter_number' => $counter->counter_number,
+                        'is_enabled' => $counter->is_enabled,
+                        'status' => $counter->is_enabled ? 'Available' : 'Disabled',
+                        'current_queue' => $currentQueue ? [
+                            'id' => $currentQueue->id,
+                            'queue_number' => $currentQueue->full_queue_number,
+                            'client_name' => $currentQueue->client_name,
+                            'called_at' => $currentQueue->called_at ? $currentQueue->called_at->format('h:i A') : null
+                        ] : null,
+                        'created_at' => $counter->created_at,
+                        'updated_at' => $counter->updated_at
+                    ];
+                });
+
             return response()->json([
-                'message' => 'User is not assigned to any office.'
-            ], 403);
+                'success' => true,
+                'data' => $counters,
+                'date' => $today
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Counters index error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Error fetching counters',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        $counters = Counter::where('office_id', $user->office_id)
-            ->orderBy('counter_number', 'asc')
-            ->get()
-            ->map(function($counter) {
-                // Check if this counter is currently serving a queue
-                $currentQueue = QueueTransaction::where('counter_id', $counter->id)
-                    ->where('status', 'SERVING')
-                    ->whereDate('queue_date', now()->toDateString())
-                    ->first();
-
-                return [
-                    'id' => $counter->id,
-                    'counter_number' => $counter->counter_number,
-                    'is_enabled' => $counter->is_enabled,
-                    'status' => $counter->is_enabled ? 'Available' : 'Disabled',
-                    'current_queue' => $currentQueue ? [
-                        'id' => $currentQueue->id,
-                        'queue_number' => $currentQueue->full_queue_number,
-                        'client_name' => $currentQueue->client_name,
-                        'called_at' => $currentQueue->called_at ? $currentQueue->called_at->format('h:i A') : null
-                    ] : null,
-                    'created_at' => $counter->created_at,
-                    'updated_at' => $counter->updated_at
-                ];
-            });
-
-        return response()->json([
-            'success' => true,
-            'data' => $counters
-        ]);
     }
 
     /**
