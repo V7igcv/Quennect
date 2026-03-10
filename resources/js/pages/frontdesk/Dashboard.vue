@@ -241,8 +241,8 @@
           </Button> 
         </div>
         <div class="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-4">
-          <!-- Counter Card -->
-          <div class="bg-[#dbf1ed] rounded-md border border-[#66d1bf] p-4">
+          <!-- Counter Card 1 -->
+          <div class="bg-[#dbf1ed] rounded-md border p-4">
             <div class="flex justify-between">
               <div class="flex gap-3">
               <p class="text-sm text-[#2E2E2E] font-semibold">
@@ -263,7 +263,15 @@
             </p>
 
             <div class="flex gap-2">
-              <Button size="sm" class="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white">
+              <Button 
+                size="sm" 
+                class="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                @click="openEvaluationModal({
+                  queueNumber: 'CPDO-P002',
+                  customerName: 'John Doe',
+                  contactNumber: '09999999999'
+                })"
+              >
                 <Check />
                 Complete
               </Button>
@@ -274,7 +282,9 @@
               </Button>
             </div>
           </div>
-          <div class="bg-[#D7F2ED] rounded-md border border-[#5DD2BE] p-4">
+          
+          <!-- Counter Card 2 -->
+          <div class="bg-[#D7F2ED] rounded-md border p-4">
             <div class="flex justify-between">
               <div class="flex gap-3">
               <p class="text-sm text-[#2E2E2E] font-semibold">
@@ -295,7 +305,15 @@
             </p>
 
             <div class="flex gap-2">
-              <Button size="sm" class="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white">
+              <Button 
+                size="sm" 
+                class="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                @click="openEvaluationModal({
+                  queueNumber: 'CPDO-P002',
+                  customerName: 'John Doe',
+                  contactNumber: '09999999999'
+                })"
+              >
                 <Check />
                 Complete
               </Button>
@@ -306,7 +324,9 @@
               </Button>
             </div>
           </div>
-          <div class="bg-[#D7F2ED] rounded-md border border-[#5DD2BE] p-4">
+          
+          <!-- Counter Card 3 -->
+          <div class="bg-[#D7F2ED] rounded-md border p-4">
             <div class="flex justify-between">
               <div class="flex gap-3">
               <p class="text-sm text-[#2E2E2E] font-semibold">
@@ -330,11 +350,21 @@
       </div>
 
     </div>
+
+    <EvaluationModal
+      v-model="showEvaluationModal"
+      :queue-number="selectedQueueNumber"
+      :customer-name="selectedCustomerName"
+      :contact-number="selectedContactNumber"
+      @submit="handleEvaluationSubmit"
+    />
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import StatCard from '@/components/common/StatCard.vue'
+import EvaluationModal from '@/components/modals/EvaluationModal.vue'
 
 import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone } from 'lucide-vue-next'
 
@@ -358,4 +388,25 @@ import {
   PaginationFirst,
   PaginationLast
 } from '@/components/ui/pagination'
+
+// Modal state
+const showEvaluationModal = ref(false)
+const selectedQueueNumber = ref('')
+const selectedCustomerName = ref('')
+const selectedContactNumber = ref('')
+
+// Methods
+const openEvaluationModal = (customerData) => {
+  selectedQueueNumber.value = customerData.queueNumber
+  selectedCustomerName.value = customerData.customerName
+  selectedContactNumber.value = customerData.contactNumber
+  showEvaluationModal.value = true
+}
+
+const handleEvaluationSubmit = (formData) => {
+  console.log('Evaluation submitted:', formData)
+  // Here you would typically send this to your backend
+  // For now, we'll just log it
+  alert('Evaluation submitted! Check console for details.')
+}
 </script>
