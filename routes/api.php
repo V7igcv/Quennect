@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FrontdeskController;
 use App\Http\Controllers\CounterController;
 use App\Http\Controllers\EvaluationController;
+use App\Http\Controllers\MonitorController;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,6 +16,22 @@ use App\Http\Controllers\EvaluationController;
 // Public routes (no authentication required)
 Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:20,1'); // 5 attempts per minute
+
+// Public routes (no authentication required)
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:20,1');
+
+// Public Monitor Routes (no auth required)
+Route::prefix('monitor')->group(function () {
+    // Get complete monitor dashboard data for an office
+    Route::get('/office/{officeId}', [MonitorController::class, 'getMonitorData']);
+    
+    // Individual endpoints if needed (you can use these or just the combined one above)
+    Route::get('/office/{officeId}/details', [MonitorController::class, 'getOfficeDetails']);
+    Route::get('/office/{officeId}/current-serving', [MonitorController::class, 'getCurrentServing']);
+    Route::get('/office/{officeId}/now-serving', [MonitorController::class, 'getNowServing']);
+    Route::get('/office/{officeId}/waiting-list', [MonitorController::class, 'getWaitingList']);
+});
 
 // Protected routes (require authentication)
 Route::middleware('auth:sanctum')->group(function () {
