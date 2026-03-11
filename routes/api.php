@@ -7,31 +7,53 @@ use App\Http\Controllers\CounterController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\MonitorController;
 
+use App\Http\Controllers\OfficeController;
+use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\BarangayController;
+use App\Http\Controllers\PrioritySectorController;
+use App\Http\Controllers\QueueController;
+use App\Http\Controllers\PrintController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 */
 
-// Public routes (no authentication required)
-Route::post('/login', [AuthController::class, 'login'])
-    ->middleware('throttle:20,1'); // 5 attempts per minute
+ // Public routes for Kiosk
+    Route::get('/offices', [OfficeController::class, 'index']);
+    Route::get('/offices/{office}', [OfficeController::class, 'show']);
+    Route::get('/offices/{office}/services', [ServiceController::class, 'getByOffice']);
+    Route::get('/services/{service}', [ServiceController::class, 'show']);
+    Route::get('/barangays', [BarangayController::class, 'index']);
+    Route::get('/priority-sectors', [PrioritySectorController::class, 'index']);
 
-// Public routes (no authentication required)
-Route::post('/login', [AuthController::class, 'login'])
-    ->middleware('throttle:20,1');
+    // Queue routes
+    Route::post('/queue', [QueueController::class, 'store']);
+    Route::get('/queue/{queueNumber}', [QueueController::class, 'show']);
+    Route::get('/offices/{office}/queue/today', [QueueController::class, 'getTodayQueue']);
 
-// Public Monitor Routes (no auth required)
-Route::prefix('monitor')->group(function () {
-    // Get complete monitor dashboard data for an office
-    Route::get('/office/{officeId}', [MonitorController::class, 'getMonitorData']);
+    // Print route
+    Route::patch('/queue/{id}/printed', [PrintController::class, 'markAsPrinted']);
+
+    // Public routes (no authentication required)
+    Route::post('/login', [AuthController::class, 'login'])
+        ->middleware('throttle:20,1'); // 5 attempts per minute
+
+    // Public routes (no authentication required)
+    Route::post('/login', [AuthController::class, 'login'])
+        ->middleware('throttle:20,1');
+
+    // Public Monitor Routes (no auth required)
+    Route::prefix('monitor')->group(function () {
+        // Get complete monitor dashboard data for an office
+        Route::get('/office/{officeId}', [MonitorController::class, 'getMonitorData']);
     
-    // Individual endpoints if needed (you can use these or just the combined one above)
-    Route::get('/office/{officeId}/details', [MonitorController::class, 'getOfficeDetails']);
-    Route::get('/office/{officeId}/current-serving', [MonitorController::class, 'getCurrentServing']);
-    Route::get('/office/{officeId}/now-serving', [MonitorController::class, 'getNowServing']);
-    Route::get('/office/{officeId}/waiting-list', [MonitorController::class, 'getWaitingList']);
-});
+        // Individual endpoints if needed (you can use these or just the combined one above)
+        Route::get('/office/{officeId}/details', [MonitorController::class, 'getOfficeDetails']);
+        Route::get('/office/{officeId}/current-serving', [MonitorController::class, 'getCurrentServing']);
+        Route::get('/office/{officeId}/now-serving', [MonitorController::class, 'getNowServing']);
+        Route::get('/office/{officeId}/waiting-list', [MonitorController::class, 'getWaitingList']);
+    });
 
 // Protected routes (require authentication)
 Route::middleware('auth:sanctum')->group(function () {
@@ -41,7 +63,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     // Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::get('/verify', [AuthController::class, 'verify']);
-    
+
+   
+        
     // // Superadmin only routes
     // Route::middleware('role:SUPERADMIN')->prefix('admin')->group(function () {
     //     // We'll add these later
@@ -56,7 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
     //     Route::post('/queue/{queue}/call', [QueueController::class, 'call']);
     //     Route::post('/queue/{queue}/skip', [QueueController::class, 'skip']);
     //     Route::post('/queue/{queue}/complete', [QueueController::class, 'complete']);
-     // Dashboard stats
+    // Dashboard stats
     Route::get('/dashboard-stats', [FrontdeskController::class, 'getDashboardStats']);
         
     // Queue table
