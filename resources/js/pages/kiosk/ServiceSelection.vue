@@ -5,10 +5,10 @@
     <KioskHeader bgColor="#0F5C5C" textColor="#FFFFFF" />
 
     <!-- Content -->
-    <div class="flex-grow max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 w-full">
+    <div class="flex-grow max-w-7xl mx-auto px-6 sm:px-8 py-4 sm:py-8 w-full">
       
       <!-- Office Info Section -->
-      <div v-if="selectedOffice" class="flex items-start gap-4 sm:gap-6 mb-6 sm:mb-8 pb-4 border-b border-gray-200">
+      <div v-if="selectedOffice" class="flex items-center gap-4 sm:gap-6 mb-6 sm:mb-8 pb-4 border-b border-gray-200">
         
         <!-- Logo -->
         <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-gray-200 flex-shrink-0">
@@ -101,22 +101,22 @@
     </div>
 
     <!-- Footer -->
-    <div class="w-full bg-gray-200 border-t border-gray-300 px-4 sm:px-6 py-3 sm:py-4">
+    <div class="w-full bg-gray-200 border-t border-gray-300 px-4 sm:px-6 py-3 sm:py-4 sticky bottom-0 z-50">
       <div class="max-w-7xl mx-auto flex justify-between items-center">
         <button 
           @click="goBack" 
-          class="flex items-center gap-1 sm:gap-2 text-[#0F5C5C] font-semibold text-sm sm:text-base hover:opacity-80 transition"
+          class="flex items-center gap-1 sm:gap-2 text-[#0F5C5C] font-semibold text-sm sm:text-base hover:opacity-80 transition cursor-pointer"
         >
-          <span class="text-lg sm:text-xl">◀</span> Bumalik
+          <Triangle class="w-4 h-4 sm:w-5 sm:h-5 rotate-270 fill-current" />Bumalik
         </button>
 
         <button 
           @click="continueToDetails"
-          class="flex items-center gap-1 sm:gap-2 text-[#0F5C5C] font-semibold text-sm sm:text-base hover:opacity-80 transition"
+          class="flex items-center gap-1 sm:gap-2 text-[#0F5C5C] font-semibold text-sm sm:text-base hover:opacity-80 transition cursor-pointer"
           :class="{ 'opacity-50 cursor-not-allowed': selectedServices.length === 0 }"
           :disabled="selectedServices.length === 0"
         >
-          Magpatuloy <span class="text-lg sm:text-xl">▶</span>
+          Magpatuloy <Triangle class="w-4 h-4 sm:w-5 sm:h-5 rotate-90 fill-current" />
         </button>
       </div>
     </div>
@@ -130,6 +130,7 @@ import { useRoute, useRouter } from 'vue-router'
 import KioskHeader from '../../components/kiosk/KioskHeader.vue'
 import ServiceCard from '../../components/kiosk/ServiceCard.vue'
 import kioskApi from '../../services/kioskApi'
+import { Triangle } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()

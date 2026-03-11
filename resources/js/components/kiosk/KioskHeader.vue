@@ -1,15 +1,18 @@
 <template>
-  <div class="w-full py-3 px-6 shadow-md" :style="{ backgroundColor: bgColor }">
+  <div class="w-full py-4 px-8 shadow-md sticky top-0 z-50" :style="{ backgroundColor: bgColor }">
     <div class="flex items-center">
       <!-- Logo/Seal -->
       <img 
-        src="/storage/logos/Ligao City Seal.png" 
+        src="/storage/logos/Ligao City Seal.png"
         alt="Ligao City Seal" 
-        class="h-10 w-auto object-contain mr-3"
+        class="h-10 w-14 h-14 object-contain mr-3"
       >
       
       <!-- System Name - katabi lang ng logo -->
-      <h1 class="text-2xl font-bold" :style="{ color: textColor }">Quennect</h1>
+      <div>
+        <h1 class="text-2xl font-bold" :style="{ color: textColor }">Quennect</h1>
+        <p class="text-md font-regular" :style="{ color: textColor }">LGU Ligao General Queuing System</p>
+      </div>
     </div>
   </div>
 </template>

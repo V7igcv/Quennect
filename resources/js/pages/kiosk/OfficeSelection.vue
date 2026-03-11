@@ -5,7 +5,7 @@
     <KioskHeader bgColor="#0F5C5C" textColor="#FFFFFF" />
 
     <!-- Content -->
-    <div class="flex-grow max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 w-full">
+    <div class="flex-grow max-w-7xl mx-auto px-6 sm:px-8 py-4 sm:py-8 w-full">
       
       <!-- Description Section -->
       <div class="rounded-lg p-4 sm:p-6 mb-4 sm:mb-8" style="background-color: #5DD2BE;">
@@ -55,13 +55,14 @@
     </div>
 
     <!-- Simple Footer na may Bumalik lang -->
-    <div class="w-full bg-gray-200 border-t border-gray-300 px-4 sm:px-6 py-3 sm:py-4">
+    <div class="w-full bg-gray-200 border-t border-gray-300 px-4 sm:px-6 py-3 sm:py-4 sticky bottom-0 z-50">
       <div class="max-w-7xl mx-auto">
         <button 
           @click="goBack" 
-          class="flex items-center gap-1 sm:gap-2 text-[#0F5C5C] font-semibold text-sm sm:text-base hover:opacity-80 transition"
+          class="flex items-center gap-1 sm:gap-2 text-[#0F5C5C] font-semibold text-sm sm:text-base hover:opacity-80 transition cursor-pointer"
         >
-          <span class="text-lg sm:text-xl">◀</span> Bumalik
+          <Triangle class="w-4 h-4 sm:w-5 sm:h-5 rotate-270 fill-current" />
+          Bumalik
         </button>
       </div>
     </div>
@@ -74,6 +75,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import KioskHeader from '../../components/kiosk/KioskHeader.vue'
 import OfficeCard from '../../components/kiosk/OfficeCard.vue'
+import { Triangle } from 'lucide-vue-next'
 import kioskApi from '../../services/kioskApi'
 
 const router = useRouter()

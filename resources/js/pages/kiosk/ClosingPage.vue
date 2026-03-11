@@ -5,7 +5,7 @@
     <KioskHeader bgColor="#0F5C5C" textColor="#FFFFFF" />
 
     <!-- Content -->
-    <div class="flex-grow flex items-center justify-center px-3 sm:px-4 py-4 sm:py-8">
+    <div class="flex-grow flex items-center justify-center px-6 sm:px-8 py-4 sm:py-8">
       <div class="max-w-2xl w-full text-center">
         
         <!-- System Title -->

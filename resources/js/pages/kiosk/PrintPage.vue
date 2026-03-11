@@ -5,7 +5,7 @@
     <KioskHeader bgColor="#0F5C5C" textColor="#FFFFFF" />
 
     <!-- Content -->
-    <div class="flex-grow max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-8 w-full">
+    <div class="flex-grow max-w-3xl mx-auto px-6 sm:px-8 py-4 sm:py-8 w-full">
       
       <!-- Loading State -->
       <div v-if="loading" class="text-center py-12">

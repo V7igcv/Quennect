@@ -5,7 +5,7 @@
     <KioskHeader bgColor="#0F5C5C" textColor="#FFFFFF" />
 
     <!-- Content -->
-    <div class="flex-grow max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-8 w-full">
+    <div class="flex-grow max-w-3xl mx-auto px-6 sm:px-8 py-4 sm:py-8 w-full">
       
       <!-- Office and Services Summary -->
       <div v-if="selectedOffice" class="mb-6 sm:mb-8 pb-4 border-b border-gray-200">
