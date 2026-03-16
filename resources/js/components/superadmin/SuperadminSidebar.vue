@@ -1,19 +1,22 @@
 <template>
   <aside 
-    class="bg-[#FFFFFF] text-white h-screen fixed left-0 top-0 transition-all duration-300 ease-in-out z-40 flex flex-col border border-[rgba(107,114,128,0.25)]"
+    class="bg-[#FFFFFF] text-white h-screen fixed left-0 top-0 z-40 flex flex-col overflow-hidden border border-[rgba(107,114,128,0.25)] transition-[width] duration-300 ease-in-out"
     :class="isCollapsed ? 'w-20' : 'w-64'"
   >
     <!-- Logo and System Name Area -->
-    <div class="flex items-center justify-center gap-5 p-4 h-[80px]">
-      <div v-if="!isCollapsed" class="flex items-center gap-2 overflow-hidden">
+    <div class="flex items-center justify-center gap-5 p-4 h-20">
+      <div
+        class="flex items-center gap-2 overflow-hidden transition-all duration-200 ease-in-out"
+        :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-40 opacity-100'"
+      >
         <!-- System Logo -->
         <img 
           src="/storage/logos/Ligao City Seal.png" 
-          class="w-12 h-12 rounded-full object-contain flex-shrink-0"
+          class="w-12 h-12 rounded-full object-contain shrink-0"
           alt="Ligao Logo"
         >
         <!-- System Name (Quennect) - hidden when collapsed -->
-        <h2 v-if="!isCollapsed" class="font-bold text-xl whitespace-nowrap text-[#1F4E79]">Quennect</h2>
+        <h2 class="font-bold text-xl whitespace-nowrap text-[#1F4E79]">Quennect</h2>
       </div>
       
       <!-- Hamburger Icon - Minimize/Maximize button -->
@@ -48,11 +51,14 @@
             }"
         >
             <!-- Analytics Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
 
-            <span v-if="!isCollapsed" class="text-sm whitespace-nowrap ">Queue Analytics</span>
+            <span
+              class="overflow-hidden text-sm whitespace-nowrap transition-all duration-200 ease-in-out"
+              :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-40 opacity-100'"
+            >Queue Analytics</span>
         </button>
 
         <!-- Tooltip -->
@@ -77,11 +83,14 @@
             }"
         >
             <!-- Office Management Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/>
             </svg>
 
-            <span v-if="!isCollapsed" class="text-sm whitespace-nowrap ">Office Management</span>
+            <span
+              class="overflow-hidden text-sm whitespace-nowrap transition-all duration-200 ease-in-out"
+              :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-40 opacity-100'"
+            >Office Management</span>
         </button>
 
         <!-- Tooltip -->
@@ -106,11 +115,14 @@
             }"
         >
             <!-- User Management Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
 
-            <span v-if="!isCollapsed" class="text-sm whitespace-nowrap">User Management</span>
+            <span
+              class="overflow-hidden text-sm whitespace-nowrap transition-all duration-200 ease-in-out"
+              :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-40 opacity-100'"
+            >User Management</span>
         </button>
 
         <!-- Tooltip -->
@@ -129,15 +141,21 @@
     <!-- User Info and Logout Section - fixed at bottom -->
     <div class="p-4">
       <!-- Account Username (hardcoded for now) -->
-      <div class="flex items-center gap-3 mb-3" :class="{ 'justify-center': isCollapsed }">
+      <div class="mb-3 overflow-hidden transition-all duration-200 ease-in-out">
         <!-- Username - hidden when collapsed -->
-        <div v-if="!isCollapsed" class="px-3 overflow-hidden">
+        <div
+          class="px-3 overflow-hidden transition-all duration-200 ease-in-out"
+          :class="isCollapsed ? 'max-h-0 max-w-0 opacity-0 px-0' : 'max-h-10 max-w-40 opacity-100'"
+        >
           <p class="text-md font-medium text-[#474C55] truncate">{{ userData?.username || 'Loading...' }}</p>
         </div>
       </div>
       
       <!-- Office Name (hardcoded for now) - hidden when collapsed -->
-      <div v-if="!isCollapsed" class="px-3 mb-4 px-2 relative group">
+      <div
+        class="relative group overflow-hidden transition-all duration-200 ease-in-out"
+        :class="isCollapsed ? 'max-h-0 opacity-0 mb-0 px-0' : 'max-h-24 opacity-100 mb-4 px-2'"
+      >
         <p class="text-sm text-[#474C55] truncate">Super Admin</p>
       </div>
 
@@ -150,10 +168,13 @@
         :class="{ 'justify-center': isCollapsed}"
       >
         <!-- Logout Icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
         </svg>
-        <span v-if="!isCollapsed" class="text-sm whitespace-nowrap">Log Out</span>
+        <span
+          class="overflow-hidden text-sm whitespace-nowrap transition-all duration-200 ease-in-out"
+          :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-40 opacity-100'"
+        >Log Out</span>
         <!-- Tooltip -->
         <div
           v-if="isCollapsed"
@@ -169,7 +190,6 @@
 </template>
 
 <script>
-import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 export default {
