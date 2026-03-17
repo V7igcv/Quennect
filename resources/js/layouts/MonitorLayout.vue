@@ -98,7 +98,7 @@
               <div v-for="(waiting, index) in waitingQueues" :key="index" class="bg-gray-100 p-3 text-center font-semibold text-teal-700 rounded">
                 {{ waiting.queue_number }}
               </div>
-              <div v-if="waitingQueues.length === 0" class="col-span-2 text-center py-8 text-gray-400">
+              <div v-if="waitingQueues.length === 0" class="col-span-3 text-center py-8 text-gray-400">
                 No queues waiting
               </div>
             </div>
