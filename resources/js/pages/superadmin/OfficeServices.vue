@@ -23,7 +23,7 @@
           {{ selectedServiceView }}
           <Repeat2 class="w-4 h-4" />
         </button>
-        <Button class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="showAddModal = true">Add Service</Button>
+        <Button class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isLoading || isSubmitting" @click="showAddModal = true">Add Service</Button>
       </div>
     </div>
 
@@ -35,14 +35,17 @@
             <TableHead class="font-semibold text-gray-600">Service Name</TableHead>
             <TableHead class="font-semibold text-gray-600">Service Code</TableHead>
             <TableHead class="font-semibold text-gray-600 text-center">Is Free</TableHead>
-            <TableHead class="font-semibold text-gray-600 text-center">Used Count</TableHead>
+            <TableHead class="font-semibold text-gray-600 text-center">Classification</TableHead>
             <TableHead class="font-semibold text-gray-600 text-center">Status</TableHead>
             <TableHead class="font-semibold text-gray-600 text-center">Lock Status</TableHead>
             <TableHead class="font-semibold text-gray-600 text-center">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="service in paginatedServices" :key="service.id" class="hover:bg-gray-50 transition-colors">
+          <TableRow v-if="isLoading">
+            <TableCell colspan="7" class="text-center py-12 text-gray-400">Loading services...</TableCell>
+          </TableRow>
+          <TableRow v-for="service in paginatedServices" v-else :key="service.id" class="hover:bg-gray-50 transition-colors">
             <TableCell class="font-medium text-gray-800">{{ service.name }}</TableCell>
             <TableCell class="text-gray-600 font-mono text-sm">{{ service.code }}</TableCell>
             <TableCell class="text-center">
@@ -54,7 +57,7 @@
                 {{ service.is_free ? 'Yes' : 'No' }}
               </button>
             </TableCell>
-            <TableCell class="text-center text-gray-600">{{ service.used_count }}</TableCell>
+            <TableCell class="text-center text-gray-600">{{ service.classification }}</TableCell>
             <TableCell class="text-center">
               <button
                 @click.stop="toggleServiceStatus(service)"
@@ -82,7 +85,7 @@
               </button>
             </TableCell>
           </TableRow>
-          <TableRow v-if="paginatedServices.length === 0">
+          <TableRow v-if="!isLoading && paginatedServices.length === 0">
             <TableCell colspan="7" class="text-center py-12 text-gray-400">No services found.</TableCell>
           </TableRow>
         </TableBody>
@@ -187,11 +190,29 @@
                   />
                 </div>
               </div>
+
+              <div>
+                <label class="block text-sm text-gray-700 mb-1">Classification:</label>
+                <div class="relative">
+                  <select
+                    v-model="newService.classification"
+                    class="w-full appearance-none border border-gray-300 rounded-lg px-4 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-[#164980] focus:border-transparent transition"
+                  >
+                    <option value="Simple">Simple</option>
+                    <option value="Complex">Complex</option>
+                    <option value="Highly Technical">Highly Technical</option>
+                  </select>
+
+                  <ChevronDown
+                    class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                  />
+                </div>
+              </div>
             </div>
 
             <div class="flex justify-end gap-3">
-              <button @click="closeAddModal" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium cursor-pointer">Cancel</button>
-              <Button class="px-5 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="handleAddService">Save</Button>
+              <button @click="closeAddModal" :disabled="isSubmitting" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium cursor-pointer">Cancel</button>
+              <Button class="px-5 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isSubmitting" @click="handleAddService">{{ isSubmitting ? 'Saving...' : 'Save' }}</Button>
             </div>
           </div>
         </div>
@@ -229,11 +250,29 @@
                   class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#164980] focus:border-transparent transition"
                 ></textarea>
               </div>
+
+              <div>
+                <label class="block text-sm text-gray-700 mb-1">Classification:</label>
+                <div class="relative">
+                  <select
+                    v-model="editService.classification"
+                    class="w-full appearance-none border border-gray-300 rounded-lg px-4 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-[#164980] focus:border-transparent transition"
+                  >
+                    <option value="Simple">Simple</option>
+                    <option value="Complex">Complex</option>
+                    <option value="Highly Technical">Highly Technical</option>
+                  </select>
+
+                  <ChevronDown
+                    class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                  />
+                </div>
+              </div>
             </div>
 
             <div class="flex justify-end gap-3">
-              <button @click="closeEditModal" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium cursor-pointer">Cancel</button>
-              <Button class="px-5 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="handleSaveService">Save</Button>
+              <button @click="closeEditModal" :disabled="isSubmitting" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium cursor-pointer">Cancel</button>
+              <Button class="px-5 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isSubmitting" @click="handleSaveService">{{ isSubmitting ? 'Saving...' : 'Save' }}</Button>
             </div>
           </div>
         </div>
@@ -261,16 +300,54 @@
               </p>
             </div>
             <div class="flex justify-end gap-3">
-              <button @click="closeDeleteModal" class="px-5 py-2 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium cursor-pointer">Cancel</button>
-              <button @click="handleDeleteService" class="px-5 py-2 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium cursor-pointer">Delete</button>
+              <button @click="closeDeleteModal" :disabled="isSubmitting" class="px-5 py-2 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium cursor-pointer">Cancel</button>
+              <button @click="handleDeleteService" :disabled="isSubmitting" class="px-5 py-2 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium cursor-pointer">{{ isSubmitting ? 'Deleting...' : 'Delete' }}</button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showSuccessModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60" @click="showSuccessModal = false"></div>
+          <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-sm p-8 z-10 mx-4 text-center">
+            <button @click="showSuccessModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer">
+              <X class="w-5 h-5" />
+            </button>
+            <div class="flex justify-center mb-4">
+              <CheckCircle class="w-14 h-14 text-[#0F5C5C]" />
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Success</h2>
+            <p class="text-sm text-gray-600 mb-8">{{ successMessage }}</p>
+            <Button class="px-8 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="showSuccessModal = false">OK</Button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showErrorModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60" @click="showErrorModal = false"></div>
+          <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-sm p-8 z-10 mx-4 text-center">
+            <button @click="showErrorModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer">
+              <X class="w-5 h-5" />
+            </button>
+            <div class="flex justify-center mb-4">
+              <CircleAlert class="w-14 h-14 text-red-500" />
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Error</h2>
+            <p class="text-sm text-gray-600 mb-8">{{ errorModalMessage }}</p>
+            <Button class="px-8 py-2 rounded-sm bg-red-500 hover:bg-red-600 text-white" @click="showErrorModal = false">OK</Button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Click outside to close dropdown -->
-    <div v-if="activeDropdown" class="fixed inset-0 z-10" @click="activeDropdown = null"></div>
+    <div v-if="activeDropdown" class="fixed inset-0 z-10" @click="closeDropdown"></div>
 
     <!-- Teleported dropdown rendered outside the table -->
     <Teleport to="body">
@@ -301,41 +378,97 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table'
 import {
-  ChevronRight, ChevronDown, SquarePen, Trash2, X, MoreHorizontal, Lock, LockOpen, Repeat2
+  ChevronRight, ChevronDown, SquarePen, Trash2, X, MoreHorizontal, Lock, LockOpen, Repeat2, CheckCircle, CircleAlert
 } from 'lucide-vue-next'
+import { serviceManagementService } from '@/services/serviceManagement'
 
 const route = useRoute()
+const officeId = Number(route.params.id)
 
-// Hardcoded office info (would come from route params / API in real app)
 const office = ref({
-  id: Number(route.params.id) || 1,
-  name: route.params.name ? decodeURIComponent(route.params.name) : 'City Health Office (CHO)'
+  id: officeId || 1,
+  name: route.params.name ? decodeURIComponent(route.params.name) : 'Office'
 })
 
 const selectedServiceView = ref('External')
+const services = ref([])
+const isLoading = ref(false)
+const isSubmitting = ref(false)
+const showSuccessModal = ref(false)
+const showErrorModal = ref(false)
+const successMessage = ref('')
+const errorModalMessage = ref('')
 
-// ---- SERVICES DATA ----
-const services = ref([
-  { id: 1, name: 'Medical Consultation', code: 'MED-001', service_type: 'External', is_free: true, used_count: 45, status: 'Active', is_locked: true },
-  { id: 2, name: 'Dental Check-Up', code: 'DEN-001', service_type: 'External', is_free: true, used_count: 22, status: 'Active', is_locked: true },
-  { id: 3, name: 'Laboratory Test', code: 'LAB-001', service_type: 'External', is_free: false, used_count: 10, status: 'Active', is_locked: false },
-  { id: 4, name: 'X-Ray', code: 'RAD-001', service_type: 'External', is_free: false, used_count: 0, status: 'Active', is_locked: false },
-  { id: 5, name: 'Vaccination', code: 'VAC-001', service_type: 'External', is_free: true, used_count: 80, status: 'Active', is_locked: true },
-  { id: 6, name: 'Blood Pressure Monitoring', code: 'BPM-001', service_type: 'Internal', is_free: true, used_count: 0, status: 'Inactive', is_locked: false },
-  { id: 7, name: 'Prenatal Check-Up', code: 'PRE-001', service_type: 'Internal', is_free: true, used_count: 33, status: 'Active', is_locked: true },
-  { id: 8, name: 'Family Planning Counseling', code: 'FPL-001', service_type: 'Internal', is_free: true, used_count: 5, status: 'Active', is_locked: false }
-])
+const showSuccess = (message) => {
+  successMessage.value = message
+  showSuccessModal.value = true
+}
+
+const showError = (message) => {
+  errorModalMessage.value = message
+  showErrorModal.value = true
+}
+
+const formatClassificationFromApi = (value) => {
+  if (value === 'Highly_Technical') return 'Highly Technical'
+  return value
+}
+
+const formatClassificationToApi = (value) => {
+  if (value === 'Highly Technical') return 'Highly_Technical'
+  return value
+}
+
+const normalizeService = (service) => ({
+  id: service.id,
+  name: service.name,
+  code: service.code,
+  description: service.description,
+  service_type: service.service_type,
+  classification: formatClassificationFromApi(service.classification),
+  is_free: Boolean(service.is_free),
+  status: service.status_label ?? (service.status === 'active' ? 'Active' : 'Inactive'),
+  is_locked: Boolean(service.is_locked),
+})
+
+const handleApiError = (error, fallback) => {
+  if (error.response?.data?.errors) {
+    const firstError = Object.values(error.response.data.errors)[0]
+    if (Array.isArray(firstError) && firstError.length > 0) {
+      showError(firstError[0])
+      return
+    }
+  }
+  showError(error.response?.data?.message || fallback)
+}
+
+const fetchOfficeServices = async () => {
+  isLoading.value = true
+  try {
+    const response = await serviceManagementService.getOfficeServices(officeId)
+    office.value = {
+      id: response.data.office.id,
+      name: response.data.office.display_name,
+    }
+    services.value = response.data.services.map(normalizeService)
+  } catch (error) {
+    console.error('Failed to load services:', error)
+    handleApiError(error, 'Unable to load services.')
+  } finally {
+    isLoading.value = false
+  }
+}
 
 // ---- PAGINATION ----
 const currentPage = ref(1)
-const pageSize = 5
+const pageSize = 10
 
 const filteredServices = computed(() =>
   services.value.filter((service) => service.service_type === selectedServiceView.value)
@@ -356,48 +489,90 @@ const activeDropdown = ref(null)
 const activeService = ref(null)
 const dropdownPos = ref(null)
 
+const closeDropdown = () => {
+  activeDropdown.value = null
+  activeService.value = null
+  dropdownPos.value = null
+}
+
 const toggleDropdown = (service, event) => {
   if (activeDropdown.value === service.id) {
-    activeDropdown.value = null
-    activeService.value = null
-    dropdownPos.value = null
+    closeDropdown()
     return
   }
   const btn = event.currentTarget
   const rect = btn.getBoundingClientRect()
   dropdownPos.value = {
     top: rect.bottom + window.scrollY + 4,
-    left: rect.right + window.scrollX - 144 // 144 = dropdown width (w-36)
+    left: rect.right + window.scrollX - 144
   }
   activeDropdown.value = service.id
   activeService.value = service
 }
 
-const toggleServiceIsFree = (service) => {
-  service.is_free = !service.is_free
+const toggleServiceIsFree = async (service) => {
+  try {
+    const response = await serviceManagementService.toggleIsFree(officeId, service.id)
+    const updated = normalizeService(response.data)
+    services.value = services.value.map((item) => (item.id === updated.id ? updated : item))
+  } catch (error) {
+    console.error('Failed to toggle is_free:', error)
+    handleApiError(error, 'Unable to update service fee setting.')
+  }
 }
 
-const toggleServiceStatus = (service) => {
-  service.status = service.status === 'Active' ? 'Inactive' : 'Active'
+const toggleServiceStatus = async (service) => {
+  try {
+    const response = await serviceManagementService.toggleStatus(officeId, service.id)
+    const updated = normalizeService(response.data)
+    services.value = services.value.map((item) => (item.id === updated.id ? updated : item))
+  } catch (error) {
+    console.error('Failed to toggle status:', error)
+    handleApiError(error, 'Unable to update service status.')
+  }
 }
 
 // ---- ADD MODAL ----
 const showAddModal = ref(false)
-const newService = ref({ name: '', code: '', description: '', is_free: true, service_type: 'External' })
+const newService = ref({ name: '', code: '', description: '', is_free: true, service_type: 'External', classification: 'Simple' })
 
 const closeAddModal = () => {
   showAddModal.value = false
-  newService.value = { name: '', code: '', description: '', is_free: true, service_type: 'External' }
+  newService.value = { name: '', code: '', description: '', is_free: true, service_type: selectedServiceView.value, classification: 'Simple' }
 }
-const handleAddService = () => {
-  if (!newService.value.name.trim()) return
-  console.log('Adding service:', newService.value)
-  closeAddModal()
+
+const handleAddService = async () => {
+  if (!newService.value.name.trim() || !newService.value.code.trim() || !newService.value.description.trim()) {
+    showError('Service name, code, and description are required.')
+    return
+  }
+
+  isSubmitting.value = true
+  try {
+    const payload = {
+      service_name: newService.value.name.trim(),
+      service_code: newService.value.code.trim(),
+      service_description: newService.value.description.trim(),
+      service_type: newService.value.service_type,
+      classification: formatClassificationToApi(newService.value.classification),
+      is_free: newService.value.is_free,
+    }
+
+    const response = await serviceManagementService.createService(officeId, payload)
+    services.value = [...services.value, normalizeService(response.data)].sort((a, b) => a.name.localeCompare(b.name))
+    closeAddModal()
+    showSuccess('Service added successfully.')
+  } catch (error) {
+    console.error('Failed to add service:', error)
+    handleApiError(error, 'Unable to add service.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 // ---- EDIT MODAL ----
 const showEditModal = ref(false)
-const editService = ref({ name: '', code: '', description: '', is_free: true, status: 'Active' })
+const editService = ref({ name: '', code: '', description: '', classification: 'Simple', is_free: true, status: 'Active' })
 const serviceToEdit = ref(null)
 
 const openEditModal = (service) => {
@@ -407,20 +582,44 @@ const openEditModal = (service) => {
     name: service.name,
     code: service.code,
     description: service.description || '',
+    classification: service.classification || 'Simple',
     is_free: service.is_free,
     status: service.status || 'Active'
   }
   showEditModal.value = true
-  activeDropdown.value = null
+  closeDropdown()
 }
+
 const closeEditModal = () => {
   showEditModal.value = false
   serviceToEdit.value = null
 }
-const handleSaveService = () => {
-  if (!editService.value.name.trim()) return
-  console.log('Saving service:', editService.value)
-  closeEditModal()
+
+const handleSaveService = async () => {
+  if (!editService.value.name.trim() || !editService.value.code.trim() || !editService.value.description.trim()) {
+    showError('Service name, code, and description are required.')
+    return
+  }
+
+  isSubmitting.value = true
+  try {
+    const payload = {
+      service_name: editService.value.name.trim(),
+      service_code: editService.value.code.trim(),
+      service_description: editService.value.description.trim(),
+      classification: formatClassificationToApi(editService.value.classification),
+    }
+    const response = await serviceManagementService.updateService(officeId, serviceToEdit.value.id, payload)
+    const updated = normalizeService(response.data)
+    services.value = services.value.map((item) => (item.id === updated.id ? updated : item))
+    closeEditModal()
+    showSuccess('Service updated successfully.')
+  } catch (error) {
+    console.error('Failed to update service:', error)
+    handleApiError(error, 'Unable to update service.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 // ---- DELETE MODAL ----
@@ -431,16 +630,33 @@ const openDeleteModal = (service) => {
   if (service.is_locked) return
   serviceToDelete.value = service
   showDeleteModal.value = true
-  activeDropdown.value = null
+  closeDropdown()
 }
+
 const closeDeleteModal = () => {
   showDeleteModal.value = false
   serviceToDelete.value = null
 }
-const handleDeleteService = () => {
-  console.log('Soft-deleting service:', serviceToDelete.value?.name)
-  closeDeleteModal()
+
+const handleDeleteService = async () => {
+  isSubmitting.value = true
+  try {
+    await serviceManagementService.deleteService(officeId, serviceToDelete.value.id)
+    services.value = services.value.filter((item) => item.id !== serviceToDelete.value.id)
+    closeDeleteModal()
+    showSuccess('Service deleted successfully.')
+  } catch (error) {
+    console.error('Failed to delete service:', error)
+    closeDeleteModal()
+    handleApiError(error, 'Unable to delete service.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
+
+onMounted(() => {
+  fetchOfficeServices()
+})
 </script>
 
 <style scoped>

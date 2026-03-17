@@ -15,6 +15,7 @@ use App\Http\Controllers\QueueController;
 use App\Http\Controllers\PrintController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\OfficeManagementController;
+use App\Http\Controllers\ServiceManagementController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -76,6 +77,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/office-management/offices', [OfficeManagementController::class, 'store']);
         Route::put('/office-management/offices/{office}', [OfficeManagementController::class, 'update']);
         Route::delete('/office-management/offices/{office}', [OfficeManagementController::class, 'destroy']);
+
+        Route::get('/office-management/offices/{office}/services', [ServiceManagementController::class, 'index']);
+        Route::post('/office-management/offices/{office}/services', [ServiceManagementController::class, 'store']);
+        Route::put('/office-management/offices/{office}/services/{service}', [ServiceManagementController::class, 'update']);
+        Route::delete('/office-management/offices/{office}/services/{service}', [ServiceManagementController::class, 'destroy']);
+        Route::patch('/office-management/offices/{office}/services/{service}/toggle-is-free', [ServiceManagementController::class, 'toggleIsFree']);
+        Route::patch('/office-management/offices/{office}/services/{service}/toggle-status', [ServiceManagementController::class, 'toggleStatus']);
     });
     
     // Front Desk routes
