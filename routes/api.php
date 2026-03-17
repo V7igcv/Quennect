@@ -13,6 +13,7 @@ use App\Http\Controllers\BarangayController;
 use App\Http\Controllers\PrioritySectorController;
 use App\Http\Controllers\QueueController;
 use App\Http\Controllers\PrintController;
+use App\Http\Controllers\UserManagementController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -64,14 +65,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::get('/verify', [AuthController::class, 'verify']);
 
-   
-        
-    // // Superadmin only routes
-    // Route::middleware('role:SUPERADMIN')->prefix('admin')->group(function () {
-    //     // We'll add these later
-    //     Route::apiResource('users', UserController::class);
-    //     Route::apiResource('offices', OfficeController::class);
-    // });
+    Route::middleware('role:SUPERADMIN')->prefix('superadmin')->group(function () {
+        Route::get('/user-management/users', [UserManagementController::class, 'index']);
+        Route::get('/user-management/offices', [UserManagementController::class, 'offices']);
+        Route::post('/user-management/users', [UserManagementController::class, 'store']);
+        Route::put('/user-management/users/{user}', [UserManagementController::class, 'update']);
+    });
     
     // Front Desk routes
     Route::middleware('role:OFFICE FRONTDESK')->prefix('frontdesk')->group(function () {

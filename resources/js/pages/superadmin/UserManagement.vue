@@ -1,12 +1,14 @@
 <template>
   <div class="max-w-7xl mx-auto px-2 sm:px-2 lg:px-2 py-2">
-    <!-- ==================== PAGE HEADER ==================== -->
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-gray-800">User Management</h2>
-      <Button class="px-4 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="showAddModal = true">Add User</Button>
+      <Button class="px-4 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isLoading || isSubmitting" @click="showAddModal = true">Add User</Button>
     </div>
 
-    <!-- ==================== USERS TABLE ==================== -->
+    <div v-if="errorMessage" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ errorMessage }}
+    </div>
+
     <div class="bg-white rounded-lg shadow border border-gray-100 overflow-hidden">
       <Table>
         <TableHeader>
@@ -18,14 +20,17 @@
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="user in paginatedUsers" :key="user.id" class="hover:bg-gray-50 transition-colors">
+          <TableRow v-if="isLoading">
+            <TableCell colspan="4" class="text-center py-12 text-gray-400">Loading users...</TableCell>
+          </TableRow>
+          <TableRow v-for="user in paginatedUsers" v-else :key="user.id" class="hover:bg-gray-50 transition-colors">
             <TableCell class="font-medium text-gray-800">{{ user.username }}</TableCell>
             <TableCell>
               <span
                 class="px-2 py-0.5 rounded-sm text-xs font-semibold"
                 :class="user.role === 'SUPERADMIN' ? 'bg-[#BCEDE4] text-[#0F5C5C]' : 'bg-blue-100 text-blue-700'"
               >
-                {{ user.role === 'SUPERADMIN' ? 'Superadmin' : 'Office Admin' }}
+                {{ user.roleLabel }}
               </span>
             </TableCell>
             <TableCell class="text-gray-600">
@@ -40,17 +45,16 @@
               </button>
             </TableCell>
           </TableRow>
-          <TableRow v-if="paginatedUsers.length === 0">
+          <TableRow v-if="!isLoading && paginatedUsers.length === 0">
             <TableCell colspan="4" class="text-center py-12 text-gray-400">No users found.</TableCell>
           </TableRow>
         </TableBody>
       </Table>
     </div>
 
-    <!-- ==================== PAGINATION ==================== -->
     <div class="flex items-center justify-between mt-4">
       <span class="text-sm text-gray-500">
-        Showing {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, users.length) }} of {{ users.length }} users
+        Showing {{ summaryStart }}–{{ summaryEnd }} of {{ users.length }} users
       </span>
       <div class="flex items-center gap-1">
         <button
@@ -79,10 +83,8 @@
       </div>
     </div>
 
-    <!-- Click outside to close dropdown -->
-    <div v-if="activeDropdown" class="fixed inset-0 z-10" @click="activeDropdown = null"></div>
+    <div v-if="activeDropdown" class="fixed inset-0 z-10" @click="closeDropdown"></div>
 
-    <!-- ==================== TELEPORTED DROPDOWN ==================== -->
     <Teleport to="body">
       <div
         v-if="activeDropdown && dropdownPos"
@@ -96,17 +98,9 @@
           <SquarePen class="w-4 h-4" />
           Edit
         </button>
-        <button
-          @click="openDeleteModal(activeUser)"
-          class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
-        >
-          <Trash2 class="w-4 h-4" />
-          Delete
-        </button>
       </div>
     </Teleport>
 
-    <!-- ==================== ADD USER MODAL ==================== -->
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center">
@@ -137,19 +131,18 @@
               </div>
               <div>
                 <label class="block text-sm text-gray-700 mb-1">Role:</label>
-                  <div class="relative">
-                    <select v-model="newUser.role"
-                      class="w-full border appearance-none border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#164980] focus:border-transparent transition">
-                      <option value="SUPERADMIN">Superadmin</option>
-                      <option value="OFFICE ADMIN">Office Admin</option>
-                    </select>
-                    <!-- Custom arrow -->
-                    <ChevronDown
-                      class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
-                    />
-                  </div>
+                <div class="relative">
+                  <select v-model="newUser.role" @change="handleRoleChange(newUser)"
+                    class="w-full border appearance-none border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#164980] focus:border-transparent transition">
+                    <option value="SUPERADMIN">Superadmin</option>
+                    <option value="OFFICE FRONTDESK">Office Frontdesk</option>
+                  </select>
+                  <ChevronDown
+                    class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                  />
+                </div>
               </div>
-              <div v-if="newUser.role === 'OFFICE ADMIN'">
+              <div v-if="newUser.role === 'OFFICE FRONTDESK'">
                 <label class="block text-sm text-gray-700 mb-1">Office:</label>
                 <div class="relative">
                   <select v-model="newUser.officeId"
@@ -157,7 +150,6 @@
                     <option :value="null" disabled>Select an office</option>
                     <option v-for="office in offices" :key="office.id" :value="office.id">{{ formatOfficeOption(office) }}</option>
                   </select>
-                  <!-- Custom arrow -->
                   <ChevronDown
                     class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
                   />
@@ -165,16 +157,36 @@
               </div>
             </div>
 
+            <p v-if="formError" class="mb-4 text-sm text-red-600">{{ formError }}</p>
+
             <div class="flex justify-end gap-3">
               <button @click="closeAddModal" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium cursor-pointer">Cancel</button>
-              <Button class="px-5 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="handleAddUser">Add User</Button>
+              <Button class="px-5 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isSubmitting" @click="handleAddUser">{{ isSubmitting ? 'Adding...' : 'Add User' }}</Button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- ==================== EDIT USER MODAL ==================== -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showSuccessModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60" @click="showSuccessModal = false"></div>
+          <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-sm p-8 z-10 mx-4 text-center">
+            <button @click="showSuccessModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer">
+              <X class="w-5 h-5" />
+            </button>
+            <div class="flex justify-center mb-4">
+              <CheckCircle class="w-14 h-14 text-[#0F5C5C]" />
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Success</h2>
+            <p class="text-sm text-gray-600 mb-8">{{ successMessage }}</p>
+            <Button class="px-8 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="showSuccessModal = false">OK</Button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center">
@@ -206,18 +218,17 @@
               <div>
                 <label class="block text-sm text-gray-700 mb-1">Role:</label>
                 <div class="relative">
-                  <select v-model="editUser.role"
+                  <select v-model="editUser.role" @change="handleRoleChange(editUser)"
                     class="w-full border appearance-none border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#164980] focus:border-transparent transition">
                     <option value="SUPERADMIN">Superadmin</option>
-                    <option value="OFFICE ADMIN">Office Admin</option>
+                    <option value="OFFICE FRONTDESK">Office Frontdesk</option>
                   </select>
-                  <!-- Custom arrow -->
                   <ChevronDown
                     class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
                   />
                 </div>
               </div>
-              <div v-if="editUser.role === 'OFFICE ADMIN'">
+              <div v-if="editUser.role === 'OFFICE FRONTDESK'">
                 <label class="block text-sm text-gray-700 mb-1">Office:</label>
                 <div class="relative">
                   <select v-model="editUser.officeId"
@@ -225,7 +236,6 @@
                     <option :value="null" disabled>Select an office</option>
                     <option v-for="office in offices" :key="office.id" :value="office.id">{{ formatOfficeOption(office) }}</option>
                   </select>
-                  <!-- Custom arrow -->
                   <ChevronDown
                     class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
                   />
@@ -233,38 +243,11 @@
               </div>
             </div>
 
+            <p v-if="formError" class="mb-4 text-sm text-red-600">{{ formError }}</p>
+
             <div class="flex justify-end gap-3">
               <button @click="closeEditModal" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium cursor-pointer">Cancel</button>
-              <Button class="px-5 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="handleSaveUser">Save</Button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- ==================== DELETE USER MODAL ==================== -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center">
-          <div class="absolute inset-0 bg-black/60" @click="closeDeleteModal"></div>
-          <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-sm p-8 z-10 mx-4">
-            <button @click="closeDeleteModal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer">
-              <X class="w-5 h-5" />
-            </button>
-            <div class="flex flex-col items-center text-center mb-6">
-              <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                <Trash2 class="w-7 h-7 text-red-500" />
-              </div>
-              <h2 class="text-xl font-bold text-gray-800 mb-2">Delete User</h2>
-              <p class="text-sm text-gray-500">
-                Are you sure you want to delete
-                <span class="font-semibold text-gray-700">{{ userToDelete?.username }}</span>?
-                This action cannot be undone.
-              </p>
-            </div>
-            <div class="flex justify-end gap-3">
-              <button @click="closeDeleteModal" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium cursor-pointer">Cancel</button>
-              <button @click="handleDeleteUser" class="px-5 py-2 rounded-sm bg-red-500 hover:bg-red-600 text-white text-sm font-medium cursor-pointer">Delete</button>
+              <Button class="px-5 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isSubmitting" @click="handleSaveUser">{{ isSubmitting ? 'Saving...' : 'Save' }}</Button>
             </div>
           </div>
         </div>
@@ -274,46 +257,51 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table'
 import {
-  SquarePen, Trash2, X, MoreHorizontal, Eye, EyeOff, ChevronDown
+  SquarePen, X, MoreHorizontal, Eye, EyeOff, ChevronDown, CheckCircle
 } from 'lucide-vue-next'
+import { userManagementService } from '@/services/userManagement'
 
-const offices = [
-  { id: 1, name: 'Office of the City Mayor', acronym: 'CMO' },
-  { id: 2, name: 'Office of the City Mayor-Library Services', acronym: 'CMO-LS' },
-  { id: 3, name: 'Office of the City Mayor-Ligao Community College', acronym: 'CMO-LCC' },
-  { id: 4, name: 'City General Services Office', acronym: 'CGSO' },
-  { id: 5, name: 'Office of the City Local Civil Registrar', acronym: 'CLCR' },
-  { id: 6, name: "City Treasurer's Office", acronym: 'CTO' },
-  { id: 7, name: "Office of the City Treasurer's Office-Operation Economic Enterprise", acronym: 'CTO-OEE' },
-  { id: 8, name: "City Assessor's Office", acronym: 'CAO' },
-  { id: 9, name: 'Business Processing Licensing Office', acronym: 'BPLO' }
-]
+const offices = ref([])
+const users = ref([])
+const isLoading = ref(false)
+const isSubmitting = ref(false)
+const errorMessage = ref('')
+const formError = ref('')
 
-const users = ref([
-  { id: 1, username: 'superadmin', role: 'SUPERADMIN', officeId: null },
-  { id: 2, username: 'cmo_admin', role: 'OFFICE ADMIN', officeId: 1 },
-  { id: 3, username: 'cgso_admin', role: 'OFFICE ADMIN', officeId: 4 },
-  { id: 4, username: 'clcr_admin', role: 'OFFICE ADMIN', officeId: 5 },
-  { id: 5, username: 'cto_admin', role: 'OFFICE ADMIN', officeId: 6 },
-  { id: 6, username: 'cao_admin', role: 'OFFICE ADMIN', officeId: 8 },
-  { id: 7, username: 'bplo_admin', role: 'OFFICE ADMIN', officeId: 9 }
-])
+const showSuccessModal = ref(false)
+const successMessage = ref('')
+
+const showSuccess = (message) => {
+  successMessage.value = message
+  showSuccessModal.value = true
+}
 
 const formatOfficeOption = (office) => `${office.name} (${office.acronym})`
 
+const normalizeUser = (user) => ({
+  id: user.id,
+  username: user.username,
+  role: user.role?.name ?? 'SUPERADMIN',
+  roleLabel: user.role?.label ?? 'Superadmin',
+  officeId: user.office_id ?? null,
+  office: user.office ?? null
+})
+
 const getOfficeLabel = (officeId) => {
-  const office = offices.find((item) => item.id === officeId)
+  const office = offices.value.find((item) => item.id === officeId)
   return office ? formatOfficeOption(office) : '—'
 }
 
 const currentPage = ref(1)
 const pageSize = 5
+const summaryStart = computed(() => (users.value.length === 0 ? 0 : (currentPage.value - 1) * pageSize + 1))
+const summaryEnd = computed(() => (users.value.length === 0 ? 0 : Math.min(currentPage.value * pageSize, users.value.length)))
 
 const totalPages = computed(() => Math.max(1, Math.ceil(users.value.length / pageSize)))
 const paginatedUsers = computed(() =>
@@ -324,11 +312,15 @@ const activeDropdown = ref(null)
 const activeUser = ref(null)
 const dropdownPos = ref(null)
 
+const closeDropdown = () => {
+  activeDropdown.value = null
+  activeUser.value = null
+  dropdownPos.value = null
+}
+
 const toggleDropdown = (user, event) => {
   if (activeDropdown.value === user.id) {
-    activeDropdown.value = null
-    activeUser.value = null
-    dropdownPos.value = null
+    closeDropdown()
     return
   }
 
@@ -344,59 +336,157 @@ const toggleDropdown = (user, event) => {
 
 const showAddModal = ref(false)
 const showNewPassword = ref(false)
-const newUser = ref({ username: '', password: '', role: 'OFFICE ADMIN', officeId: null })
+const newUser = ref({ username: '', password: '', role: 'OFFICE FRONTDESK', officeId: null })
+
+const handleRoleChange = (form) => {
+  if (form.role === 'SUPERADMIN') {
+    form.officeId = null
+  }
+}
+
+const extractErrorMessage = (error, fallback) => {
+  if (error.response?.data?.errors) {
+    const firstFieldErrors = Object.values(error.response.data.errors)[0]
+    if (Array.isArray(firstFieldErrors) && firstFieldErrors.length > 0) {
+      return firstFieldErrors[0]
+    }
+  }
+
+  return error.response?.data?.message || fallback
+}
+
+const fetchUserManagementData = async () => {
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    const [usersResponse, officesResponse] = await Promise.all([
+      userManagementService.getUsers(),
+      userManagementService.getOffices()
+    ])
+
+    users.value = usersResponse.data.map(normalizeUser)
+    offices.value = officesResponse.data
+
+    if (currentPage.value > totalPages.value) {
+      currentPage.value = totalPages.value
+    }
+  } catch (error) {
+    console.error('Failed to load user management data:', error)
+    errorMessage.value = extractErrorMessage(error, 'Unable to load user management data.')
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const closeAddModal = () => {
   showAddModal.value = false
   showNewPassword.value = false
-  newUser.value = { username: '', password: '', role: 'OFFICE ADMIN', officeId: null }
+  formError.value = ''
+  newUser.value = { username: '', password: '', role: 'OFFICE FRONTDESK', officeId: null }
 }
 
-const handleAddUser = () => {
-  if (!newUser.value.username.trim() || !newUser.value.password.trim()) return
-  closeAddModal()
+const handleAddUser = async () => {
+  if (!newUser.value.username.trim() || !newUser.value.password.trim()) {
+    formError.value = 'Username and password are required.'
+    return
+  }
+
+  if (newUser.value.role === 'OFFICE FRONTDESK' && !newUser.value.officeId) {
+    formError.value = 'Office is required for Office Frontdesk users.'
+    return
+  }
+
+  isSubmitting.value = true
+  formError.value = ''
+
+  try {
+    const response = await userManagementService.createUser({
+      username: newUser.value.username.trim(),
+      password: newUser.value.password,
+      role: newUser.value.role,
+      office_id: newUser.value.role === 'OFFICE FRONTDESK' ? newUser.value.officeId : null
+    })
+
+    users.value = [...users.value, normalizeUser(response.data)].sort((left, right) =>
+      left.username.localeCompare(right.username)
+    )
+    currentPage.value = totalPages.value
+    closeAddModal()
+    showSuccess('User added successfully.')
+  } catch (error) {
+    console.error('Failed to add user:', error)
+    formError.value = extractErrorMessage(error, 'Unable to add user.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const showEditModal = ref(false)
 const showEditPassword = ref(false)
-const editUser = ref({ username: '', password: '', role: 'OFFICE ADMIN', officeId: null })
+const editUser = ref({ username: '', password: '', role: 'OFFICE FRONTDESK', officeId: null })
 const userToEdit = ref(null)
 
 const openEditModal = (user) => {
   userToEdit.value = user
   editUser.value = { username: user.username, password: '', role: user.role, officeId: user.officeId ?? null }
   showEditModal.value = true
-  activeDropdown.value = null
+  formError.value = ''
+  closeDropdown()
 }
 
 const closeEditModal = () => {
   showEditModal.value = false
   showEditPassword.value = false
+  formError.value = ''
   userToEdit.value = null
 }
 
-const handleSaveUser = () => {
-  if (!editUser.value.username.trim()) return
-  closeEditModal()
+const handleSaveUser = async () => {
+  if (!editUser.value.username.trim()) {
+    formError.value = 'Username is required.'
+    return
+  }
+
+  if (editUser.value.role === 'OFFICE FRONTDESK' && !editUser.value.officeId) {
+    formError.value = 'Office is required for Office Frontdesk users.'
+    return
+  }
+
+  isSubmitting.value = true
+  formError.value = ''
+
+  try {
+    const payload = {
+      username: editUser.value.username.trim(),
+      role: editUser.value.role,
+      office_id: editUser.value.role === 'OFFICE FRONTDESK' ? editUser.value.officeId : null
+    }
+
+    if (editUser.value.password.trim()) {
+      payload.password = editUser.value.password
+    }
+
+    const response = await userManagementService.updateUser(userToEdit.value.id, payload)
+    const updatedUser = normalizeUser(response.data)
+
+    users.value = users.value
+      .map((user) => (user.id === updatedUser.id ? updatedUser : user))
+      .sort((left, right) => left.username.localeCompare(right.username))
+
+    closeEditModal()
+    showSuccess('User updated successfully.')
+  } catch (error) {
+    console.error('Failed to update user:', error)
+    formError.value = extractErrorMessage(error, 'Unable to update user.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
-const showDeleteModal = ref(false)
-const userToDelete = ref(null)
-
-const openDeleteModal = (user) => {
-  userToDelete.value = user
-  showDeleteModal.value = true
-  activeDropdown.value = null
-}
-
-const closeDeleteModal = () => {
-  showDeleteModal.value = false
-  userToDelete.value = null
-}
-
-const handleDeleteUser = () => {
-  closeDeleteModal()
-}
+onMounted(() => {
+  fetchUserManagementData()
+})
 </script>
 
 <style scoped>

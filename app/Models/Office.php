@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Office extends Model
 {
-    use HasFactory; 
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'office_name',
@@ -19,6 +20,7 @@ class Office extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'deleted_at' => 'datetime',
     ];
 
     // Optional: Add an accessor for logo URL
