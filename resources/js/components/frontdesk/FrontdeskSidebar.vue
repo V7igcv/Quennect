@@ -1,6 +1,6 @@
 <template>
   <aside 
-    class="bg-[#FFFFFF] text-white h-screen fixed left-0 top-0 z-40 flex flex-col overflow-hidden border border-[rgba(107,114,128,0.25)] transition-[width] duration-300 ease-in-out"
+    class="bg-[#FFFFFF] text-white h-screen fixed left-0 top-0 z-40 flex flex-col overflow-visible border border-[rgba(107,114,128,0.25)] transition-[width] duration-300 ease-in-out"
     :class="isCollapsed ? 'w-20' : 'w-64'"
   >
     <!-- Logo and System Name Area -->
@@ -69,7 +69,7 @@
           v-if="isCollapsed"
           class="absolute left-16 top-1/2 -translate-y-1/2 whitespace-nowrap 
                 bg-[#0F5C5C] text-white text-sm px-3 py-1 rounded-md shadow-md
-                opacity-0 group-hover:opacity-100 transition pointer-events-none"
+                opacity-0 group-hover:opacity-100 transition pointer-events-none z-50"
         >
           Queue Dashboard
         </div>
@@ -101,9 +101,73 @@
           v-if="isCollapsed"
           class="absolute left-16 top-1/2 -translate-y-1/2 whitespace-nowrap 
                 bg-[#0F5C5C] text-white text-sm px-3 py-1 rounded-md shadow-md
-                opacity-0 group-hover:opacity-100 transition pointer-events-none"
+                opacity-0 group-hover:opacity-100 transition pointer-events-none z-50"
         >
           Queue Analytics
+        </div>
+        </li>
+
+        <!-- CSM Analytics Button -->
+        <li class="relative group">
+        <button
+            @click="navigateTo('/frontdesk/csm-analytics')"
+            class="w-full flex items-center gap-3 p-3 rounded-md transition-colors cursor-pointer"
+            :class="{
+            'bg-[#0F5C5C] text-white': isActive('/frontdesk/csm-analytics'),
+            'hover:bg-[#F5F5F5] text-[#474C55]': !isActive('/frontdesk/csm-analytics')
+            }"
+        >
+            <!-- CSM Icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-4l-4 4v-4z" />
+            </svg>
+
+            <span
+              class="overflow-hidden text-sm whitespace-nowrap transition-all duration-200 ease-in-out"
+              :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-40 opacity-100'"
+            >CSM Analytics</span>
+        </button>
+
+        <!-- Tooltip -->
+        <div
+          v-if="isCollapsed"
+          class="absolute left-16 top-1/2 -translate-y-1/2 whitespace-nowrap 
+                bg-[#0F5C5C] text-white text-sm px-3 py-1 rounded-md shadow-md
+                opacity-0 group-hover:opacity-100 transition pointer-events-none z-50"
+        >
+          CSM Analytics
+        </div>
+        </li>
+
+        <!-- Internal Transactions Button -->
+        <li class="relative group">
+        <button
+            @click="navigateTo('/frontdesk/internal-transactions')"
+            class="w-full flex items-center gap-3 p-3 rounded-md transition-colors cursor-pointer"
+            :class="{
+            'bg-[#0F5C5C] text-white': isActive('/frontdesk/internal-transactions'),
+            'hover:bg-[#F5F5F5] text-[#474C55]': !isActive('/frontdesk/internal-transactions')
+            }"
+        >
+            <!-- Internal Transactions Icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6-4v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+
+            <span
+              class="overflow-hidden text-sm whitespace-nowrap transition-all duration-200 ease-in-out"
+              :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-40 opacity-100'"
+            >Internal Transactions</span>
+        </button>
+
+        <!-- Tooltip -->
+        <div
+          v-if="isCollapsed"
+          class="absolute left-16 top-1/2 -translate-y-1/2 whitespace-nowrap 
+                bg-[#0F5C5C] text-white text-sm px-3 py-1 rounded-md shadow-md
+                opacity-0 group-hover:opacity-100 transition pointer-events-none z-50"
+        >
+          Internal Transactions
         </div>
         </li>
       </ul>
@@ -160,7 +224,7 @@
           v-if="isCollapsed"
           class="absolute left-16 top-1/2 -translate-y-1/2 whitespace-nowrap 
                 bg-[#0F5C5C] text-white text-sm px-3 py-1 rounded-md shadow-md
-                opacity-0 group-hover:opacity-100 transition pointer-events-none"
+                opacity-0 group-hover:opacity-100 transition pointer-events-none z-50"
         >
           Log Out
         </div>

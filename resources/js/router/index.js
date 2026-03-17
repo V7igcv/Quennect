@@ -67,6 +67,16 @@ const routes = [
         path: 'analytics',
         name: 'frontdesk.analytics',
         component: () => import('../pages/frontdesk/FrontDeskAnalytics.vue')
+      },
+      {
+        path: 'csm-analytics',
+        name: 'frontdesk.csm-analytics',
+        component: () => import('../pages/frontdesk/CSMAnalytics.vue')
+      },
+      {
+        path: 'internal-transactions',
+        name: 'frontdesk.internal-transactions',
+        component: () => import('../pages/frontdesk/InternalTransactions.vue')
       }
     ]
   },
