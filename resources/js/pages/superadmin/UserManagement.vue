@@ -299,7 +299,7 @@ const getOfficeLabel = (officeId) => {
 }
 
 const currentPage = ref(1)
-const pageSize = 5
+const pageSize = 10
 const summaryStart = computed(() => (users.value.length === 0 ? 0 : (currentPage.value - 1) * pageSize + 1))
 const summaryEnd = computed(() => (users.value.length === 0 ? 0 : Math.min(currentPage.value * pageSize, users.value.length)))
 

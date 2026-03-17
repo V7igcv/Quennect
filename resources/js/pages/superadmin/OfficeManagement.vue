@@ -2,9 +2,13 @@
   <div class="max-w-7xl mx-auto px-2 sm:px-2 lg:px-2 py-2">
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-gray-800">Office Management</h2>
-      <Button class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="showAddModal = true">
+      <Button class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isLoading || isSubmitting" @click="showAddModal = true">
         Add New Office
       </Button>
+    </div>
+
+    <div v-if="errorMessage" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ errorMessage }}
     </div>
 
     <Teleport to="body">
@@ -73,12 +77,14 @@
               </div>
             </div>
 
+            <p v-if="formError" class="mb-4 text-sm text-red-600">{{ formError }}</p>
+
             <div class="flex justify-end gap-3">
-              <button @click="closeAddModal" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors cursor-pointer">
+              <button @click="closeAddModal" :disabled="isSubmitting" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors cursor-pointer">
                 Cancel
               </button>
-              <Button class="px-5 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="handleAddOffice">
-                Add Office
+              <Button class="px-5 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isSubmitting" @click="handleAddOffice">
+                {{ isSubmitting ? 'Adding...' : 'Add Office' }}
               </Button>
             </div>
           </div>
@@ -150,7 +156,7 @@
                 <label class="block text-sm text-gray-700 mb-2">Office Logo:</label>
                 <div
                   class="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-5 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#164980] transition-colors"
-                  @click="triggerAddLogoInput"
+                  @click="triggerEditLogoInput"
                 >
                   <template v-if="editLogoPreview">
                     <img :src="editLogoPreview" class="w-20 h-20 object-contain rounded-full" alt="Preview" />
@@ -166,12 +172,14 @@
               </div>
             </div>
 
+            <p v-if="formError" class="mb-4 text-sm text-red-600">{{ formError }}</p>
+
             <div class="flex justify-end gap-3">
-              <button @click="closeEditModal" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors cursor-pointer">
+              <button @click="closeEditModal" :disabled="isSubmitting" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors cursor-pointer">
                 Cancel
               </button>
-              <Button class="px-5 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="handleSaveOffice">
-                Save
+              <Button class="px-5 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isSubmitting" @click="handleSaveOffice">
+                {{ isSubmitting ? 'Saving...' : 'Save' }}
               </Button>
             </div>
           </div>
@@ -201,11 +209,11 @@
             </div>
 
             <div class="flex justify-end gap-3">
-              <button @click="closeDeleteModal" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors cursor-pointer">
+              <button @click="closeDeleteModal" :disabled="isSubmitting" class="px-5 py-2 rounded-sm border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors cursor-pointer">
                 Cancel
               </button>
-              <button @click="handleDeleteOffice" class="px-5 py-2 rounded-sm bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors cursor-pointer">
-                Delete
+              <button @click="handleDeleteOffice" :disabled="isSubmitting" class="px-5 py-2 rounded-sm bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors cursor-pointer">
+                {{ isSubmitting ? 'Deleting...' : 'Delete' }}
               </button>
             </div>
           </div>
@@ -213,7 +221,30 @@
       </Transition>
     </Teleport>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showSuccessModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60" @click="showSuccessModal = false"></div>
+          <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-sm p-8 z-10 mx-4 text-center">
+            <button @click="showSuccessModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer">
+              <X class="w-5 h-5" />
+            </button>
+            <div class="flex justify-center mb-4">
+              <CheckCircle class="w-14 h-14 text-[#0F5C5C]" />
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Success</h2>
+            <p class="text-sm text-gray-600 mb-8">{{ successMessage }}</p>
+            <Button class="px-8 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" @click="showSuccessModal = false">OK</Button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <div v-if="isLoading" class="flex justify-center items-center py-16 text-gray-400">
+      Loading offices...
+    </div>
+
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <div
         v-for="office in offices"
         :key="office.id"
@@ -246,25 +277,71 @@
           {{ office.description }}
         </p>
       </div>
+
+      <div v-if="offices.length === 0" class="col-span-full text-center py-16 text-gray-400">
+        No offices found.
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
-import { ImagePlus, SquarePen, Trash2, X, ChevronDown } from 'lucide-vue-next'
+import { CheckCircle, ChevronDown, ImagePlus, SquarePen, Trash2, X } from 'lucide-vue-next'
+import { officeManagementService } from '@/services/officeManagement'
 
 const router = useRouter()
 
 const addLogoInput = ref(null)
 const editLogoInput = ref(null)
+const newLogoFile = ref(null)
+const editLogoFile = ref(null)
+
+const offices = ref([])
+const isLoading = ref(false)
+const isSubmitting = ref(false)
+const errorMessage = ref('')
+const formError = ref('')
+
+const showSuccessModal = ref(false)
+const successMessage = ref('')
+
+const showSuccess = (message) => {
+  successMessage.value = message
+  showSuccessModal.value = true
+}
+
+const extractErrorMessage = (error, fallback) => {
+  if (error.response?.data?.errors) {
+    const firstFieldErrors = Object.values(error.response.data.errors)[0]
+    if (Array.isArray(firstFieldErrors) && firstFieldErrors.length > 0) {
+      return firstFieldErrors[0]
+    }
+  }
+  return error.response?.data?.message || fallback
+}
+
+const fetchOffices = async () => {
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    const response = await officeManagementService.getOffices()
+    offices.value = response.data
+  } catch (error) {
+    console.error('Failed to load offices:', error)
+    errorMessage.value = extractErrorMessage(error, 'Unable to load offices.')
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const navigateToServices = (office) => {
   router.push({ name: 'OfficeServices', params: { id: office.id, name: encodeURIComponent(office.name) } })
 }
 
+// ── Add modal ─────────────────────────────────────────
 const showAddModal = ref(false)
 const newOfficeName = ref('')
 const newOfficeAcronym = ref('')
@@ -277,30 +354,54 @@ const closeAddModal = () => {
   newOfficeAcronym.value = ''
   newOfficeDescription.value = ''
   newLogoPreview.value = null
-  if (addLogoInput.value) {
-    addLogoInput.value.value = ''
-  }
+  newLogoFile.value = null
+  formError.value = ''
+  if (addLogoInput.value) addLogoInput.value.value = ''
 }
 
-const triggerAddLogoInput = () => {
-  addLogoInput.value?.click()
-}
+const triggerAddLogoInput = () => { addLogoInput.value?.click() }
 
 const onAddLogoChange = (event) => {
   const file = event.target.files?.[0]
   if (file) {
     newLogoPreview.value = URL.createObjectURL(file)
+    newLogoFile.value = file
   }
 }
 
-const handleAddOffice = () => {
+const handleAddOffice = async () => {
   if (!newOfficeName.value.trim() || !newOfficeAcronym.value.trim()) {
+    formError.value = 'Office name and acronym are required.'
+    return
+  }
+  if (!newOfficeDescription.value.trim()) {
+    formError.value = 'Office description is required.'
     return
   }
 
-  closeAddModal()
+  isSubmitting.value = true
+  formError.value = ''
+
+  try {
+    const formData = new FormData()
+    formData.append('name', newOfficeName.value.trim())
+    formData.append('acronym', newOfficeAcronym.value.trim())
+    formData.append('description', newOfficeDescription.value.trim())
+    if (newLogoFile.value) formData.append('logo', newLogoFile.value)
+
+    const response = await officeManagementService.createOffice(formData)
+    offices.value = [...offices.value, response.data].sort((a, b) => a.name.localeCompare(b.name))
+    closeAddModal()
+    showSuccess('Office added successfully.')
+  } catch (error) {
+    console.error('Failed to add office:', error)
+    formError.value = extractErrorMessage(error, 'Unable to add office.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
+// ── Edit modal ─────────────────────────────────────────
 const showEditModal = ref(false)
 const editOfficeName = ref('')
 const editOfficeAcronym = ref('')
@@ -316,6 +417,8 @@ const openEditModal = (office) => {
   editOfficeDescription.value = office.description
   editOfficeStatus.value = office.status || 'Active'
   editLogoPreview.value = office.logo
+  editLogoFile.value = null
+  formError.value = ''
   showEditModal.value = true
 }
 
@@ -326,31 +429,59 @@ const closeEditModal = () => {
   editOfficeDescription.value = ''
   editOfficeStatus.value = 'Active'
   editLogoPreview.value = null
+  editLogoFile.value = null
   officeToEdit.value = null
-  if (editLogoInput.value) {
-    editLogoInput.value.value = ''
-  }
+  formError.value = ''
+  if (editLogoInput.value) editLogoInput.value.value = ''
 }
 
-const triggerEditLogoInput = () => {
-  editLogoInput.value?.click()
-}
+const triggerEditLogoInput = () => { editLogoInput.value?.click() }
 
 const onEditLogoChange = (event) => {
   const file = event.target.files?.[0]
   if (file) {
     editLogoPreview.value = URL.createObjectURL(file)
+    editLogoFile.value = file
   }
 }
 
-const handleSaveOffice = () => {
+const handleSaveOffice = async () => {
   if (!editOfficeName.value.trim() || !editOfficeAcronym.value.trim()) {
+    formError.value = 'Office name and acronym are required.'
+    return
+  }
+  if (!editOfficeDescription.value.trim()) {
+    formError.value = 'Office description is required.'
     return
   }
 
-  closeEditModal()
+  isSubmitting.value = true
+  formError.value = ''
+
+  try {
+    const formData = new FormData()
+    formData.append('name', editOfficeName.value.trim())
+    formData.append('acronym', editOfficeAcronym.value.trim())
+    formData.append('description', editOfficeDescription.value.trim())
+    formData.append('status', editOfficeStatus.value)
+    if (editLogoFile.value) formData.append('logo', editLogoFile.value)
+
+    const response = await officeManagementService.updateOffice(officeToEdit.value.id, formData)
+    const updated = response.data
+    offices.value = offices.value
+      .map((o) => (o.id === updated.id ? updated : o))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    closeEditModal()
+    showSuccess('Office updated successfully.')
+  } catch (error) {
+    console.error('Failed to update office:', error)
+    formError.value = extractErrorMessage(error, 'Unable to update office.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
+// ── Delete modal ───────────────────────────────────────
 const showDeleteModal = ref(false)
 const officeToDelete = ref(null)
 
@@ -364,75 +495,23 @@ const closeDeleteModal = () => {
   officeToDelete.value = null
 }
 
-const handleDeleteOffice = () => {
-  closeDeleteModal()
+const handleDeleteOffice = async () => {
+  isSubmitting.value = true
+  try {
+    await officeManagementService.deleteOffice(officeToDelete.value.id)
+    offices.value = offices.value.filter((o) => o.id !== officeToDelete.value.id)
+    closeDeleteModal()
+    showSuccess('Office deleted successfully.')
+  } catch (error) {
+    console.error('Failed to delete office:', error)
+    closeDeleteModal()
+    errorMessage.value = extractErrorMessage(error, 'Unable to delete office.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
-const offices = [
-  {
-    id: 1,
-    name: 'Office of the City Mayor',
-    acronym: 'CMO',
-    description: 'Provides executive leadership and citywide governance services.',
-    logo: '/storage/logos/OCM LOGO.png'
-  },
-  {
-    id: 2,
-    name: 'Office of the City Mayor - Library Services',
-    acronym: 'CMO-LS',
-    description: 'Manages public library programs, reading resources, and outreach.',
-    logo: null
-  },
-  {
-    id: 3,
-    name: 'Office of the City Mayor - Ligao Community College',
-    acronym: 'CMO-LCC',
-    description: 'Oversees local higher education support and academic services.',
-    logo: null
-  },
-  {
-    id: 4,
-    name: 'City General Services Office',
-    acronym: 'CGSO',
-    description: 'Handles procurement, asset management, and general administrative support.',
-    logo: null
-  },
-  {
-    id: 5,
-    name: 'Office of the City Local Civil Registrar',
-    acronym: 'CLCR',
-    description: 'Processes civil registry documents such as birth, marriage, and death records.',
-    logo: '/storage/logos/CLCR LOGO.png'
-  },
-  {
-    id: 6,
-    name: "City Treasurer's Office",
-    acronym: 'CTO',
-    description: 'Administers local revenue collection, treasury operations, and disbursement.',
-    logo: null
-  },
-  {
-    id: 7,
-    name: "Office of the City Treasurer - Operation Economic Enterprise",
-    acronym: 'CTO-OEE',
-    description: 'Manages enterprise-related collections and city economic operations.',
-    logo: null
-  },
-  {
-    id: 8,
-    name: "City Assessor's Office",
-    acronym: 'CAO',
-    description: 'Maintains property assessment records and valuation services.',
-    logo: '/storage/logos/CAO LOGO.png'
-  },
-  {
-    id: 9,
-    name: 'Business Processing Licensing Office',
-    acronym: 'BPLO',
-    description: 'Handles business permit processing, renewal, and regulatory compliance.',
-    logo: null
-  }
-]
+onMounted(() => { fetchOffices() })
 </script>
 
 <style scoped>

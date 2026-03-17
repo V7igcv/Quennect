@@ -14,6 +14,7 @@ use App\Http\Controllers\PrioritySectorController;
 use App\Http\Controllers\QueueController;
 use App\Http\Controllers\PrintController;
 use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\OfficeManagementController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -70,6 +71,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/user-management/offices', [UserManagementController::class, 'offices']);
         Route::post('/user-management/users', [UserManagementController::class, 'store']);
         Route::put('/user-management/users/{user}', [UserManagementController::class, 'update']);
+
+        Route::get('/office-management/offices', [OfficeManagementController::class, 'index']);
+        Route::post('/office-management/offices', [OfficeManagementController::class, 'store']);
+        Route::put('/office-management/offices/{office}', [OfficeManagementController::class, 'update']);
+        Route::delete('/office-management/offices/{office}', [OfficeManagementController::class, 'destroy']);
     });
     
     // Front Desk routes
