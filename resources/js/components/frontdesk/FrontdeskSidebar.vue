@@ -4,7 +4,10 @@
     :class="isCollapsed ? 'w-20' : 'w-64'"
   >
     <!-- Logo and System Name Area -->
-    <div class="flex items-center justify-center gap-5 p-4 h-20">
+    <div
+      class="flex items-center h-20 transition-all duration-200 ease-in-out"
+      :class="isCollapsed ? 'justify-center px-0 gap-0' : 'justify-center gap-5 p-4'"
+    >
       <div
         class="flex items-center gap-2 overflow-hidden transition-all duration-200 ease-in-out"
         :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-40 opacity-100'"

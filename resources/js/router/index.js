@@ -88,6 +88,11 @@ const routes = [
         component: () => import('../pages/superadmin/OfficeManagement.vue')
       },
       {
+        path: 'offices/:id/services/:name',
+        name: 'OfficeServices',
+        component: () => import('../pages/superadmin/OfficeServices.vue')
+      },
+      {
         path: 'users',
         name: 'superadmin.users',
         component: () => import('../pages/superadmin/UserManagement.vue')
