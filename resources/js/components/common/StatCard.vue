@@ -1,10 +1,10 @@
 <template>
   <Card class="shadow-sm rounded-xl bg-white">
-    <CardContent class="flex items-center gap-4 p-5">
+    <CardContent class="flex items-center gap-4 p-5 min-h-[100px]">
 
       <!-- Icon Circle -->
       <div
-        class="flex items-center justify-center w-12 h-12 rounded-full"
+        class="flex items-center justify-center w-12 h-12 rounded-full shrink-0"
         :class="iconBg"
       >
         <component :is="icon" class="w-6 h-6" :class="iconColor" />
@@ -17,7 +17,7 @@
         </p>
 
         <p class="text-2xl font-semibold" :class="numberColor">
-          {{ value }}
+          {{ value }}{{ suffix }}
         </p>
       </div>
 
@@ -34,6 +34,10 @@ defineProps({
   icon: Object,
   iconBg: String,
   iconColor: String,
-  numberColor: String
+  numberColor: String,
+  suffix: {
+    type: String,
+    default: ''
+  }
 })
 </script>
