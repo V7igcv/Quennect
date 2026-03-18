@@ -116,6 +116,159 @@
           />
         </div>
       </div>
+      <div class="space-y-6">
+        <!-- Citizen's Charter Count Section -->
+        <div>
+          <div class="mb-4">
+            <h2 class="text-xl font-semibold">
+              Citizen's Charter Count 
+              <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
+            </h2>
+          </div>
+
+          <!-- Main Card containing all CC charts -->
+          <Card class="rounded-2xl border border-gray-200 shadow-sm p-5">
+            <CardContent class="p-6 lg:p-8">
+              <div class="grid grid-cols-1 md:grid-cols-3 md:divide-x md:divide-gray-200">
+
+                <!-- CC1 - Awareness -->
+                <div class="space-y-4 md:pr-10 md:pt-0">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-lg font-bold tracking-tight text-[#3F3F46]">CC1</span>
+                    <span class="rounded-full bg-[#F7D4D4] px-4 py-1 text-sm font-semibold text-[#6B4E4E]">Awareness</span>
+                  </div>
+                  <p class="text-sm leading-tight text-[#4B5563]">
+                    Which of the following best describes your awareness of a CC?
+                  </p>
+                  <div class="space-y-3">
+                    <div v-for="(option, index) in ccData.awareness" :key="`awareness-${index}`" class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+                      <span class="text-sm font-semibold text-[#3F3F46]">Option {{ index + 1 }}</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger as-child>
+                            <div class="relative h-4 w-full cursor-help overflow-hidden rounded-full bg-[#D4D4D8]">
+                              <div
+                                class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                                :class="getBarShade('awareness', ccData.awareness, index)"
+                                :style="{ width: `${option.percentage}%` }"
+                              ></div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p class="text-xs">{{ option.description }}</p>
+                            <p class="mt-1 text-xs font-semibold">Responses: {{ option.count }}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <span class="text-sm font-bold text-[#52525B]">{{ option.percentage }}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- CC2 - Visibility -->
+                <div class="space-y-4 md:px-10 md:pt-0">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-lg font-bold tracking-tight text-[#3F3F46]">CC2</span>
+                    <span class="rounded-full bg-[#F2D7BC] px-4 py-1 text-sm font-semibold text-[#6A4A2D]">Visibility</span>
+                  </div>
+
+                  <p class="text-sm leading-tight text-[#4B5563]">
+                    If aware of CC, would you say that the CC of this office was...?
+                  </p>
+
+                  <div class="space-y-3">
+                    <div 
+                      v-for="(option, index) in ccData.visibility" 
+                      :key="`visibility-${index}`" 
+                      class="grid grid-cols-[auto_1fr_auto] items-center gap-3"
+                    >
+                      <span class="text-sm font-semibold text-[#3F3F46]">
+                        Option {{ index + 1 }}
+                      </span>
+
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger as-child>
+                            <div class="relative h-4 w-full cursor-help overflow-hidden rounded-full bg-[#D4D4D8]">
+                              <div
+                                class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                                :class="getBarShade('visibility', ccData.visibility, index)"
+                                :style="{ width: `${option.percentage}%` }"
+                              ></div>
+                            </div>
+                          </TooltipTrigger>
+
+                          <TooltipContent>
+                            <p class="text-xs">{{ option.description }}</p>
+                            <p class="mt-1 text-xs font-semibold">
+                              Responses: {{ option.count }}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <span class="text-sm font-bold text-[#52525B]">
+                        {{ option.percentage }}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- CC3 - Helpfulness -->
+                <div class="space-y-4 md:pl-10 md:pt-0">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-lg font-bold tracking-tight text-[#3F3F46]">CC3</span>
+                    <span class="rounded-full bg-[#DCC9F3] px-4 py-1 text-sm font-semibold text-[#5C417A]">
+                      Helpfulness
+                    </span>
+                  </div>
+
+                  <p class="text-sm leading-tight text-[#4B5563]">
+                    If aware of CC, how much did the CC help you in your transactions?
+                  </p>
+
+                  <div class="space-y-3">
+                    <div 
+                      v-for="(option, index) in ccData.helpfulness" 
+                      :key="`helpfulness-${index}`" 
+                      class="grid grid-cols-[auto_1fr_auto] items-center gap-3"
+                    >
+                      <span class="text-sm font-semibold text-[#3F3F46]">
+                        Option {{ index + 1 }}
+                      </span>
+
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger as-child>
+                            <div class="relative h-4 w-full cursor-help overflow-hidden rounded-full bg-[#D4D4D8]">
+                              <div
+                                class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                                :class="getBarShade('helpfulness', ccData.helpfulness, index)"
+                                :style="{ width: `${option.percentage}%` }"
+                              ></div>
+                            </div>
+                          </TooltipTrigger>
+
+                          <TooltipContent>
+                            <p class="text-xs">{{ option.description }}</p>
+                            <p class="mt-1 text-xs font-semibold">
+                              Responses: {{ option.count }}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <span class="text-sm font-bold text-[#52525B]">
+                        {{ option.percentage }}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -123,7 +276,14 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import StatCard from '@/components/common/StatCard.vue'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { 
   FileText,
   Building2, 
@@ -168,4 +328,49 @@ const stats = ref({
   ccHelpfulness: 88.9,
   overallScore: 85.2
 })
+
+// Mock data for CC charts
+const ccData = ref({
+  awareness: [
+    { percentage: 89, count: 445, description: 'I know what a CC is and I saw this offices CC.' },
+    { percentage: 67, count: 335, description: 'I know what a CC is but I did NOT see this offices CC.' },
+    { percentage: 45, count: 225, description: 'I have learned of the CC only when I saw this offices CC.' },
+    { percentage: 23, count: 115, description: 'I do not know what a CC is and I did not see one in this office.' }
+  ],
+  visibility: [
+    { percentage: 78, count: 390, description: 'Easy to see' },
+    { percentage: 56, count: 280, description: 'Somewhat easy to see' },
+    { percentage: 34, count: 170, description: 'Difficult to see' },
+    { percentage: 34, count: 170, description: 'Not visible at all' },
+    { percentage: 34, count: 170, description: 'N/A' }
+  ],
+  helpfulness: [
+    { percentage: 82, count: 410, description: 'Helped very much' },
+    { percentage: 64, count: 320, description: 'Somewhat helped' },
+    { percentage: 41, count: 205, description: 'Did not help' },
+    { percentage: 18, count: 90, description: 'N/A' }
+  ]
+})
+
+const ccShadeMap = {
+  awareness: ['bg-[#DC2626]', 'bg-[#E55353]', 'bg-[#EF8080]', 'bg-[#F7B3B3]'],
+  visibility: ['bg-[#F5700B]', 'bg-[#F78A36]', 'bg-[#F9A461]', 'bg-[#FBC08D]'],
+  helpfulness: ['bg-[#9626DC]', 'bg-[#AB53E3]', 'bg-[#C080EA]', 'bg-[#D9B3F3]']
+}
+
+const getBarShade = (ccType, items, index) => {
+  const shades = ccShadeMap[ccType] || ccShadeMap.awareness
+  const value = items[index]?.percentage ?? 0
+
+  const sortedPercentages = [...items]
+    .map((item) => item.percentage ?? 0)
+    .sort((a, b) => b - a)
+
+  const rank = sortedPercentages.findIndex((percentage) => percentage === value)
+  const shadeIndex = Math.min(Math.max(rank, 0), shades.length - 1)
+
+  return shades[shadeIndex]
+}
 </script>
+
+
