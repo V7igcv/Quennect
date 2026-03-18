@@ -127,12 +127,12 @@
           </div>
 
           <!-- Main Card containing all CC charts -->
-          <Card class="rounded-2xl border border-gray-200 shadow-sm p-5">
+          <Card class="rounded-2xl border border-gray-200 shadow-sm">
             <CardContent class="p-6 lg:p-8">
               <div class="grid grid-cols-1 md:grid-cols-3 md:divide-x md:divide-gray-200">
 
                 <!-- CC1 - Awareness -->
-                <div class="space-y-4 md:pr-10 md:pt-0">
+                <div class="space-y-5 md:pr-10 md:pt-0">
                   <div class="flex items-center justify-between gap-3">
                     <span class="text-lg font-bold tracking-tight text-[#3F3F46]">CC1</span>
                     <span class="rounded-full bg-[#F7D4D4] px-4 py-1 text-sm font-semibold text-[#6B4E4E]">Awareness</span>
@@ -140,7 +140,7 @@
                   <p class="text-sm leading-tight text-[#4B5563]">
                     Which of the following best describes your awareness of a CC?
                   </p>
-                  <div class="space-y-3">
+                  <div class="space-y-5">
                     <div v-for="(option, index) in ccData.awareness" :key="`awareness-${index}`" class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
                       <span class="text-sm font-semibold text-[#3F3F46]">Option {{ index + 1 }}</span>
                       <TooltipProvider>
@@ -166,7 +166,7 @@
                 </div>
 
                 <!-- CC2 - Visibility -->
-                <div class="space-y-4 md:px-10 md:pt-0">
+                <div class="space-y-5 md:px-10 md:pt-0">
                   <div class="flex items-center justify-between gap-3">
                     <span class="text-lg font-bold tracking-tight text-[#3F3F46]">CC2</span>
                     <span class="rounded-full bg-[#F2D7BC] px-4 py-1 text-sm font-semibold text-[#6A4A2D]">Visibility</span>
@@ -176,7 +176,7 @@
                     If aware of CC, would you say that the CC of this office was...?
                   </p>
 
-                  <div class="space-y-3">
+                  <div class="space-y-5">
                     <div 
                       v-for="(option, index) in ccData.visibility" 
                       :key="`visibility-${index}`" 
@@ -215,7 +215,7 @@
                 </div>
 
                 <!-- CC3 - Helpfulness -->
-                <div class="space-y-4 md:pl-10 md:pt-0">
+                <div class="space-y-5 md:pl-10 md:pt-0">
                   <div class="flex items-center justify-between gap-3">
                     <span class="text-lg font-bold tracking-tight text-[#3F3F46]">CC3</span>
                     <span class="rounded-full bg-[#DCC9F3] px-4 py-1 text-sm font-semibold text-[#5C417A]">
@@ -227,7 +227,7 @@
                     If aware of CC, how much did the CC help you in your transactions?
                   </p>
 
-                  <div class="space-y-3">
+                  <div class="space-y-5">
                     <div 
                       v-for="(option, index) in ccData.helpfulness" 
                       :key="`helpfulness-${index}`" 
@@ -269,6 +269,20 @@
           </Card>
         </div>
       </div>
+      <!-- SDQ Results Section -->
+      <div>
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold">
+            SDQ Results 
+            <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
+          </h2>
+        </div>
+        
+        <SDQResultsCard 
+          :service-type="selectedServiceType"
+          :date-range="selectedDateRange"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -301,6 +315,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import SDQResultsCard from '@/components/CSM/SDQResultsCard.vue'
 
 // State for dropdowns
 const selectedServiceType = ref('external')
