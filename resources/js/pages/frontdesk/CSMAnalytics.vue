@@ -302,6 +302,21 @@
           </div>
         </div>
       </div>
+
+      <!-- Overall Score Per Service Section -->
+      <div>
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold">
+            Overall Score Per Service 
+            <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
+          </h2>
+        </div>
+        
+        <OverallScorePerServiceCard 
+          :service-type="selectedServiceType"
+          :date-range="selectedDateRange"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -336,6 +351,7 @@ import {
 } from '@/components/ui/select'
 import SDQResultsCard from '@/components/CSM/SDQResultsCard.vue'
 import DemographicProfileCard from '@/components/CSM/DemographicProfileCard.vue'
+import OverallScorePerServiceCard from '@/components/CSM/OverallScorePerServiceCard.vue'
 
 // State for dropdowns
 const selectedServiceType = ref('external')
