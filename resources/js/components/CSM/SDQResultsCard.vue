@@ -27,22 +27,31 @@
             <div
               v-for="(entry, index) in chartData"
               :key="'bar-' + index"
-              class="flex min-w-0 flex-1 flex-col items-center gap-2"
+              class="flex min-w-0 flex-1 flex-col items-center"
             >
-              <div class="flex h-48 w-full max-w-12 items-end">
-                <div
-                  class="w-full rounded-t-md transition-all duration-300"
-                  :style="{
-                    height: `${getBarHeight(entry.value)}%`,
-                    backgroundColor: getBarColor(entry.criteria)
-                  }"
-                  :title="`${entry.criteria}: ${entry.value}`"
-                ></div>
-              </div>
-              <span class="text-[11px] font-medium leading-tight text-center text-gray-600">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <div class="flex h-48 w-full max-w-12 items-end cursor-help">
+                      <div
+                        class="w-full rounded-t-md transition-all duration-300"
+                        :style="{
+                          height: `${getBarHeight(entry.value)}%`,
+                          backgroundColor: getBarColor(entry.criteria)
+                        }"
+                      ></div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
+                    <p class="font-semibold text-gray-900">{{ entry.criteria }}</p>
+                    <p class="mt-1 text-gray-600">Responses: <span class="font-semibold">{{ entry.value }}</span></p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <span class="mt-2 h-10 px-1 text-[11px] font-medium leading-tight text-center text-gray-600 flex items-start justify-center">
                 {{ entry.criteria }}
               </span>
-              <span class="text-xs font-semibold text-gray-900">{{ entry.value }}</span>
+              <span class="mt-1 text-xs font-semibold text-gray-900">{{ entry.value }}</span>
             </div>
           </div>
         </div>
@@ -75,6 +84,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 // Props
 const props = defineProps({

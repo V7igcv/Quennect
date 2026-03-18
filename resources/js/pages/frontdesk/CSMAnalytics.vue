@@ -154,9 +154,10 @@
                               ></div>
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p class="text-xs">{{ option.description }}</p>
-                            <p class="mt-1 text-xs font-semibold">Responses: {{ option.count }}</p>
+                          <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
+                            <p class="font-semibold text-gray-900">{{ option.description }}</p>
+                            <p class="mt-1 text-gray-600">Responses: <span class="font-semibold">{{ option.count }}</span></p>
+                            <p class="text-gray-600">Percentage: <span class="font-semibold">{{ option.percentage }}%</span></p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -198,11 +199,10 @@
                             </div>
                           </TooltipTrigger>
 
-                          <TooltipContent>
-                            <p class="text-xs">{{ option.description }}</p>
-                            <p class="mt-1 text-xs font-semibold">
-                              Responses: {{ option.count }}
-                            </p>
+                          <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
+                            <p class="font-semibold text-gray-900">{{ option.description }}</p>
+                            <p class="mt-1 text-gray-600">Responses: <span class="font-semibold">{{ option.count }}</span></p>
+                            <p class="text-gray-600">Percentage: <span class="font-semibold">{{ option.percentage }}%</span></p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -249,11 +249,10 @@
                             </div>
                           </TooltipTrigger>
 
-                          <TooltipContent>
-                            <p class="text-xs">{{ option.description }}</p>
-                            <p class="mt-1 text-xs font-semibold">
-                              Responses: {{ option.count }}
-                            </p>
+                          <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
+                            <p class="font-semibold text-gray-900">{{ option.description }}</p>
+                            <p class="mt-1 text-gray-600">Responses: <span class="font-semibold">{{ option.count }}</span></p>
+                            <p class="text-gray-600">Percentage: <span class="font-semibold">{{ option.percentage }}%</span></p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -269,19 +268,39 @@
           </Card>
         </div>
       </div>
-      <!-- SDQ Results Section -->
+
+      <!-- SDQ and Demographic Section -->
       <div>
-        <div class="mb-4">
-          <h2 class="text-xl font-semibold">
-            SDQ Results 
-            <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
-          </h2>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+          <div class="mb-4">
+            <h2 class="text-xl font-semibold">
+              SDQ Results
+              <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
+            </h2>
+          </div>
+          <div class="mb-4">
+            <h2 class="text-xl font-semibold">
+              Demographic Profile
+              <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
+            </h2>
+          </div>
         </div>
-        
-        <SDQResultsCard 
-          :service-type="selectedServiceType"
-          :date-range="selectedDateRange"
-        />
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+          <div class="space-y-3">
+            <SDQResultsCard
+              :service-type="selectedServiceType"
+              :date-range="selectedDateRange"
+            />
+          </div>
+
+          <div class="space-y-3">
+            <DemographicProfileCard
+              :service-type="selectedServiceType"
+              :date-range="selectedDateRange"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -316,6 +335,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import SDQResultsCard from '@/components/CSM/SDQResultsCard.vue'
+import DemographicProfileCard from '@/components/CSM/DemographicProfileCard.vue'
 
 // State for dropdowns
 const selectedServiceType = ref('external')
