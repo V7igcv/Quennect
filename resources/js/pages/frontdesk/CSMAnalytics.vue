@@ -21,20 +21,125 @@
           </SelectContent>
         </Select>
 
-        <!-- Date Dropdown -->
-        <Select v-model="selectedDateRange">
-          <SelectTrigger class="w-full sm:w-[180px] bg-white cursor-pointer">
-            <span class="flex items-center gap-2">
-              <Calendar class="h-4 w-4 text-gray-500 shrink-0" />
-              <SelectValue placeholder="Date Range" />
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="daily">Daily</SelectItem>
-            <SelectItem value="monthly">Monthly</SelectItem>
-            <SelectItem value="yearly">Yearly</SelectItem>
-          </SelectContent>
-        </Select>
+        <!-- Date Filter Dropdown -->
+        <Popover v-model:open="isDateFilterOpen">
+          <PopoverTrigger as-child>
+            <Button variant="outline" class="w-full sm:w-[220px] justify-start bg-white">
+              <span class="flex items-center gap-2">
+                <Calendar class="h-4 w-4 text-gray-500 shrink-0" />
+                <span class="truncate">{{ dateFilterLabel }}</span>
+              </span>
+            </Button>
+          </PopoverTrigger>
+
+          <PopoverContent align="end" class="w-[320px] p-3">
+            <!-- Daily -->
+            <div v-if="selectedDateRange === 'daily'" class="space-y-3">
+              <div class="flex items-center justify-between">
+                <Button variant="ghost" size="icon" class="h-8 w-8" @click="goToPrevDailyMonth">
+                  <ChevronLeft class="h-4 w-4" />
+                </Button>
+                <p class="text-sm font-semibold">{{ dailyHeaderLabel }}</p>
+                <Button variant="ghost" size="icon" class="h-8 w-8" @click="goToNextDailyMonth">
+                  <ChevronRight class="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div class="grid grid-cols-7 gap-1 text-center text-xs text-gray-500">
+                <span v-for="dayName in weekDayLabels" :key="dayName">{{ dayName }}</span>
+              </div>
+
+              <div class="grid grid-cols-7 gap-1">
+                <button
+                  v-for="(cell, index) in dailyCalendarCells"
+                  :key="`day-cell-${index}`"
+                  type="button"
+                  :disabled="!cell"
+                  class="h-9 rounded-md text-sm transition-colors"
+                  :class="[
+                    !cell ? 'cursor-default' : 'hover:bg-gray-100',
+                    cell && isSelectedDay(cell) ? 'bg-[#111827] text-white hover:bg-[#111827]' : 'text-gray-800'
+                  ]"
+                  @click="cell && selectDailyDate(cell)"
+                >
+                  {{ cell ?? '' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Monthly -->
+            <div v-else-if="selectedDateRange === 'monthly'" class="space-y-3">
+              <div class="flex items-center justify-between">
+                <Button variant="ghost" size="icon" class="h-8 w-8" @click="selectedMonthYear -= 1">
+                  <ChevronLeft class="h-4 w-4" />
+                </Button>
+                <p class="text-sm font-semibold">{{ monthNames[selectedMonthIndex] }} {{ selectedMonthYear }}</p>
+                <Button variant="ghost" size="icon" class="h-8 w-8" @click="selectedMonthYear += 1">
+                  <ChevronRight class="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2">
+                <button
+                  v-for="(monthName, monthIndex) in monthNames"
+                  :key="monthName"
+                  type="button"
+                  class="h-9 rounded-md border text-xs font-medium transition-colors"
+                  :class="monthIndex === selectedMonthIndex ? 'border-[#111827] bg-[#111827] text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
+                  @click="selectedMonthIndex = monthIndex"
+                >
+                  {{ monthName.slice(0, 3).toUpperCase() }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Yearly -->
+            <div v-else class="space-y-3">
+              <p class="text-center text-sm font-semibold">{{ selectedYear }}</p>
+
+              <div class="max-h-56 space-y-1 overflow-y-auto pr-1">
+                <button
+                  v-for="yearOption in yearOptions"
+                  :key="yearOption"
+                  type="button"
+                  class="flex h-9 w-full items-center justify-between rounded-md px-3 text-sm transition-colors"
+                  :class="String(yearOption) === selectedYear ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'"
+                  @click="selectedYear = String(yearOption)"
+                >
+                  <span>{{ yearOption }}</span>
+                  <span v-if="String(yearOption) === selectedYear" class="text-xs">✓</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-3 grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                size="sm"
+                :variant="selectedDateRange === 'daily' ? 'default' : 'secondary'"
+                @click="selectedDateRange = 'daily'"
+              >
+                Daily
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                :variant="selectedDateRange === 'monthly' ? 'default' : 'secondary'"
+                @click="selectedDateRange = 'monthly'"
+              >
+                Monthly
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                :variant="selectedDateRange === 'yearly' ? 'default' : 'secondary'"
+                @click="selectedDateRange = 'yearly'"
+              >
+                Yearly
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
 
@@ -322,7 +427,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import StatCard from '@/components/common/StatCard.vue'
@@ -336,6 +441,8 @@ import {
   FileText,
   Building2, 
   Calendar, 
+  ChevronLeft,
+  ChevronRight,
   Users, 
   Megaphone, 
   Eye, 
@@ -349,13 +456,142 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import SDQResultsCard from '@/components/CSM/SDQResultsCard.vue'
 import DemographicProfileCard from '@/components/CSM/DemographicProfileCard.vue'
 import OverallScorePerServiceCard from '@/components/CSM/OverallScorePerServiceCard.vue'
 
 // State for dropdowns
 const selectedServiceType = ref('external')
-const selectedDateRange = ref('monthly')
+const selectedDateRange = ref('daily')
+const isDateFilterOpen = ref(false)
+
+const bodyOriginalOverflow = ref('')
+const htmlOriginalOverflow = ref('')
+
+const lockPageScroll = () => {
+  if (typeof document === 'undefined') {
+    return
+  }
+
+  bodyOriginalOverflow.value = document.body.style.overflow
+  htmlOriginalOverflow.value = document.documentElement.style.overflow
+  document.body.style.overflow = 'hidden'
+  document.documentElement.style.overflow = 'hidden'
+}
+
+const unlockPageScroll = () => {
+  if (typeof document === 'undefined') {
+    return
+  }
+
+  document.body.style.overflow = bodyOriginalOverflow.value
+  document.documentElement.style.overflow = htmlOriginalOverflow.value
+}
+
+watch(isDateFilterOpen, (isOpen) => {
+  if (isOpen) {
+    lockPageScroll()
+    return
+  }
+  unlockPageScroll()
+})
+
+onBeforeUnmount(() => {
+  unlockPageScroll()
+})
+
+// Date filter state
+const now = new Date()
+const selectedDate = ref(new Date(now.getFullYear(), now.getMonth(), now.getDate()))
+const selectedMonthIndex = ref(now.getMonth())
+const selectedMonthYear = ref(now.getFullYear())
+const selectedYear = ref(String(now.getFullYear()))
+const dailyViewMonth = ref(now.getMonth())
+const dailyViewYear = ref(now.getFullYear())
+
+const monthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+const weekDayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+
+const dateFilterLabel = computed(() => {
+  if (selectedDateRange.value === 'daily') {
+    return selectedDate.value.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
+
+  if (selectedDateRange.value === 'monthly') {
+    return `${monthNames[selectedMonthIndex.value]} ${selectedMonthYear.value}`
+  }
+
+  return selectedYear.value
+})
+
+const dailyHeaderLabel = computed(() => `${monthNames[dailyViewMonth.value]} ${dailyViewYear.value}`)
+
+const yearOptions = computed(() => {
+  const years = []
+  const currentYear = new Date().getFullYear()
+  for (let year = currentYear + 2; year >= currentYear - 60; year -= 1) {
+    years.push(year)
+  }
+  return years
+})
+
+const dailyCalendarCells = computed(() => {
+  const firstDayOfMonth = new Date(dailyViewYear.value, dailyViewMonth.value, 1).getDay()
+  const totalDays = new Date(dailyViewYear.value, dailyViewMonth.value + 1, 0).getDate()
+
+  const cells = []
+  for (let i = 0; i < firstDayOfMonth; i += 1) {
+    cells.push(null)
+  }
+  for (let day = 1; day <= totalDays; day += 1) {
+    cells.push(day)
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push(null)
+  }
+
+  return cells
+})
+
+const goToPrevDailyMonth = () => {
+  if (dailyViewMonth.value === 0) {
+    dailyViewMonth.value = 11
+    dailyViewYear.value -= 1
+    return
+  }
+  dailyViewMonth.value -= 1
+}
+
+const goToNextDailyMonth = () => {
+  if (dailyViewMonth.value === 11) {
+    dailyViewMonth.value = 0
+    dailyViewYear.value += 1
+    return
+  }
+  dailyViewMonth.value += 1
+}
+
+const selectDailyDate = (day) => {
+  selectedDate.value = new Date(dailyViewYear.value, dailyViewMonth.value, day)
+}
+
+const isSelectedDay = (day) => {
+  return selectedDate.value.getFullYear() === dailyViewYear.value
+    && selectedDate.value.getMonth() === dailyViewMonth.value
+    && selectedDate.value.getDate() === day
+}
 
 // Computed property for service type label
 const getServiceTypeLabel = computed(() => {

@@ -58,6 +58,7 @@ export default {
     const router = useRouter()
     const sidebarCollapsed = ref(false)
     const mobileSidebarOpen = ref(false)
+    const isRefreshing = ref(false)
 
     // Initialize with stored user data immediately - this prevents "Loading..." flash
     const currentUser = ref(authService.getCurrentUser())
@@ -118,6 +119,7 @@ export default {
     return {
       sidebarCollapsed,
       mobileSidebarOpen,
+      isRefreshing,
       currentUser,
       toggleSidebar,
       toggleMobileSidebar,
