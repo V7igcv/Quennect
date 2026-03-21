@@ -199,6 +199,12 @@ class FrontdeskController extends Controller
             $queue->status = 'SERVING';
             $queue->counter_id = $counter->id;
             $queue->called_at = now();
+            
+            // Calculate and store waiting time
+            if ($queue->created_at) {
+                $queue->waiting_time = (int) round($queue->created_at->diffInMinutes($queue->called_at));
+            }
+            
             $queue->save();
 
             DB::commit();
@@ -336,6 +342,12 @@ class FrontdeskController extends Controller
             // Update queue transaction
             $queue->status = 'COMPLETED';
             $queue->completed_at = now();
+            
+            // Calculate and store serving time
+            if ($queue->called_at) {
+                $queue->serving_time = (int) round($queue->called_at->diffInMinutes($queue->completed_at));
+            }
+            
             $queue->save();
 
             DB::commit();

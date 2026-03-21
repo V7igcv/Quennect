@@ -203,6 +203,9 @@ class EvaluationController extends Controller
             // Update transaction status to COMPLETED
             $transaction->status = 'COMPLETED';
             $transaction->completed_at = now();
+            if ($transaction->called_at) {
+                $transaction->serving_time = (int) round($transaction->called_at->diffInMinutes($transaction->completed_at));
+            }
             $transaction->average_satisfaction_rating = $averageRating;
             $transaction->save();
 

@@ -28,6 +28,8 @@ class QueueTransaction extends Model
         'completed_at',
         'skipped_at',
         'average_satisfaction_rating',
+        'waiting_time',
+        'serving_time',
     ];
 
     protected $casts = [
