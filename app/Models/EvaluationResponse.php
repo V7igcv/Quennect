@@ -13,6 +13,8 @@ class EvaluationResponse extends Model
 
     protected $fillable = [
         'queue_transaction_id',
+        'internal_transaction_id',
+        'evaluation_session_id',
         'question_id',
         'answer_value',
         'rating_value'
@@ -28,6 +30,11 @@ class EvaluationResponse extends Model
     public function queueTransaction()
     {
         return $this->belongsTo(QueueTransaction::class, 'queue_transaction_id');
+    }
+
+    public function evaluationSession()
+    {
+        return $this->belongsTo(EvaluationSession::class, 'evaluation_session_id');
     }
 
     /**

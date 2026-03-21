@@ -118,15 +118,18 @@
               <div class="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
                 <span>Rows per page</span>
 
-                <select 
-                  class="border rounded-md px-2 py-1 text-sm"
-                  :value="rowsPerPage"
-                  @change="changeRowsPerPage($event.target.value)"
-                >
-                  <option value="5">5</option>
-                  <option value="10">10</option>
-                  <option value="20">20</option>
-                </select>
+                <div class="relative">
+                  <select 
+                    class="appearance-none border rounded-md pl-2 pr-8 py-1 text-sm"
+                    :value="rowsPerPage"
+                    @change="changeRowsPerPage($event.target.value)"
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                  </select>
+                  <ChevronDown class="w-4 h-4 text-gray-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
               </div>
 
               <!-- Page indicator -->
@@ -377,6 +380,7 @@
       :queue-number="selectedQueueNumber"
       :customer-name="selectedCustomerName"
       :contact-number="selectedContactNumber"
+      :barangay="selectedBarangay"
       :likert-questions="likertQuestions"
       @submit="handleEvaluationSubmit"
       @alert="handleAlert"
@@ -390,7 +394,7 @@ import api from '@/services/api'
 import StatCard from '@/components/common/StatCard.vue'
 import EvaluationModal from '@/components/modals/EvaluationModal.vue'
 
-import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone } from 'lucide-vue-next'
+import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone, ChevronDown } from 'lucide-vue-next'
 
 import {
   Table,
@@ -449,6 +453,7 @@ const showEvaluationModal = ref(false)
 const selectedQueueNumber = ref('')
 const selectedCustomerName = ref('')
 const selectedContactNumber = ref('')
+const selectedBarangay = ref('')
 const selectedQueueId = ref(null)
 const likertQuestions = ref([])
 
@@ -742,6 +747,7 @@ const openEvaluationModal = async (queueData) => {
       selectedQueueNumber.value = transaction.queue_number
       selectedCustomerName.value = transaction.client_name
       selectedContactNumber.value = transaction.contact_number
+      selectedBarangay.value = transaction.barangay_name || ''
       selectedQueueId.value = queueData.id
       showEvaluationModal.value = true
     }
@@ -759,6 +765,11 @@ const handleEvaluationSubmit = async (formData) => {
   try {
     // Format the data for the backend API
     const evaluationData = {
+      session: {
+        client_type: formData.client_type || null,
+        sex: formData.sex || null,
+        age: formData.age ?? null
+      },
       responses: {
         multiple_choice: {
           1: String(formData.cc1), // CC1
@@ -791,6 +802,7 @@ const handleEvaluationSubmit = async (formData) => {
       selectedQueueNumber.value = ''
       selectedCustomerName.value = ''
       selectedContactNumber.value = ''
+      selectedBarangay.value = ''
       
       alertTitle.value = 'Success'
       alertMessage.value = 'Evaluation submitted successfully!'

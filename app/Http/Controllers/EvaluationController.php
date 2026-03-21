@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\EvaluationQuestion;
 use App\Models\EvaluationResponse;
+use App\Models\EvaluationSession;
 use App\Models\QueueTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -79,7 +80,8 @@ class EvaluationController extends Controller
         $user = Auth::user();
 
         try {
-            $transaction = QueueTransaction::where('id', $queueId)
+            $transaction = QueueTransaction::with('barangay')
+                ->where('id', $queueId)
                 ->where('office_id', $user->office_id)
                 ->where('status', 'SERVING')
                 ->first();
@@ -104,6 +106,7 @@ class EvaluationController extends Controller
                     'queue_number' => $transaction->full_queue_number,
                     'client_name' => $transaction->client_name,
                     'contact_number' => $transaction->contact_number,
+                    'barangay_name' => $transaction->barangay?->barangay_name,
                     'services' => $transaction->services->pluck('service_code')->implode(', ')
                 ]
             ]);
@@ -129,6 +132,10 @@ class EvaluationController extends Controller
         $user = Auth::user();
 
         $request->validate([
+            'session' => 'required|array',
+            'session.client_type' => 'required|in:Citizen,Business,Government',
+            'session.sex' => 'required|in:Male,Female',
+            'session.age' => 'required|integer|min:1|max:120',
             'responses' => 'required|array',
             'responses.multiple_choice' => 'sometimes|array',
             'responses.multiple_choice.*' => 'required|string', // question_id => answer_value
@@ -161,11 +168,19 @@ class EvaluationController extends Controller
             $totalRating = 0;
             $likertCount = 0;
 
+            $evaluationSession = EvaluationSession::create([
+                'queue_transaction_id' => $transaction->id,
+                'client_type' => $request->input('session.client_type'),
+                'sex' => $request->input('session.sex'),
+                'age' => $request->input('session.age'),
+            ]);
+
             // Save multiple choice responses
             if (isset($request->responses['multiple_choice'])) {
                 foreach ($request->responses['multiple_choice'] as $questionId => $answerValue) {
                     EvaluationResponse::create([
                         'queue_transaction_id' => $transaction->id,
+                        'evaluation_session_id' => $evaluationSession->id,
                         'question_id' => $questionId,
                         'answer_value' => $answerValue,
                         'rating_value' => null
@@ -187,6 +202,7 @@ class EvaluationController extends Controller
 
                     EvaluationResponse::create([
                         'queue_transaction_id' => $transaction->id,
+                        'evaluation_session_id' => $evaluationSession->id,
                         'question_id' => $questionId,
                         'answer_value' => $value,
                         'rating_value' => $ratingValue

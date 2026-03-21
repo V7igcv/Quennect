@@ -40,6 +40,54 @@
         <p class="text-[#2E2E2E] font-medium">Contact Number:</p>
         <p class="text-[#474C55]">{{ contactNumber }}</p>
       </div>
+      <div class="flex justify-start gap-2">
+        <p class="text-[#2E2E2E] font-medium">Barangay:</p>
+        <p class="text-[#474C55]">{{ barangay || 'N/A' }}</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+        <div>
+          <label class="block text-sm font-medium text-[#2E2E2E] mb-1">Client Type</label>
+          <div class="relative">
+            <select
+              v-model="clientType"
+              class="w-full appearance-none border border-gray-300 rounded-md px-3 pr-8 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
+            >
+              <option value="">Select client type</option>
+              <option value="Citizen">Citizen</option>
+              <option value="Business">Business</option>
+              <option value="Government">Government</option>
+            </select>
+            <ChevronDown class="w-4 h-4 text-gray-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-[#2E2E2E] mb-1">Sex</label>
+          <div class="relative">
+            <select
+              v-model="sex"
+              class="w-full appearance-none border border-gray-300 rounded-md px-3 pr-8 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
+            >
+              <option value="">Select sex</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+            <ChevronDown class="w-4 h-4 text-gray-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-[#2E2E2E] mb-1">Age</label>
+          <input
+            v-model.number="age"
+            type="number"
+            min="0"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
+            placeholder="Enter age"
+          >
+        </div>
+      </div>
 
       <div class="border-t border-gray-200 w-11/11 mx-auto my-4"></div>
 
@@ -237,7 +285,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { X } from 'lucide-vue-next'
+import { X, ChevronDown } from 'lucide-vue-next'
 import {
   Table,
   TableBody,
@@ -266,6 +314,10 @@ const props = defineProps({
     type: String,
     default: '09999999999'
   },
+  barangay: {
+    type: String,
+    default: ''
+  },
   likertQuestions: {
     type: Array,
     default: () => []
@@ -285,6 +337,9 @@ const currentPage = ref(1)
 const cc1 = ref('')
 const cc2 = ref('')
 const cc3 = ref('')
+const clientType = ref('')
+const sex = ref('')
+const age = ref('')
 
 // Form data for Page 2 - Likert ratings
 const likertRatings = ref({
@@ -351,6 +406,9 @@ const resetForm = () => {
   cc1.value = ''
   cc2.value = ''
   cc3.value = ''
+  clientType.value = ''
+  sex.value = ''
+  age.value = ''
   likertRatings.value = {
     sqd0: '', sqd1: '', sqd2: '', sqd3: '', sqd4: '', sqd5: '', sqd6: '', sqd7: '', sqd8: ''
   }
@@ -402,6 +460,27 @@ const handleSubmit = () => {
     return
   }
 
+  if (!clientType.value) {
+    emit('alert', { title: 'Validation Error', message: 'Please select a client type.' })
+    return
+  }
+
+  if (!sex.value) {
+    emit('alert', { title: 'Validation Error', message: 'Please select sex.' })
+    return
+  }
+
+  if (age.value === '' || age.value === null || age.value === undefined) {
+    emit('alert', { title: 'Validation Error', message: 'Please enter age.' })
+    return
+  }
+
+  const normalizedAge = Number(age.value)
+  if (!Number.isInteger(normalizedAge) || normalizedAge < 1 || normalizedAge > 120) {
+    emit('alert', { title: 'Validation Error', message: 'Age must be a whole number from 1 to 120.' })
+    return
+  }
+
   // Check if all likert questions are answered
   const unansweredLikert = Object.values(likertRatings.value).some(rating => !rating)
   if (unansweredLikert) {
@@ -416,12 +495,16 @@ const handleSubmit = () => {
     cc1: cc1.value,
     cc2: cc2.value,
     cc3: cc3.value,
+    client_type: clientType.value,
+    sex: sex.value,
+    age: normalizedAge,
     // Page 2 data
     likertRatings: likertRatings.value,
     // Customer info
     queueNumber: props.queueNumber,
     customerName: props.customerName,
-    contactNumber: props.contactNumber
+    contactNumber: props.contactNumber,
+    barangay: props.barangay
   }
   
   // Emit the form data
