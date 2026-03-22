@@ -431,9 +431,8 @@ import {
   PaginationLast,
 } from '@/components/ui/pagination'
 
-const selectedOffice = ref('all')
+const selectedOffice = ref('bpso')
 const officeOptions = ref([
-  { value: 'all', label: 'All Offices' },
   { value: 'bpso', label: 'Business Permit and Licensing Office' },
   { value: 'assessor', label: 'City Assessor Office' },
   { value: 'treasury', label: 'City Treasury Office' },
