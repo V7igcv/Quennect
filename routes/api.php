@@ -16,6 +16,7 @@ use App\Http\Controllers\PrintController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\OfficeManagementController;
 use App\Http\Controllers\ServiceManagementController;
+use App\Http\Controllers\FrontdeskAnalyticsController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -104,6 +105,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/queue/skip-from-table/{queueId}', [FrontdeskController::class, 'skipFromTable']);
     Route::post('/queue/skip-from-counter/{queueId}', [FrontdeskController::class, 'skipFromCounter']);
     Route::post('/queue/complete/{queueId}', [FrontdeskController::class, 'completeTransaction']);
+
+    // Analytics
+    Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);
+    Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
+    Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
+    Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
 
     // Counter Management
     Route::get('/counters', [CounterController::class, 'index']);

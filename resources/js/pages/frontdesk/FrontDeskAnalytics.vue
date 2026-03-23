@@ -183,7 +183,7 @@
     <!-- Charts Row -->
     <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div>
-        <h2 class="mb-3 text-lg font-semibold">Client Satisfaction Distribution</h2>
+        <h2 class="mb-3 text-lg font-semibold">Average Client Satisfaction Distribution</h2>
         <Card class="w-full">
         <CardContent class="pt-6">
           <div class="h-[300px] w-full">
@@ -288,8 +288,8 @@
               <TableHead class="w-[11.11%]">Lane Type</TableHead>
               <TableHead class="w-[11.11%]">Status</TableHead>
               <TableHead class="w-[11.11%]">Completion Time</TableHead>
-              <TableHead class="w-[11.11%]">Average Waiting Time</TableHead>
-              <TableHead class="w-[11.11%]">Average Serving Time</TableHead>
+              <TableHead class="w-[11.11%]">Waiting Time</TableHead>
+              <TableHead class="w-[11.11%]">Service Time</TableHead>
               <TableHead class="w-[11.11%]">Average Satisfaction Rating</TableHead>
             </TableRow>
           </TableHeader>

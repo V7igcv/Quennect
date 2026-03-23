@@ -309,8 +309,8 @@
               <TableHead class="w-[11.11%]">Lane Type</TableHead>
               <TableHead class="w-[11.11%]">Status</TableHead>
               <TableHead class="w-[11.11%]">Completion Time</TableHead>
-              <TableHead class="w-[11.11%]">Average Waiting Time</TableHead>
-              <TableHead class="w-[11.11%]">Average Serving Time</TableHead>
+              <TableHead class="w-[11.11%]">Waiting Time</TableHead>
+              <TableHead class="w-[11.11%]">Service Time</TableHead>
               <TableHead class="w-[11.11%]">Average Satisfaction Rating</TableHead>
             </TableRow>
           </TableHeader>
