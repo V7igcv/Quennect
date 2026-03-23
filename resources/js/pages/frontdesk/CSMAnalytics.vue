@@ -116,7 +116,9 @@
               <Button
                 type="button"
                 size="sm"
-                :variant="selectedDateRange === 'daily' ? 'default' : 'secondary'"
+                variant="outline"
+                class="font-medium"
+                :class="selectedDateRange === 'daily' ? 'border-[#0F5C5C] bg-[#0F5C5C] text-white hover:bg-[#0C4B4B] hover:text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
                 @click="selectedDateRange = 'daily'"
               >
                 Daily
@@ -124,7 +126,9 @@
               <Button
                 type="button"
                 size="sm"
-                :variant="selectedDateRange === 'monthly' ? 'default' : 'secondary'"
+                variant="outline"
+                class="font-medium"
+                :class="selectedDateRange === 'monthly' ? 'border-[#0F5C5C] bg-[#0F5C5C] text-white hover:bg-[#0C4B4B] hover:text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
                 @click="selectedDateRange = 'monthly'"
               >
                 Monthly
@@ -132,7 +136,9 @@
               <Button
                 type="button"
                 size="sm"
-                :variant="selectedDateRange === 'yearly' ? 'default' : 'secondary'"
+                variant="outline"
+                class="font-medium"
+                :class="selectedDateRange === 'yearly' ? 'border-[#0F5C5C] bg-[#0F5C5C] text-white hover:bg-[#0C4B4B] hover:text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
                 @click="selectedDateRange = 'yearly'"
               >
                 Yearly

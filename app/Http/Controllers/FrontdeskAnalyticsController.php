@@ -34,19 +34,15 @@ class FrontdeskAnalyticsController extends Controller
                 ], 401);
             }
 
-            if (!$user->office_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User is not assigned to any office.',
-                ], 403);
-            }
-
             $validated = $request->validate([
                 'period' => 'nullable|in:daily,monthly,yearly',
                 'date' => 'nullable|date_format:Y-m-d',
                 'month' => 'nullable|integer|min:1|max:12',
                 'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
             ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
 
             $period = $validated['period'] ?? 'daily';
             $today = now();
@@ -59,7 +55,7 @@ class FrontdeskAnalyticsController extends Controller
             $year = $validated['year'] ?? $today->year;
 
             $baseQuery = QueueTransaction::query()
-                ->where('office_id', $user->office_id)
+                ->where('office_id', $officeId)
                 ->whereHas('services', function (Builder $query) {
                     $query->where('service_type', 'External');
                 });
@@ -135,19 +131,15 @@ class FrontdeskAnalyticsController extends Controller
                 ], 401);
             }
 
-            if (!$user->office_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User is not assigned to any office.',
-                ], 403);
-            }
-
             $validated = $request->validate([
                 'period' => 'nullable|in:daily,monthly,yearly',
                 'date' => 'nullable|date_format:Y-m-d',
                 'month' => 'nullable|integer|min:1|max:12',
                 'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
             ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
 
             $period = $validated['period'] ?? 'daily';
             $today = now();
@@ -160,10 +152,12 @@ class FrontdeskAnalyticsController extends Controller
             $year = (int) ($validated['year'] ?? $today->year);
 
             $queueTransactionsQuery = QueueTransaction::query()
-                ->where('office_id', $user->office_id)
+                ->where('office_id', $officeId)
                 ->whereHas('services', function (Builder $query) {
                     $query->where('service_type', 'External');
-                });
+                })
+                ->where('status', TransactionStatus::COMPLETED->value)
+                ->whereHas('evaluationResponses');
 
             $filteredQueueTransactionsQuery = $this->applyDateFilter(
                 $queueTransactionsQuery,
@@ -219,8 +213,8 @@ class FrontdeskAnalyticsController extends Controller
 
             $totalResponses = EvaluationResponse::query()
                 ->whereNotNull('queue_transaction_id')
-                ->whereHas('queueTransaction', function (Builder $query) use ($user, $period, $date, $month, $year) {
-                    $query->where('office_id', $user->office_id)
+                ->whereHas('queueTransaction', function (Builder $query) use ($officeId, $period, $date, $month, $year) {
+                    $query->where('office_id', $officeId)
                         ->whereHas('services', function (Builder $serviceQuery) {
                             $serviceQuery->where('service_type', 'External');
                         });
@@ -271,19 +265,15 @@ class FrontdeskAnalyticsController extends Controller
                 ], 401);
             }
 
-            if (!$user->office_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User is not assigned to any office.',
-                ], 403);
-            }
-
             $validated = $request->validate([
                 'period' => 'nullable|in:daily,monthly,yearly',
                 'date' => 'nullable|date_format:Y-m-d',
                 'month' => 'nullable|integer|min:1|max:12',
                 'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
             ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
 
             $period = $validated['period'] ?? 'daily';
             $today = now();
@@ -296,10 +286,12 @@ class FrontdeskAnalyticsController extends Controller
             $year = (int) ($validated['year'] ?? $today->year);
 
             $baseTransactionsQuery = QueueTransaction::query()
-                ->where('office_id', $user->office_id)
+                ->where('office_id', $officeId)
                 ->whereHas('services', function (Builder $query) {
                     $query->where('service_type', 'External');
-                });
+                })
+                ->where('status', TransactionStatus::COMPLETED->value)
+                ->whereHas('evaluationResponses');
 
             $filteredTransactionsQuery = $this->applyDateFilter(
                 $baseTransactionsQuery,
@@ -410,13 +402,6 @@ class FrontdeskAnalyticsController extends Controller
                 ], 401);
             }
 
-            if (!$user->office_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User is not assigned to any office.',
-                ], 403);
-            }
-
             $validated = $request->validate([
                 'period' => 'nullable|in:daily,monthly,yearly',
                 'date' => 'nullable|date_format:Y-m-d',
@@ -424,7 +409,10 @@ class FrontdeskAnalyticsController extends Controller
                 'year' => 'nullable|integer|min:2000|max:2100',
                 'page' => 'nullable|integer|min:1',
                 'per_page' => 'nullable|integer|min:1|max:50',
+                'office_id' => 'nullable|integer|exists:offices,id',
             ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
 
             $period = $validated['period'] ?? 'daily';
             $today = now();
@@ -445,7 +433,7 @@ class FrontdeskAnalyticsController extends Controller
                             ->where('service_type', 'External');
                     },
                 ])
-                ->where('office_id', $user->office_id)
+                ->where('office_id', $officeId)
                 ->whereIn('status', [
                     TransactionStatus::COMPLETED->value,
                     TransactionStatus::SKIPPED->value,
@@ -486,8 +474,12 @@ class FrontdeskAnalyticsController extends Controller
                     'lane_type' => $transaction->is_priority ? 'Priority' : 'Regular',
                     'status' => $isSkipped ? 'Skipped' : 'Completed',
                     'completion_time' => $completionTime?->format('h:i A'),
-                    'waiting_time' => $transaction->waiting_time,
-                    'service_time' => $transaction->serving_time,
+                    'waiting_time' => $transaction->waiting_time === null
+                        ? null
+                        : round((float) $transaction->waiting_time, 2),
+                    'service_time' => $transaction->serving_time === null
+                        ? null
+                        : round((float) $transaction->serving_time, 2),
                     'average_satisfaction_rating' => $isSkipped
                         ? '-'
                         : $this->mapAverageSatisfactionLabel($transaction->average_satisfaction_rating),
@@ -539,6 +531,27 @@ class FrontdeskAnalyticsController extends Controller
         $normalizedRating = (int) round((float) $averageRating);
 
         return $labelMap[$normalizedRating] ?? '-';
+    }
+
+    private function resolveOfficeId($user, array $validated): int
+    {
+        if ($user->isSuperadmin()) {
+            if (empty($validated['office_id'])) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'office_id' => ['The office_id field is required for superadmin analytics.'],
+                ]);
+            }
+
+            return (int) $validated['office_id'];
+        }
+
+        if (!$user->office_id) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'office_id' => ['No office is assigned to this user.'],
+            ]);
+        }
+
+        return (int) $user->office_id;
     }
 
     private function applyDateFilter(

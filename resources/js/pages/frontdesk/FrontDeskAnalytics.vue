@@ -99,7 +99,9 @@
             <Button
               type="button"
               size="sm"
-              :variant="selectedDateRange === 'daily' ? 'default' : 'secondary'"
+              variant="outline"
+              class="font-medium"
+              :class="selectedDateRange === 'daily' ? 'border-[#0F5C5C] bg-[#0F5C5C] text-white hover:bg-[#0C4B4B] hover:text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
               @click="selectedDateRange = 'daily'"
             >
               Daily
@@ -107,7 +109,9 @@
             <Button
               type="button"
               size="sm"
-              :variant="selectedDateRange === 'monthly' ? 'default' : 'secondary'"
+              variant="outline"
+              class="font-medium"
+              :class="selectedDateRange === 'monthly' ? 'border-[#0F5C5C] bg-[#0F5C5C] text-white hover:bg-[#0C4B4B] hover:text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
               @click="selectedDateRange = 'monthly'"
             >
               Monthly
@@ -115,7 +119,9 @@
             <Button
               type="button"
               size="sm"
-              :variant="selectedDateRange === 'yearly' ? 'default' : 'secondary'"
+              variant="outline"
+              class="font-medium"
+              :class="selectedDateRange === 'yearly' ? 'border-[#0F5C5C] bg-[#0F5C5C] text-white hover:bg-[#0C4B4B] hover:text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
               @click="selectedDateRange = 'yearly'"
             >
               Yearly
@@ -123,6 +129,14 @@
           </div>
         </PopoverContent>
       </Popover>
+    </div>
+
+    <div
+      v-if="isLoadingAnalytics"
+      class="mb-4 flex items-center gap-2 rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm font-medium text-[#0F5C5C]"
+    >
+      <Loader2 class="h-4 w-4 animate-spin" />
+      Loading analytics data...
     </div>
 
     <!-- Stat Cards -->
@@ -185,91 +199,91 @@
       <div>
         <h2 class="mb-3 text-lg font-semibold">Average Client Satisfaction Distribution</h2>
         <Card class="w-full">
-        <CardContent class="pt-6">
-          <div class="h-[300px] w-full">
-            <div class="h-full rounded-lg border border-gray-100 bg-gray-50 p-4">
-              <div class="flex h-full items-end gap-3 border-b border-gray-200 pb-3">
-                <div
-                  v-for="(entry, index) in clientSatisfactionData"
-                  :key="`client-satisfaction-bar-${index}`"
-                  class="flex min-w-0 flex-1 flex-col items-center"
-                >
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <div class="flex h-48 w-full max-w-12 items-end cursor-help">
-                          <div
-                            class="w-full rounded-t-md transition-all duration-300"
-                            :style="{
-                              height: `${getClientSatisfactionBarHeight(entry.value)}%`,
-                              backgroundColor: getClientSatisfactionBarColor(entry.label)
-                            }"
-                          ></div>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
-                        <p class="font-semibold text-gray-900">{{ entry.label }}</p>
-                        <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ entry.value }}</span></p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <span class="mt-2 h-10 px-1 text-[11px] font-medium leading-tight text-center text-gray-600 flex items-start justify-center">
-                    {{ entry.label }}
-                  </span>
-                  <span class="mt-1 text-xs font-semibold text-gray-900">{{ entry.value }}</span>
+          <CardContent class="pt-6">
+            <div class="h-[300px] w-full">
+              <div class="h-full rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <div class="flex h-full items-end gap-3 border-b border-gray-200 pb-3">
+                  <div
+                    v-for="(entry, index) in clientSatisfactionData"
+                    :key="`client-satisfaction-bar-${index}`"
+                    class="flex min-w-0 flex-1 flex-col items-center"
+                  >
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger as-child>
+                          <div class="flex h-48 w-full max-w-12 items-end cursor-help">
+                            <div
+                              class="w-full rounded-t-md transition-all duration-300"
+                              :style="{
+                                height: `${getClientSatisfactionBarHeight(entry.value)}%`,
+                                backgroundColor: getClientSatisfactionBarColor(entry.label)
+                              }"
+                            ></div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
+                          <p class="font-semibold text-gray-900">{{ entry.label }}</p>
+                          <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ entry.value }}</span></p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <span class="mt-2 h-10 px-1 text-[11px] font-medium leading-tight text-center text-gray-600 flex items-start justify-center">
+                      {{ entry.label }}
+                    </span>
+                    <span class="mt-1 text-xs font-semibold text-gray-900">{{ entry.value }}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="mt-6 flex items-center gap-2 border-t border-gray-100 pt-4">
-            <span class="text-sm font-medium text-gray-500">Total Responses:</span>
-            <span class="text-lg font-semibold text-gray-900">{{ clientSatisfactionTotalResponses }}</span>
-          </div>
-        </CardContent>
+            <div class="mt-6 flex items-center gap-2 border-t border-gray-100 pt-4">
+              <span class="text-sm font-medium text-gray-500">Total Responses:</span>
+              <span class="text-lg font-semibold text-gray-900">{{ clientSatisfactionTotalResponses }}</span>
+            </div>
+          </CardContent>
         </Card>
       </div>
 
       <div>
         <h2 class="mb-3 text-lg font-semibold">Lane Type Distribution</h2>
         <Card class="w-full">
-        <CardContent>
-          <div class="h-[300px] w-full mt-2 flex items-center justify-center">
-            <div
-              class="relative h-52 w-52"
-              @mousemove="handleLaneDonutMouseMove"
-              @mouseleave="clearLaneHoverSegment"
-            >
-              <div class="h-full w-full rounded-full" :style="{ background: lanePieGradient }"></div>
-              <div class="absolute inset-6 rounded-full bg-white flex flex-col items-center justify-center">
-                <span class="text-2xl font-bold text-gray-900">{{ laneTotalClients }}</span>
-                <span class="text-xs text-gray-500">Total Clients</span>
-              </div>
-
+          <CardContent>
+            <div class="h-[300px] w-full mt-2 flex items-center justify-center">
               <div
-                v-if="hoveredLaneSegment"
-                class="pointer-events-none absolute z-20 min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg"
-                :style="{ left: `${laneTooltipPosition.x}px`, top: `${laneTooltipPosition.y}px`, transform: 'translate(8px, -110%)' }"
+                class="relative h-52 w-52"
+                @mousemove="handleLaneDonutMouseMove"
+                @mouseleave="clearLaneHoverSegment"
               >
-                <p class="font-semibold text-gray-900">{{ hoveredLaneSegment.name }}</p>
-                <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ hoveredLaneSegment.value }}</span></p>
-                <p class="text-gray-600">Percentage: <span class="font-semibold">{{ hoveredLaneSegment.percentage }}%</span></p>
+                <div class="h-full w-full rounded-full" :style="{ background: lanePieGradient }"></div>
+                <div class="absolute inset-6 rounded-full bg-white flex flex-col items-center justify-center">
+                  <span class="text-2xl font-bold text-gray-900">{{ laneTotalClients }}</span>
+                  <span class="text-xs text-gray-500">Total Clients</span>
+                </div>
+
+                <div
+                  v-if="hoveredLaneSegment"
+                  class="pointer-events-none absolute z-20 min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg"
+                  :style="{ left: `${laneTooltipPosition.x}px`, top: `${laneTooltipPosition.y}px`, transform: 'translate(8px, -110%)' }"
+                >
+                  <p class="font-semibold text-gray-900">{{ hoveredLaneSegment.name }}</p>
+                  <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ hoveredLaneSegment.value }}</span></p>
+                  <p class="text-gray-600">Percentage: <span class="font-semibold">{{ hoveredLaneSegment.percentage }}%</span></p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 pt-4 border-t border-gray-100">
-            <div
-              v-for="(segment, index) in laneTypeChartData"
-              :key="`lane-segment-${index}`"
-              class="flex items-center gap-2 text-sm"
-            >
-              <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getLaneSegmentColor(index) }"></div>
-              <span class="text-gray-600">{{ segment.name }}</span>
-              <span class="text-gray-900 font-medium ml-auto">{{ segment.percentage }}%</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 pt-4 border-t border-gray-100">
+              <div
+                v-for="(segment, index) in laneTypeChartData"
+                :key="`lane-segment-${index}`"
+                class="flex items-center gap-2 text-sm"
+              >
+                <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getLaneSegmentColor(index) }"></div>
+                <span class="text-gray-600">{{ segment.name }}</span>
+                <span class="text-gray-900 font-medium ml-auto">{{ segment.percentage }}%</span>
+              </div>
             </div>
-          </div>
-        </CardContent>
+          </CardContent>
         </Card>
       </div>
     </div>
@@ -314,9 +328,15 @@
               <TableCell>{{ entry.averageSatisfactionRating }}</TableCell>
             </TableRow>
 
-            <TableRow v-if="paginatedQueueSummaryRows.length === 0">
+            <TableRow v-if="!isLoadingQueueSummary && paginatedQueueSummaryRows.length === 0">
               <TableCell colspan="9" class="text-center text-gray-500 py-8">
                 No queue summary records found.
+              </TableCell>
+            </TableRow>
+
+            <TableRow v-if="isLoadingQueueSummary">
+              <TableCell colspan="9" class="text-center text-gray-500 py-8">
+                Loading queue summary...
               </TableCell>
             </TableRow>
           </TableBody>
@@ -359,7 +379,8 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import api from '@/services/api'
 import StatCard from '@/components/common/StatCard.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -372,6 +393,7 @@ import {
   XCircle,
   Clock3,
   Hourglass,
+  Loader2,
 } from 'lucide-vue-next'
 import {
   Popover,
@@ -404,6 +426,9 @@ import {
 
 const selectedDateRange = ref('daily')
 const isDateFilterOpen = ref(false)
+const isLoadingAnalytics = ref(false)
+const isLoadingQueueSummary = ref(false)
+const isApplyingDateFilter = ref(false)
 
 const stats = ref({
   totalClients: 0,
@@ -415,177 +440,31 @@ const stats = ref({
 
 const queueSummaryRowsPerPage = 10
 const currentQueueSummaryPage = ref(1)
+const queueSummaryPagination = ref({
+  currentPage: 1,
+  perPage: queueSummaryRowsPerPage,
+  totalRows: 0,
+  totalPages: 1,
+  startRow: 0,
+  endRow: 0,
+})
 
-const queueSummaryRows = ref([
-  {
-    id: 1,
-    queueNumber: 'A-001',
-    clientName: 'Juan Dela Cruz',
-    serviceCode: 'BP-101',
-    laneType: 'Regular',
-    status: 'Completed',
-    completionTime: '08:41 AM',
-    averageWaitingTime: 12,
-    averageServingTime: 7,
-    averageSatisfactionRating: 'Strongly Agree',
-  },
-  {
-    id: 2,
-    queueNumber: 'A-002',
-    clientName: 'Maria Santos',
-    serviceCode: 'HC-203',
-    laneType: 'Priority',
-    status: 'Completed',
-    completionTime: '08:50 AM',
-    averageWaitingTime: 9,
-    averageServingTime: 6,
-    averageSatisfactionRating: 'Agree',
-  },
-  {
-    id: 3,
-    queueNumber: 'A-003',
-    clientName: 'Pedro Reyes',
-    serviceCode: 'TC-118',
-    laneType: 'Regular',
-    status: 'Skipped',
-    completionTime: '08:58 AM',
-    averageWaitingTime: 21,
-    averageServingTime: 0,
-    averageSatisfactionRating: '-',
-  },
-  {
-    id: 4,
-    queueNumber: 'A-004',
-    clientName: 'Ana Villanueva',
-    serviceCode: 'CD-012',
-    laneType: 'Regular',
-    status: 'Completed',
-    completionTime: '09:06 AM',
-    averageWaitingTime: 15,
-    averageServingTime: 8,
-    averageSatisfactionRating: 'Agree',
-  },
-  {
-    id: 5,
-    queueNumber: 'A-005',
-    clientName: 'Jose Garcia',
-    serviceCode: 'BC-087',
-    laneType: 'Priority',
-    status: 'Completed',
-    completionTime: '09:15 AM',
-    averageWaitingTime: 11,
-    averageServingTime: 5,
-    averageSatisfactionRating: 'Strongly Agree',
-  },
-  {
-    id: 6,
-    queueNumber: 'A-006',
-    clientName: 'Liza Romero',
-    serviceCode: 'BR-122',
-    laneType: 'Regular',
-    status: 'Completed',
-    completionTime: '09:23 AM',
-    averageWaitingTime: 14,
-    averageServingTime: 9,
-    averageSatisfactionRating: 'Neither',
-  },
-  {
-    id: 7,
-    queueNumber: 'A-007',
-    clientName: 'Carlos Medina',
-    serviceCode: 'PV-066',
-    laneType: 'Regular',
-    status: 'Skipped',
-    completionTime: '09:31 AM',
-    averageWaitingTime: 24,
-    averageServingTime: 0,
-    averageSatisfactionRating: '-',
-  },
-  {
-    id: 8,
-    queueNumber: 'A-008',
-    clientName: 'Ramon Flores',
-    serviceCode: 'TA-144',
-    laneType: 'Priority',
-    status: 'Completed',
-    completionTime: '09:42 AM',
-    averageWaitingTime: 10,
-    averageServingTime: 6,
-    averageSatisfactionRating: 'Agree',
-  },
-  {
-    id: 9,
-    queueNumber: 'A-009',
-    clientName: 'Sofia Lim',
-    serviceCode: 'DR-031',
-    laneType: 'Regular',
-    status: 'Completed',
-    completionTime: '09:50 AM',
-    averageWaitingTime: 13,
-    averageServingTime: 7,
-    averageSatisfactionRating: 'Strongly Agree',
-  },
-  {
-    id: 10,
-    queueNumber: 'A-010',
-    clientName: 'Daniel Cruz',
-    serviceCode: 'RU-095',
-    laneType: 'Regular',
-    status: 'Completed',
-    completionTime: '09:57 AM',
-    averageWaitingTime: 16,
-    averageServingTime: 8,
-    averageSatisfactionRating: 'Disagree',
-  },
-  {
-    id: 11,
-    queueNumber: 'A-011',
-    clientName: 'Patricia Ong',
-    serviceCode: 'SP-211',
-    laneType: 'Priority',
-    status: 'Completed',
-    completionTime: '10:05 AM',
-    averageWaitingTime: 8,
-    averageServingTime: 5,
-    averageSatisfactionRating: 'Strongly Agree',
-  },
-  {
-    id: 12,
-    queueNumber: 'A-012',
-    clientName: 'Mark Salazar',
-    serviceCode: 'CF-050',
-    laneType: 'Regular',
-    status: 'Skipped',
-    completionTime: '10:12 AM',
-    averageWaitingTime: 19,
-    averageServingTime: 0,
-    averageSatisfactionRating: '-',
-  },
-])
+const queueSummaryRows = ref([])
 
-const queueSummaryTotalRows = computed(() => queueSummaryRows.value.length)
+const queueSummaryTotalRows = computed(() => queueSummaryPagination.value.totalRows)
 
 const queueSummaryTotalPages = computed(() => {
-  return Math.max(1, Math.ceil(queueSummaryTotalRows.value / queueSummaryRowsPerPage))
+  return Math.max(1, queueSummaryPagination.value.totalPages)
 })
 
-const paginatedQueueSummaryRows = computed(() => {
-  const start = (currentQueueSummaryPage.value - 1) * queueSummaryRowsPerPage
-  const end = start + queueSummaryRowsPerPage
-  return queueSummaryRows.value.slice(start, end)
-})
+const paginatedQueueSummaryRows = computed(() => queueSummaryRows.value)
 
-const queueSummaryStartRow = computed(() => {
-  if (queueSummaryTotalRows.value === 0) return 0
-  return (currentQueueSummaryPage.value - 1) * queueSummaryRowsPerPage + 1
-})
+const queueSummaryStartRow = computed(() => queueSummaryPagination.value.startRow)
 
-const queueSummaryEndRow = computed(() => {
-  if (queueSummaryTotalRows.value === 0) return 0
-  return Math.min(currentQueueSummaryPage.value * queueSummaryRowsPerPage, queueSummaryTotalRows.value)
-})
+const queueSummaryEndRow = computed(() => queueSummaryPagination.value.endRow)
 
 const firstQueueSummaryPage = () => {
+  if (currentQueueSummaryPage.value === 1) return
   currentQueueSummaryPage.value = 1
 }
 
@@ -602,25 +481,28 @@ const nextQueueSummaryPage = () => {
 }
 
 const lastQueueSummaryPage = () => {
+  if (currentQueueSummaryPage.value === queueSummaryTotalPages.value) return
   currentQueueSummaryPage.value = queueSummaryTotalPages.value
 }
 
 const clientSatisfactionData = ref([
-  { label: 'Strongly Disagree', value: 8 },
-  { label: 'Disagree', value: 14 },
-  { label: 'Neither', value: 23 },
-  { label: 'Agree', value: 51 },
-  { label: 'Strongly Agree', value: 67 },
-  { label: 'Not Applicable', value: 5 },
+  { label: 'Strongly Disagree', value: 0 },
+  { label: 'Disagree', value: 0 },
+  { label: 'Neither', value: 0 },
+  { label: 'Agree', value: 0 },
+  { label: 'Strongly Agree', value: 0 },
+  { label: 'Not Applicable', value: 0 },
 ])
+const clientSatisfactionTotalResponsesValue = ref(0)
 
 const laneTypeData = ref([
-  { name: 'Regular', value: 92 },
-  { name: 'Senior Citizen', value: 31 },
-  { name: 'Pregnant', value: 8 },
-  { name: 'PWD', value: 17 },
-  { name: 'Member of Indigenous People', value: 6 },
+  { name: 'Regular', value: 0, percentage: 0 },
+  { name: 'Senior Citizen', value: 0, percentage: 0 },
+  { name: 'Pregnant', value: 0, percentage: 0 },
+  { name: 'PWD', value: 0, percentage: 0 },
+  { name: 'Member of Indigenous People', value: 0, percentage: 0 },
 ])
+const laneTotalClientsValue = ref(0)
 
 const hoveredLaneSegment = ref(null)
 const laneTooltipPosition = ref({ x: 0, y: 0 })
@@ -633,19 +515,15 @@ const maxClientSatisfactionValue = computed(() => {
 })
 
 const clientSatisfactionTotalResponses = computed(() => {
-  return clientSatisfactionData.value.reduce((sum, item) => sum + item.value, 0)
+  return clientSatisfactionTotalResponsesValue.value
 })
 
 const laneTotalClients = computed(() => {
-  return laneTypeData.value.reduce((sum, item) => sum + item.value, 0)
+  return laneTotalClientsValue.value
 })
 
 const laneTypeChartData = computed(() => {
-  const total = laneTotalClients.value
-  return laneTypeData.value.map(item => ({
-    ...item,
-    percentage: total === 0 ? 0 : Math.round((item.value / total) * 100),
-  }))
+  return laneTypeData.value
 })
 
 const lanePieGradient = computed(() => {
@@ -843,4 +721,192 @@ const isSelectedDay = (day) => {
     && selectedDate.value.getMonth() === dailyViewMonth.value
     && selectedDate.value.getDate() === day
 }
+
+const formatDate = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getDateFilterParams = () => {
+  if (selectedDateRange.value === 'monthly') {
+    return {
+      period: 'monthly',
+      month: selectedMonthIndex.value + 1,
+      year: selectedMonthYear.value,
+    }
+  }
+
+  if (selectedDateRange.value === 'yearly') {
+    return {
+      period: 'yearly',
+      year: Number(selectedYear.value),
+    }
+  }
+
+  return {
+    period: 'daily',
+    date: formatDate(selectedDate.value),
+  }
+}
+
+const fetchCardStats = async () => {
+  const response = await api.get('/frontdesk/analytics/cards', {
+    params: getDateFilterParams(),
+  })
+
+  const payload = response?.data?.data || {}
+  stats.value = {
+    totalClients: payload.total_clients ?? 0,
+    totalServed: payload.total_served ?? 0,
+    totalSkipped: payload.total_skipped ?? 0,
+    averageWaitingTime: payload.average_waiting_time ?? 0,
+    averageServiceTime: payload.average_service_time ?? 0,
+  }
+}
+
+const getDefaultClientSatisfactionDistribution = () => ([
+  { label: 'Strongly Disagree', value: 0 },
+  { label: 'Disagree', value: 0 },
+  { label: 'Neither', value: 0 },
+  { label: 'Agree', value: 0 },
+  { label: 'Strongly Agree', value: 0 },
+  { label: 'Not Applicable', value: 0 },
+])
+
+const fetchClientSatisfaction = async () => {
+  const response = await api.get('/frontdesk/analytics/client-satisfaction', {
+    params: getDateFilterParams(),
+  })
+
+  const payload = response?.data?.data || {}
+  clientSatisfactionData.value = payload.distribution?.length
+    ? payload.distribution
+    : getDefaultClientSatisfactionDistribution()
+  clientSatisfactionTotalResponsesValue.value = payload.total_responses ?? 0
+}
+
+const getDefaultLaneTypeDistribution = () => ([
+  { name: 'Regular', value: 0, percentage: 0 },
+  { name: 'Senior Citizen', value: 0, percentage: 0 },
+  { name: 'Pregnant', value: 0, percentage: 0 },
+  { name: 'PWD', value: 0, percentage: 0 },
+  { name: 'Member of Indigenous People', value: 0, percentage: 0 },
+])
+
+const fetchLaneTypeDistribution = async () => {
+  const response = await api.get('/frontdesk/analytics/lane-type', {
+    params: getDateFilterParams(),
+  })
+
+  const payload = response?.data?.data || {}
+  laneTypeData.value = payload.distribution?.length
+    ? payload.distribution
+    : getDefaultLaneTypeDistribution()
+  laneTotalClientsValue.value = payload.total_clients ?? 0
+}
+
+const fetchQueueSummary = async () => {
+  isLoadingQueueSummary.value = true
+  try {
+    const response = await api.get('/frontdesk/analytics/queue-summary', {
+      params: {
+        ...getDateFilterParams(),
+        page: currentQueueSummaryPage.value,
+        per_page: queueSummaryRowsPerPage,
+      },
+    })
+
+    const payload = response?.data?.data || {}
+    const rows = payload.rows || []
+
+    queueSummaryRows.value = rows.map((row) => ({
+      id: row.id,
+      queueNumber: row.queue_number,
+      clientName: row.client_name,
+      serviceCode: row.service_code,
+      laneType: row.lane_type,
+      status: row.status,
+      completionTime: row.completion_time,
+      averageWaitingTime: row.waiting_time ?? 0,
+      averageServingTime: row.service_time ?? 0,
+      averageSatisfactionRating: row.average_satisfaction_rating,
+    }))
+
+    const pagination = payload.pagination || {}
+    queueSummaryPagination.value = {
+      currentPage: pagination.current_page ?? 1,
+      perPage: pagination.per_page ?? queueSummaryRowsPerPage,
+      totalRows: pagination.total_rows ?? 0,
+      totalPages: pagination.total_pages ?? 1,
+      startRow: pagination.start_row ?? 0,
+      endRow: pagination.end_row ?? 0,
+    }
+  } catch (error) {
+    console.error('Error fetching queue summary:', error)
+    queueSummaryRows.value = []
+    queueSummaryPagination.value = {
+      currentPage: 1,
+      perPage: queueSummaryRowsPerPage,
+      totalRows: 0,
+      totalPages: 1,
+      startRow: 0,
+      endRow: 0,
+    }
+  } finally {
+    isLoadingQueueSummary.value = false
+  }
+}
+
+const fetchAnalyticsData = async () => {
+  isLoadingAnalytics.value = true
+  try {
+    await Promise.all([
+      fetchCardStats(),
+      fetchClientSatisfaction(),
+      fetchLaneTypeDistribution(),
+      fetchQueueSummary(),
+    ])
+  } catch (error) {
+    console.error('Error fetching analytics data:', error)
+  } finally {
+    isLoadingAnalytics.value = false
+  }
+}
+
+watch(currentQueueSummaryPage, () => {
+  if (isApplyingDateFilter.value) return
+  fetchQueueSummary()
+})
+
+const applyDateFilterAndReload = async () => {
+  isApplyingDateFilter.value = true
+  currentQueueSummaryPage.value = 1
+  await fetchAnalyticsData()
+  isApplyingDateFilter.value = false
+}
+
+watch(selectedDateRange, () => {
+  applyDateFilterAndReload()
+})
+
+watch(selectedDate, () => {
+  if (selectedDateRange.value !== 'daily') return
+  applyDateFilterAndReload()
+})
+
+watch([selectedMonthIndex, selectedMonthYear], () => {
+  if (selectedDateRange.value !== 'monthly') return
+  applyDateFilterAndReload()
+})
+
+watch(selectedYear, () => {
+  if (selectedDateRange.value !== 'yearly') return
+  applyDateFilterAndReload()
+})
+
+onMounted(() => {
+  fetchAnalyticsData()
+})
 </script>

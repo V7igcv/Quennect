@@ -85,6 +85,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/office-management/offices/{office}/services/{service}', [ServiceManagementController::class, 'destroy']);
         Route::patch('/office-management/offices/{office}/services/{service}/toggle-is-free', [ServiceManagementController::class, 'toggleIsFree']);
         Route::patch('/office-management/offices/{office}/services/{service}/toggle-status', [ServiceManagementController::class, 'toggleStatus']);
+
+        // Analytics (requires office_id query param)
+        Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);
+        Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
+        Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
+        Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
     });
     
     // Front Desk routes

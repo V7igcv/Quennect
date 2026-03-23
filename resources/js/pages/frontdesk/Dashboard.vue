@@ -2,6 +2,14 @@
   <div class="max-w-7xl mx-auto px-2 sm:px-2 lg:px-2 py-2">
     <h1 class="text-2xl font-semibold mb-6">Queue Dashboard</h1>
 
+    <div
+      v-if="isLoadingDashboardData"
+      class="mb-4 flex items-center gap-2 rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm font-medium text-[#0F5C5C]"
+    >
+      <Loader2 class="h-4 w-4 animate-spin" />
+      Loading Dashboard Data...
+    </div>
+
     <!-- Stat Cards -->
     <div class="grid grid-cols-4 gap-6">
 
@@ -95,9 +103,15 @@
               </TableRow>
 
               <!-- Empty state -->
-              <TableRow v-if="filteredQueueEntries.length === 0">
+              <TableRow v-if="!isLoadingQueue && filteredQueueEntries.length === 0">
                 <TableCell colspan="6" class="text-center text-gray-500 py-8">
                   No waiting queues at this time
+                </TableCell>
+              </TableRow>
+
+              <TableRow v-if="isLoadingQueue">
+                <TableCell colspan="6" class="text-center text-gray-500 py-8">
+                  Loading queue data...
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -308,8 +322,13 @@
             </div>
           </div>
 
+          <!-- Loading state -->
+          <div v-if="isLoadingCounters_countersSection" class="text-center py-8 text-gray-500">
+            Loading counters...
+          </div>
+
           <!-- Empty state -->
-          <div v-if="counters.length === 0" class="text-center py-8 text-gray-500">
+          <div v-else-if="counters.length === 0" class="text-center py-8 text-gray-500">
             No counters added yet. Click "Add Counter" to create one.
           </div>
         </div>
@@ -381,6 +400,7 @@
       :customer-name="selectedCustomerName"
       :contact-number="selectedContactNumber"
       :barangay="selectedBarangay"
+      :multiple-choice-questions="multipleChoiceQuestions"
       :likert-questions="likertQuestions"
       @submit="handleEvaluationSubmit"
       @alert="handleAlert"
@@ -394,7 +414,7 @@ import api from '@/services/api'
 import StatCard from '@/components/common/StatCard.vue'
 import EvaluationModal from '@/components/modals/EvaluationModal.vue'
 
-import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone, ChevronDown } from 'lucide-vue-next'
+import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone, ChevronDown, Loader2 } from 'lucide-vue-next'
 
 import {
   Table,
@@ -428,6 +448,7 @@ const stats = ref({
 const queueEntries = ref([])
 const filteredQueueEntries = ref([])
 const isLoadingQueue = ref(false)
+const isLoadingDashboardData = ref(false)
 
 // Pagination state
 const currentPage = ref(1)
@@ -455,6 +476,7 @@ const selectedCustomerName = ref('')
 const selectedContactNumber = ref('')
 const selectedBarangay = ref('')
 const selectedQueueId = ref(null)
+const multipleChoiceQuestions = ref([])
 const likertQuestions = ref([])
 
 // Alert modal state
@@ -473,7 +495,8 @@ const fetchEvaluationQuestions = async () => {
   try {
     const response = await api.get('/frontdesk/evaluation/questions')
     if (response.data.success) {
-      likertQuestions.value = response.data.data.likert
+      multipleChoiceQuestions.value = response.data.data.multiple_choice || []
+      likertQuestions.value = response.data.data.likert || []
     }
   } catch (error) {
     console.error('Error fetching evaluation questions:', error)
@@ -763,6 +786,9 @@ const handleEvaluationSubmit = async (formData) => {
   if (!selectedQueueId.value) return
 
   try {
+    const multipleChoiceAnswers = formData.multipleChoiceAnswers || {}
+    const likertAnswers = formData.likertRatings || {}
+
     // Format the data for the backend API
     const evaluationData = {
       session: {
@@ -771,22 +797,16 @@ const handleEvaluationSubmit = async (formData) => {
         age: formData.age ?? null
       },
       responses: {
-        multiple_choice: {
-          1: String(formData.cc1), // CC1
-          2: String(formData.cc2), // CC2
-          3: String(formData.cc3)  // CC3
-        },
-        likert: {
-          4: String(formData.likertRatings.sqd0), // SQD0
-          5: String(formData.likertRatings.sqd1), // SQD1
-          6: String(formData.likertRatings.sqd2), // SQD2
-          7: String(formData.likertRatings.sqd3), // SQD3
-          8: String(formData.likertRatings.sqd4), // SQD4
-          9: String(formData.likertRatings.sqd5), // SQD5
-          10: String(formData.likertRatings.sqd6), // SQD6
-          11: String(formData.likertRatings.sqd7), // SQD7
-          12: String(formData.likertRatings.sqd8)  // SQD8
-        }
+        multiple_choice: Object.fromEntries(
+          Object.entries(multipleChoiceAnswers)
+            .filter(([, value]) => value !== '' && value !== null && value !== undefined)
+            .map(([questionId, value]) => [questionId, String(value)])
+        ),
+        likert: Object.fromEntries(
+          Object.entries(likertAnswers)
+            .filter(([, value]) => value !== '' && value !== null && value !== undefined)
+            .map(([questionId, value]) => [questionId, String(value)])
+        )
       }
     }
 
@@ -818,9 +838,20 @@ const handleEvaluationSubmit = async (formData) => {
 
 // Lifecycle
 onMounted(() => {
-  fetchEvaluationQuestions()
-  fetchDashboardStats()
-  fetchQueueTable()
-  fetchCounters()
+  const loadDashboard = async () => {
+    isLoadingDashboardData.value = true
+    try {
+      await Promise.all([
+        fetchEvaluationQuestions(),
+        fetchDashboardStats(),
+        fetchQueueTable(),
+        fetchCounters(),
+      ])
+    } finally {
+      isLoadingDashboardData.value = false
+    }
+  }
+
+  loadDashboard()
 })
 </script>

@@ -27,22 +27,29 @@
 
       <div class="border-t border-gray-200 w-11/11 mx-auto mb-4"></div>
 
-      <!-- Customer Info (same for both pages) -->
-      <div class="flex justify-start gap-2">
-        <p class="text-[#2E2E2E] font-medium">Queue Number:</p>
-        <p class="text-[#474C55]">{{ queueNumber }}</p>
-      </div>
-      <div class="flex justify-start gap-2">
-        <p class="text-[#2E2E2E] font-medium">Name:</p>
-        <p class="text-[#474C55]">{{ customerName }}</p>
-      </div>
-      <div class="flex justify-start gap-2">
-        <p class="text-[#2E2E2E] font-medium">Contact Number:</p>
-        <p class="text-[#474C55]">{{ contactNumber }}</p>
-      </div>
-      <div class="flex justify-start gap-2">
-        <p class="text-[#2E2E2E] font-medium">Barangay:</p>
-        <p class="text-[#474C55]">{{ barangay || 'N/A' }}</p>
+      <!-- Customer Info -->
+      <div class="rounded-lg border border-gray-200 bg-gray-50/70 p-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="rounded-md border border-gray-200 bg-white px-3 py-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Queue Number</p>
+            <p class="mt-1 text-sm font-semibold text-[#1F2937]">{{ queueNumber || 'N/A' }}</p>
+          </div>
+
+          <div class="rounded-md border border-gray-200 bg-white px-3 py-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Name</p>
+            <p class="mt-1 text-sm font-semibold text-[#1F2937]">{{ customerName || 'N/A' }}</p>
+          </div>
+
+          <div class="rounded-md border border-gray-200 bg-white px-3 py-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Contact Number</p>
+            <p class="mt-1 text-sm font-semibold text-[#1F2937]">{{ contactNumber || 'N/A' }}</p>
+          </div>
+
+          <div class="rounded-md border border-gray-200 bg-white px-3 py-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Barangay</p>
+            <p class="mt-1 text-sm font-semibold text-[#1F2937]">{{ barangay || 'N/A' }}</p>
+          </div>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
@@ -93,49 +100,26 @@
 
       <!-- Page 1: CC Survey Questions -->
       <div v-if="currentPage === 1" class="space-y-6">
-        <!-- CC1 Question -->
-        <div>
-          <h3 class="font-semibold text-[#2E2E2E] mb-3"># CC1 Which of the following best describes your awareness of a CC?</h3>
-          <Table>
-            <TableBody>
-              <TableRow v-for="option in cc1Options" :key="option.value" class="hover:bg-gray-50 p-0">
-                <TableCell colspan="2" class="p-0">
-                  <label class="flex items-center gap-3 w-full h-full px-4 py-2 cursor-pointer">
-                    <input type="radio" name="cc1" :value="option.value" v-model="cc1" class="cursor-pointer">
-                    <span class="text-[#474C55]">{{ option.label }}</span>
-                  </label>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+        <div v-if="multipleChoiceQuestions.length === 0" class="text-sm text-gray-500">
+          Loading questions...
         </div>
 
-        <!-- CC2 Question -->
-        <div>
-          <h3 class="font-semibold text-[#2E2E2E] mb-3"># CC2 If aware of CC (1–3 in CC1), would you say that the CC of this office was...?</h3>
+        <div v-for="question in visibleMultipleChoiceQuestions" :key="question.id">
+          <h3 class="font-semibold text-[#2E2E2E] mb-3">
+            # {{ question.question_code }} {{ question.question_text }}
+          </h3>
           <Table>
             <TableBody>
-              <TableRow v-for="option in cc2Options" :key="option.value" class="hover:bg-gray-50 p-0">
+              <TableRow v-for="option in question.options" :key="`${question.id}-${option.value}`" class="hover:bg-gray-50 p-0">
                 <TableCell colspan="2" class="p-0">
                   <label class="flex items-center gap-3 w-full h-full px-4 py-2 cursor-pointer">
-                    <input type="radio" name="cc2" :value="option.value" v-model="cc2" class="cursor-pointer">
-                    <span class="text-[#474C55]">{{ option.label }}</span>
-                  </label>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-
-        <!-- CC3 Question -->
-        <div>
-          <h3 class="font-semibold text-[#2E2E2E] mb-3"># CC3 If aware of CC (1–3 in CC1), how much did the CC help you in your transaction?</h3>
-          <Table>
-            <TableBody>
-              <TableRow v-for="option in cc3Options" :key="option.value" class="hover:bg-gray-50 p-0">
-                <TableCell colspan="2" class="p-0">
-                  <label class="flex items-center gap-3 w-full h-full px-4 py-2 cursor-pointer">
-                    <input type="radio" name="cc3" :value="option.value" v-model="cc3" class="cursor-pointer">
+                    <input
+                      type="radio"
+                      :name="`mc-${question.id}`"
+                      :value="option.value"
+                      v-model="multipleChoiceAnswers[question.id]"
+                      class="cursor-pointer"
+                    >
                     <span class="text-[#474C55]">{{ option.label }}</span>
                   </label>
                 </TableCell>
@@ -177,7 +161,7 @@
                     type="radio" 
                     :name="question.id" 
                     :value="1" 
-                    v-model="likertRatings[question.id]"
+                v-model="likertRatings[question.id]"
                     class="w-4 h-4 cursor-pointer"
                 >
                 </label>
@@ -321,6 +305,10 @@ const props = defineProps({
   likertQuestions: {
     type: Array,
     default: () => []
+  },
+  multipleChoiceQuestions: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -334,58 +322,102 @@ const modalContent = ref(null)
 const currentPage = ref(1)
 
 // Form data
-const cc1 = ref('')
-const cc2 = ref('')
-const cc3 = ref('')
 const clientType = ref('')
 const sex = ref('')
 const age = ref('')
 
+const multipleChoiceAnswers = ref({})
+
 // Form data for Page 2 - Likert ratings
-const likertRatings = ref({
-  sqd0: '',
-  sqd1: '',
-  sqd2: '',
-  sqd3: '',
-  sqd4: '',
-  sqd5: '',
-  sqd6: '',
-  sqd7: '',
-  sqd8: ''
+const likertRatings = ref({})
+
+const getOptionValueAndLabel = (optionText) => {
+  const raw = String(optionText ?? '').trim()
+  const match = raw.match(/^(\d+)\s*[-.)]\s*(.+)$/)
+  if (match) {
+    return {
+      value: match[1],
+      label: `${match[1]}. ${match[2]}`,
+    }
+  }
+
+  return {
+    value: raw,
+    label: raw,
+  }
+}
+
+const multipleChoiceQuestions = computed(() => {
+  return props.multipleChoiceQuestions.map((q) => ({
+    id: String(q.id),
+    question_code: q.question_code || '',
+    question_text: q.question_text || '',
+    options: (q.options || []).map(getOptionValueAndLabel),
+  }))
 })
+
+const normalizeQuestionCode = (value) => {
+  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
 
 // Likert questions
 const likertQuestions = computed(() => 
-  props.likertQuestions.map((q, index) => ({ 
-    id: `sqd${index}`, 
-    label: q.question_text 
+  props.likertQuestions.map((q) => ({ 
+    id: String(q.id),
+    label: `${q.question_code ? `${q.question_code}. ` : ''}${q.question_text}`
   }))
 )
 
-// Options for CC1
-const cc1Options = [
-  { value: '1', label: '1. I know what a CC is and I saw this office\'s CC.' },
-  { value: '2', label: '2. I know what a CC is but I did NOT see this office\'s CC.' },
-  { value: '3', label: '3. I learned the CC only when I saw this office\'s CC.' },
-  { value: '4', label: '4. I do not know what a CC is and I did not see one in this office (N/A on CC2 & CC3)' }
-]
+const cc1Question = computed(() => multipleChoiceQuestions.value.find((q) => normalizeQuestionCode(q.question_code) === 'CC1'))
+const cc2Question = computed(() => multipleChoiceQuestions.value.find((q) => normalizeQuestionCode(q.question_code) === 'CC2'))
+const cc3Question = computed(() => multipleChoiceQuestions.value.find((q) => normalizeQuestionCode(q.question_code) === 'CC3'))
+const cc1Value = computed(() => (cc1Question.value ? multipleChoiceAnswers.value[cc1Question.value.id] : ''))
 
-// Options for CC2
-const cc2Options = [
-  { value: '1', label: '1. Easy to see' },
-  { value: '2', label: '2. Somewhat easy to see' },
-  { value: '3', label: '3. Difficult to see' },
-  { value: '4', label: '4. Not visible at all' },
-  { value: '5', label: '5. N/A' }
-]
+const getNaOptionValue = (question, fallback = 'NA') => {
+  if (!question || !Array.isArray(question.options)) return fallback
 
-// Options for CC3
-const cc3Options = [
-  { value: '1', label: '1. Helped very much' },
-  { value: '2', label: '2. Somewhat helped' },
-  { value: '3', label: '3. Did not help' },
-  { value: '4', label: '4. N/A' }
-]
+  const naOption = question.options.find((option) => String(option.label).toUpperCase().includes('N/A'))
+  return naOption ? String(naOption.value) : fallback
+}
+
+const shouldShowCc2Cc3 = computed(() => ['1', '2', '3'].includes(String(cc1Value.value)))
+
+const visibleMultipleChoiceQuestions = computed(() => {
+  return multipleChoiceQuestions.value.filter((question) => {
+    const code = normalizeQuestionCode(question.question_code)
+    if (code === 'CC1') return true
+    if (code === 'CC2' || code === 'CC3') return shouldShowCc2Cc3.value
+    return true
+  })
+})
+
+watch(multipleChoiceQuestions, (questions) => {
+  const next = {}
+  questions.forEach((question) => {
+    next[question.id] = multipleChoiceAnswers.value[question.id] ?? ''
+  })
+  multipleChoiceAnswers.value = next
+}, { immediate: true })
+
+watch(likertQuestions, (questions) => {
+  const next = {}
+  questions.forEach((question) => {
+    next[question.id] = likertRatings.value[question.id] ?? ''
+  })
+  likertRatings.value = next
+}, { immediate: true })
+
+watch(cc1Value, (value) => {
+  if (value !== '4') return
+
+  if (cc2Question.value) {
+    multipleChoiceAnswers.value[cc2Question.value.id] = getNaOptionValue(cc2Question.value, '5')
+  }
+
+  if (cc3Question.value) {
+    multipleChoiceAnswers.value[cc3Question.value.id] = getNaOptionValue(cc3Question.value, '4')
+  }
+})
 
 // Watch for page changes and scroll to top
 watch(currentPage, () => {
@@ -403,31 +435,35 @@ const closeModal = () => {
 
 const resetForm = () => {
   currentPage.value = 1
-  cc1.value = ''
-  cc2.value = ''
-  cc3.value = ''
   clientType.value = ''
   sex.value = ''
   age.value = ''
-  likertRatings.value = {
-    sqd0: '', sqd1: '', sqd2: '', sqd3: '', sqd4: '', sqd5: '', sqd6: '', sqd7: '', sqd8: ''
-  }
+  multipleChoiceAnswers.value = Object.fromEntries(
+    multipleChoiceQuestions.value.map((question) => [question.id, ''])
+  )
+  likertRatings.value = Object.fromEntries(
+    likertQuestions.value.map((question) => [question.id, ''])
+  )
 }
 
 const goToNextPage = () => {
+  const selectedCc1Value = cc1Question.value ? multipleChoiceAnswers.value[cc1Question.value.id] : ''
+  const cc2Value = cc2Question.value ? multipleChoiceAnswers.value[cc2Question.value.id] : ''
+  const cc3Value = cc3Question.value ? multipleChoiceAnswers.value[cc3Question.value.id] : ''
+
   // Validate CC questions before proceeding
-  if (!cc1.value) {
+  if (!selectedCc1Value) {
     emit('alert', { title: 'Validation Error', message: 'Please answer CC1 question.' })
     return
   }
 
   // Check if CC2 and CC3 are required based on CC1 answer
-  if (cc1.value !== '4' && !cc2.value) {
+  if (shouldShowCc2Cc3.value && !cc2Value) {
     emit('alert', { title: 'Validation Error', message: 'Please answer CC2 question.' })
     return
   }
 
-  if (cc1.value !== '4' && !cc3.value) {
+  if (shouldShowCc2Cc3.value && !cc3Value) {
     emit('alert', { title: 'Validation Error', message: 'Please answer CC3 question.' })
     return
   }
@@ -440,21 +476,25 @@ const goToPreviousPage = () => {
 }
 
 const handleSubmit = () => {
+  const selectedCc1Value = cc1Question.value ? multipleChoiceAnswers.value[cc1Question.value.id] : ''
+  const cc2Value = cc2Question.value ? multipleChoiceAnswers.value[cc2Question.value.id] : ''
+  const cc3Value = cc3Question.value ? multipleChoiceAnswers.value[cc3Question.value.id] : ''
+
   // Basic validation
-  if (!cc1.value) {
+  if (!selectedCc1Value) {
     emit('alert', { title: 'Validation Error', message: 'Please answer CC1 question.' })
     currentPage.value = 1
     return
   }
 
   // Check if CC2 and CC3 are required based on CC1 answer
-  if (cc1.value !== '4' && !cc2.value) {
+  if (shouldShowCc2Cc3.value && !cc2Value) {
     emit('alert', { title: 'Validation Error', message: 'Please answer CC2 question.' })
     currentPage.value = 1
     return
   }
 
-  if (cc1.value !== '4' && !cc3.value) {
+  if (shouldShowCc2Cc3.value && !cc3Value) {
     emit('alert', { title: 'Validation Error', message: 'Please answer CC3 question.' })
     currentPage.value = 1
     return
@@ -492,9 +532,7 @@ const handleSubmit = () => {
   // Combine all form data
   const formData = {
     // Page 1 data
-    cc1: cc1.value,
-    cc2: cc2.value,
-    cc3: cc3.value,
+    multipleChoiceAnswers: { ...multipleChoiceAnswers.value },
     client_type: clientType.value,
     sex: sex.value,
     age: normalizedAge,

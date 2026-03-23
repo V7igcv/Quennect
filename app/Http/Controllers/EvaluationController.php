@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class EvaluationController extends Controller
 {
@@ -27,6 +28,7 @@ class EvaluationController extends Controller
                 ->map(function($question) {
                     return [
                         'id' => $question->id,
+                        'question_code' => $question->question_code,
                         'question_text' => $question->question_text,
                         'question_type' => $question->question_type,
                         'options' => $question->multiple_choice_options
@@ -39,6 +41,7 @@ class EvaluationController extends Controller
                 ->map(function($question) {
                     return [
                         'id' => $question->id,
+                        'question_code' => $question->question_code,
                         'question_text' => $question->question_text,
                         'question_type' => $question->question_type,
                         'scale' => [
@@ -168,6 +171,50 @@ class EvaluationController extends Controller
             $totalRating = 0;
             $likertCount = 0;
 
+            $multipleChoiceResponses = $request->input('responses.multiple_choice', []);
+            $multipleChoiceQuestions = EvaluationQuestion::query()
+                ->whereIn('question_type', ['MULTIPLE_CHOICE', 'MULTIPLE CHOICE'])
+                ->whereIn('question_code', ['CC1', 'CC2', 'CC3'])
+                ->get()
+                ->keyBy('question_code');
+
+            $cc1Question = $multipleChoiceQuestions->get('CC1');
+            $cc2Question = $multipleChoiceQuestions->get('CC2');
+            $cc3Question = $multipleChoiceQuestions->get('CC3');
+
+            $cc1Answer = $cc1Question ? ($multipleChoiceResponses[$cc1Question->id] ?? null) : null;
+
+            if (empty($cc1Answer)) {
+                throw ValidationException::withMessages([
+                    'responses.multiple_choice' => ['CC1 answer is required.'],
+                ]);
+            }
+
+            if ((string) $cc1Answer === '4') {
+                if ($cc2Question) {
+                    $multipleChoiceResponses[$cc2Question->id] = $this->resolveNaAnswerValue($cc2Question, '5');
+                }
+
+                if ($cc3Question) {
+                    $multipleChoiceResponses[$cc3Question->id] = $this->resolveNaAnswerValue($cc3Question, '4');
+                }
+            } else {
+                $cc2Answer = $cc2Question ? ($multipleChoiceResponses[$cc2Question->id] ?? null) : null;
+                $cc3Answer = $cc3Question ? ($multipleChoiceResponses[$cc3Question->id] ?? null) : null;
+
+                if ($cc2Question && empty($cc2Answer)) {
+                    throw ValidationException::withMessages([
+                        'responses.multiple_choice' => ['CC2 answer is required when CC1 is 1-3.'],
+                    ]);
+                }
+
+                if ($cc3Question && empty($cc3Answer)) {
+                    throw ValidationException::withMessages([
+                        'responses.multiple_choice' => ['CC3 answer is required when CC1 is 1-3.'],
+                    ]);
+                }
+            }
+
             $evaluationSession = EvaluationSession::create([
                 'queue_transaction_id' => $transaction->id,
                 'client_type' => $request->input('session.client_type'),
@@ -176,8 +223,8 @@ class EvaluationController extends Controller
             ]);
 
             // Save multiple choice responses
-            if (isset($request->responses['multiple_choice'])) {
-                foreach ($request->responses['multiple_choice'] as $questionId => $answerValue) {
+            if (!empty($multipleChoiceResponses)) {
+                foreach ($multipleChoiceResponses as $questionId => $answerValue) {
                     EvaluationResponse::create([
                         'queue_transaction_id' => $transaction->id,
                         'evaluation_session_id' => $evaluationSession->id,
@@ -246,6 +293,27 @@ class EvaluationController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    private function resolveNaAnswerValue(EvaluationQuestion $question, string $fallback): string
+    {
+        $options = $question->multiple_choice_options ?? [];
+
+        foreach ($options as $option) {
+            $optionText = (string) $option;
+
+            if (stripos($optionText, 'N/A') === false) {
+                continue;
+            }
+
+            if (preg_match('/^(\d+)\s*[-.)]/', $optionText, $matches)) {
+                return (string) $matches[1];
+            }
+
+            return 'NA';
+        }
+
+        return $fallback;
     }
 
     /**

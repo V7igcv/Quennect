@@ -11,6 +11,7 @@ class EvaluationQuestion extends Model
     use HasFactory;
 
     protected $fillable = [
+        'question_code',
         'question_text',
         'question_type'
     ];
@@ -32,7 +33,7 @@ class EvaluationQuestion extends Model
      */
     public function scopeLikert($query)
     {
-        return $query->where('question_type', 'LIKERT');
+        return $query->whereIn('question_type', ['LIKERT']);
     }
 
     /**
@@ -40,7 +41,7 @@ class EvaluationQuestion extends Model
      */
     public function scopeMultipleChoice($query)
     {
-        return $query->where('question_type', 'MULTIPLE_CHOICE');
+        return $query->whereIn('question_type', ['MULTIPLE_CHOICE', 'MULTIPLE CHOICE']);
     }
 
     /**
@@ -49,20 +50,20 @@ class EvaluationQuestion extends Model
     public function getMultipleChoiceOptionsAttribute()
     {
         $options = [
-            1 => [ // CC1 options
+            'CC1' => [
                 '1 - I know what a CC is and I saw this offices CC.',
                 '2 - I know what a CC is but I did NOT see this offices CC.',
                 '3 - I learned the CC only when I saw this offices CC.',
                 '4 - I do not know what a CC is and I did not see one in this office (N/A on CC2 & CC3)'
             ],
-            2 => [ // CC2 options
+            'CC2' => [
                 '1 - Easy to see',
                 '2 - Somewhat easy to see',
                 '3 - Difficult to see',
                 '4 - Not visible at all',
                 '5 - N/A'
             ],
-            3 => [ // CC3 options
+            'CC3' => [
                 '1 - Helped very much',
                 '2 - Somewhat helped',
                 '3 - Did not help',
@@ -70,7 +71,9 @@ class EvaluationQuestion extends Model
             ]
         ];
 
-        return $options[$this->id] ?? [];
+        $normalizedCode = strtoupper((string) $this->question_code);
+
+        return $options[$normalizedCode] ?? [];
     }
 }
 
