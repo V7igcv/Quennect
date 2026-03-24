@@ -15,6 +15,16 @@ class SemaphoreSmsSender implements SmsSender
         $baseUrl = rtrim((string) config('sms.semaphore.base_url', ''), '/');
         $endpoint = '/' . ltrim((string) config('sms.semaphore.endpoint', '/messages'), '/');
         $timeout = (int) config('sms.semaphore.timeout', 10);
+        $dryRun = (bool) config('sms.semaphore.dry_run', true);
+
+        if ($dryRun) {
+            Log::info('Semaphore dry run: SMS accepted without external API call.', [
+                'to' => $to,
+                'message_preview' => mb_substr($message, 0, 120),
+            ]);
+
+            return true;
+        }
 
         if (empty($apiKey) || empty($baseUrl)) {
             Log::warning('Semaphore sender is not configured.', [

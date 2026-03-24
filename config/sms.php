@@ -20,6 +20,7 @@ return [
         'base_url' => env('SEMAPHORE_BASE_URL', 'https://api.semaphore.co/api/v4'),
         'endpoint' => env('SEMAPHORE_ENDPOINT', '/messages'),
         'timeout' => (int) env('SEMAPHORE_TIMEOUT', 10),
+        'dry_run' => filter_var(env('SEMAPHORE_DRY_RUN', true), FILTER_VALIDATE_BOOLEAN),
         'api_key' => env('SEMAPHORE_API_KEY'),
         'sender' => env('SEMAPHORE_SENDER'),
     ],
