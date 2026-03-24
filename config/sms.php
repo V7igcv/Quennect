@@ -18,6 +18,8 @@ return [
 
     'smsapiph' => [
         'base_url' => env('SMSAPIPH_BASE_URL', 'https://smsapi.ph/api'),
+        'endpoint' => env('SMSAPIPH_ENDPOINT', '/sms/send'),
+        'timeout' => (int) env('SMSAPIPH_TIMEOUT', 10),
         'api_key' => env('SMSAPIPH_API_KEY'),
         'sender' => env('SMSAPIPH_SENDER'),
     ],
