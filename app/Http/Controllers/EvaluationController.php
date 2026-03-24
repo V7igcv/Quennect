@@ -6,6 +6,7 @@ use App\Models\EvaluationQuestion;
 use App\Models\EvaluationResponse;
 use App\Models\EvaluationSession;
 use App\Models\QueueTransaction;
+use App\Services\Sms\SmsNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -274,14 +275,28 @@ class EvaluationController extends Controller
 
             DB::commit();
 
-            // TODO: Send SMS notification (will be added later)
+            $smsSent = false;
+
+            try {
+                $smsSent = app(SmsNotificationService::class)->sendEvaluationSubmittedMessage(
+                    $transaction->contact_number,
+                    $transaction->full_queue_number
+                );
+            } catch (\Throwable $smsException) {
+                Log::warning('Evaluation completed but SMS sending failed.', [
+                    'queue_transaction_id' => $transaction->id,
+                    'contact_number' => $transaction->contact_number,
+                    'error' => $smsException->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'message' => 'Evaluation submitted successfully',
                 'data' => [
                     'queue_number' => $transaction->full_queue_number,
                     'average_rating' => $averageRating,
-                    'completed_at' => $transaction->completed_at->format('h:i A')
+                    'completed_at' => $transaction->completed_at->format('h:i A'),
+                    'sms_sent' => $smsSent,
                 ]
             ]);
 
