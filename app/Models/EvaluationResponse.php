@@ -17,10 +17,12 @@ class EvaluationResponse extends Model
         'evaluation_session_id',
         'question_id',
         'answer_value',
+        'answer_option',
         'rating_value'
     ];
 
-        protected $casts = [
+    protected $casts = [
+        'answer_option' => 'integer',
         'rating_value' => 'integer'
     ];
 
@@ -30,6 +32,11 @@ class EvaluationResponse extends Model
     public function queueTransaction()
     {
         return $this->belongsTo(QueueTransaction::class, 'queue_transaction_id');
+    }
+
+    public function internalTransaction()
+    {
+        return $this->belongsTo(InternalTransaction::class, 'internal_transaction_id');
     }
 
     public function evaluationSession()

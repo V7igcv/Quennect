@@ -56,6 +56,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import api from '@/services/api'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import {
   Select,
@@ -68,17 +69,23 @@ import {
 const props = defineProps({
   serviceType: {
     type: String,
-    default: 'external'
+    default: 'external',
   },
   dateRange: {
     type: String,
-    default: 'monthly'
-  }
+    default: 'monthly',
+  },
+  filterParams: {
+    type: Object,
+    default: () => ({}),
+  },
 })
 
 const selectedCategory = ref('Age')
 const hoveredSegment = ref(null)
 const tooltipPosition = ref({ x: 0, y: 0 })
+const chartData = ref([])
+const totalResponses = ref(0)
 
 const colorPalette = [
   '#2563EB',
@@ -86,38 +93,30 @@ const colorPalette = [
   '#F5700B',
   '#9626DC',
   '#16A34A',
-  '#6B7280'
+  '#6B7280',
 ]
 
-const mockData = {
+const defaultData = {
   Age: [
-    { name: '19 or lower', value: 145, percentage: 18 },
-    { name: '20-34', value: 312, percentage: 38 },
-    { name: '35-49', value: 198, percentage: 24 },
-    { name: '50-64', value: 112, percentage: 14 },
-    { name: '65-Higher', value: 42, percentage: 5 },
-    { name: 'Did not specify', value: 8, percentage: 1 }
+    { name: '19 or lower', value: 0, percentage: 0 },
+    { name: '20-34', value: 0, percentage: 0 },
+    { name: '35-49', value: 0, percentage: 0 },
+    { name: '50-64', value: 0, percentage: 0 },
+    { name: '65-Higher', value: 0, percentage: 0 },
+    { name: 'Did not specify', value: 0, percentage: 0 },
   ],
   Sex: [
-    { name: 'Male', value: 425, percentage: 52 },
-    { name: 'Female', value: 367, percentage: 45 },
-    { name: 'Did not specify', value: 25, percentage: 3 }
+    { name: 'Male', value: 0, percentage: 0 },
+    { name: 'Female', value: 0, percentage: 0 },
+    { name: 'Did not specify', value: 0, percentage: 0 },
   ],
   'Client Type': [
-    { name: 'Citizen', value: 578, percentage: 71 },
-    { name: 'Business', value: 156, percentage: 19 },
-    { name: 'Government', value: 67, percentage: 8 },
-    { name: 'Did not specify', value: 16, percentage: 2 }
-  ]
+    { name: 'Citizen', value: 0, percentage: 0 },
+    { name: 'Business', value: 0, percentage: 0 },
+    { name: 'Government', value: 0, percentage: 0 },
+    { name: 'Did not specify', value: 0, percentage: 0 },
+  ],
 }
-
-const chartData = computed(() => {
-  return mockData[selectedCategory.value] || mockData.Age
-})
-
-const totalResponses = computed(() => {
-  return chartData.value.reduce((sum, item) => sum + item.value, 0)
-})
 
 const getSegmentColor = (index) => {
   return colorPalette[index % colorPalette.length]
@@ -176,14 +175,45 @@ const clearHoverSegment = () => {
   hoveredSegment.value = null
 }
 
-watch(
-  [() => props.serviceType, () => props.dateRange, selectedCategory],
-  () => {
-    console.log('Fetching demographic data for:', {
-      serviceType: props.serviceType,
-      dateRange: props.dateRange,
-      category: selectedCategory.value
+const normalizeCategoryForApi = (category) => {
+  if (category === 'Client Type') {
+    return 'client_type'
+  }
+
+  return category.toLowerCase()
+}
+
+const fetchDemographicData = async () => {
+  try {
+    const response = await api.get('/frontdesk/analytics/csm/demographic-profile', {
+      params: {
+        ...props.filterParams,
+        service_type: props.serviceType,
+        category: normalizeCategoryForApi(selectedCategory.value),
+      },
     })
+
+    const payload = response?.data?.data || {}
+    chartData.value = payload.distribution?.length
+      ? payload.distribution.map((item) => ({
+          name: item.name,
+          value: item.value ?? 0,
+          percentage: item.percentage ?? 0,
+        }))
+      : defaultData[selectedCategory.value]
+
+    totalResponses.value = payload.total_responses ?? 0
+  } catch (error) {
+    console.error('Error fetching demographic data:', error)
+    chartData.value = defaultData[selectedCategory.value]
+    totalResponses.value = 0
+  }
+}
+
+watch(
+  [() => props.serviceType, () => props.filterParams.period, () => props.filterParams.date, () => props.filterParams.month, () => props.filterParams.year, selectedCategory],
+  () => {
+    fetchDemographicData()
   },
   { immediate: true }
 )

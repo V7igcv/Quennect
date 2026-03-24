@@ -149,6 +149,14 @@
       </div>
     </div>
 
+    <div
+      v-if="isLoadingAnalytics"
+      class="mb-4 flex items-center gap-2 rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm font-medium text-[#0F5C5C]"
+    >
+      <Loader2 class="h-4 w-4 animate-spin" />
+      Loading analytics data...
+    </div>
+
     <!-- Rest of the dashboard content will go here -->
     <!-- Dashboard Content -->
     <div class="space-y-6">
@@ -380,12 +388,12 @@
         </div>
       </div>
 
-      <!-- SDQ and Demographic Section -->
+      <!-- SQD and Demographic Section -->
       <div>
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
           <div class="mb-4">
             <h2 class="text-xl font-semibold">
-              SDQ Results
+              SQD Results
               <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
             </h2>
           </div>
@@ -399,9 +407,10 @@
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
           <div class="space-y-3">
-            <SDQResultsCard
+            <SQDResultsCard
               :service-type="selectedServiceType"
               :date-range="selectedDateRange"
+              :filter-params="apiFilterParams"
             />
           </div>
 
@@ -409,6 +418,7 @@
             <DemographicProfileCard
               :service-type="selectedServiceType"
               :date-range="selectedDateRange"
+              :filter-params="apiFilterParams"
             />
           </div>
         </div>
@@ -426,6 +436,7 @@
         <OverallScorePerServiceCard 
           :service-type="selectedServiceType"
           :date-range="selectedDateRange"
+          :filter-params="apiFilterParams"
         />
       </div>
     </div>
@@ -433,7 +444,8 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import api from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import StatCard from '@/components/common/StatCard.vue'
@@ -443,17 +455,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { 
+import {
   FileText,
-  Building2, 
-  Calendar, 
+  Building2,
+  Calendar,
   ChevronLeft,
   ChevronRight,
-  Users, 
-  Megaphone, 
-  Eye, 
-  Hand, 
-  BarChart3 
+  Users,
+  Megaphone,
+  Eye,
+  Hand,
+  BarChart3,
+  Loader2,
 } from 'lucide-vue-next'
 import {
   Select,
@@ -467,14 +480,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import SDQResultsCard from '@/components/CSM/SDQResultsCard.vue'
+import SQDResultsCard from '@/components/CSM/SQDResultsCard.vue'
 import DemographicProfileCard from '@/components/CSM/DemographicProfileCard.vue'
 import OverallScorePerServiceCard from '@/components/CSM/OverallScorePerServiceCard.vue'
 
-// State for dropdowns
 const selectedServiceType = ref('external')
 const selectedDateRange = ref('daily')
 const isDateFilterOpen = ref(false)
+const isLoadingAnalytics = ref(false)
+const isApplyingDateFilter = ref(false)
 
 const bodyOriginalOverflow = ref('')
 const htmlOriginalOverflow = ref('')
@@ -511,7 +525,6 @@ onBeforeUnmount(() => {
   unlockPageScroll()
 })
 
-// Date filter state
 const now = new Date()
 const selectedDate = ref(new Date(now.getFullYear(), now.getMonth(), now.getDate()))
 const selectedMonthIndex = ref(now.getMonth())
@@ -599,9 +612,8 @@ const isSelectedDay = (day) => {
     && selectedDate.value.getDate() === day
 }
 
-// Computed property for service type label
 const getServiceTypeLabel = computed(() => {
-  switch(selectedServiceType.value) {
+  switch (selectedServiceType.value) {
     case 'external':
       return 'External'
     case 'internal':
@@ -613,42 +625,40 @@ const getServiceTypeLabel = computed(() => {
   }
 })
 
-// Mock data for stats (replace with actual API data later)
 const stats = ref({
-  totalTransactions: 23455,
-  ccAwareness: 82.3,
-  ccVisibility: 91.7,
-  ccHelpfulness: 88.9,
-  overallScore: 85.2
+  totalTransactions: 0,
+  ccAwareness: 0,
+  ccVisibility: 0,
+  ccHelpfulness: 0,
+  overallScore: 0,
 })
 
-// Mock data for CC charts
-const ccData = ref({
+const getDefaultCcData = () => ({
   awareness: [
-    { percentage: 89, count: 445, description: 'I know what a CC is and I saw this offices CC.' },
-    { percentage: 67, count: 335, description: 'I know what a CC is but I did NOT see this offices CC.' },
-    { percentage: 45, count: 225, description: 'I have learned of the CC only when I saw this offices CC.' },
-    { percentage: 23, count: 115, description: 'I do not know what a CC is and I did not see one in this office.' }
+    { option: 1, label: 'Option 1', description: 'Option 1', count: 0, percentage: 0 },
+    { option: 2, label: 'Option 2', description: 'Option 2', count: 0, percentage: 0 },
+    { option: 3, label: 'Option 3', description: 'Option 3', count: 0, percentage: 0 },
+    { option: 4, label: 'Option 4', description: 'Option 4', count: 0, percentage: 0 },
   ],
   visibility: [
-    { percentage: 78, count: 390, description: 'Easy to see' },
-    { percentage: 56, count: 280, description: 'Somewhat easy to see' },
-    { percentage: 34, count: 170, description: 'Difficult to see' },
-    { percentage: 34, count: 170, description: 'Not visible at all' },
-    { percentage: 34, count: 170, description: 'N/A' }
+    { option: 1, label: 'Option 1', description: 'Option 1', count: 0, percentage: 0 },
+    { option: 2, label: 'Option 2', description: 'Option 2', count: 0, percentage: 0 },
+    { option: 3, label: 'Option 3', description: 'Option 3', count: 0, percentage: 0 },
   ],
   helpfulness: [
-    { percentage: 82, count: 410, description: 'Helped very much' },
-    { percentage: 64, count: 320, description: 'Somewhat helped' },
-    { percentage: 41, count: 205, description: 'Did not help' },
-    { percentage: 18, count: 90, description: 'N/A' }
-  ]
+    { option: 1, label: 'Option 1', description: 'Option 1', count: 0, percentage: 0 },
+    { option: 2, label: 'Option 2', description: 'Option 2', count: 0, percentage: 0 },
+    { option: 3, label: 'Option 3', description: 'Option 3', count: 0, percentage: 0 },
+    { option: 4, label: 'Option 4', description: 'Option 4', count: 0, percentage: 0 },
+  ],
 })
+
+const ccData = ref(getDefaultCcData())
 
 const ccShadeMap = {
   awareness: ['bg-[#DC2626]', 'bg-[#E55353]', 'bg-[#EF8080]', 'bg-[#F7B3B3]'],
   visibility: ['bg-[#F5700B]', 'bg-[#F78A36]', 'bg-[#F9A461]', 'bg-[#FBC08D]'],
-  helpfulness: ['bg-[#9626DC]', 'bg-[#AB53E3]', 'bg-[#C080EA]', 'bg-[#D9B3F3]']
+  helpfulness: ['bg-[#9626DC]', 'bg-[#AB53E3]', 'bg-[#C080EA]', 'bg-[#D9B3F3]'],
 }
 
 const getBarShade = (ccType, items, index) => {
@@ -664,6 +674,126 @@ const getBarShade = (ccType, items, index) => {
 
   return shades[shadeIndex]
 }
+
+const formatDate = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const apiFilterParams = computed(() => {
+  if (selectedDateRange.value === 'monthly') {
+    return {
+      period: 'monthly',
+      month: selectedMonthIndex.value + 1,
+      year: selectedMonthYear.value,
+    }
+  }
+
+  if (selectedDateRange.value === 'yearly') {
+    return {
+      period: 'yearly',
+      year: Number(selectedYear.value),
+    }
+  }
+
+  return {
+    period: 'daily',
+    date: formatDate(selectedDate.value),
+  }
+})
+
+const buildCsmParams = () => ({
+  ...apiFilterParams.value,
+  service_type: selectedServiceType.value,
+})
+
+const fetchOverviewStats = async () => {
+  const response = await api.get('/frontdesk/analytics/csm/overview', {
+    params: buildCsmParams(),
+  })
+
+  const payload = response?.data?.data || {}
+  stats.value = {
+    totalTransactions: payload.total_transactions ?? 0,
+    ccAwareness: payload.cc_awareness ?? 0,
+    ccVisibility: payload.cc_visibility ?? 0,
+    ccHelpfulness: payload.cc_helpfulness ?? 0,
+    overallScore: payload.overall_score ?? 0,
+  }
+}
+
+const fetchCitizenCharter = async () => {
+  const response = await api.get('/frontdesk/analytics/csm/citizen-charter', {
+    params: buildCsmParams(),
+  })
+
+  const payload = response?.data?.data
+  ccData.value = payload
+    ? {
+        awareness: payload.awareness || getDefaultCcData().awareness,
+        visibility: payload.visibility || getDefaultCcData().visibility,
+        helpfulness: payload.helpfulness || getDefaultCcData().helpfulness,
+      }
+    : getDefaultCcData()
+}
+
+const fetchCsmAnalytics = async () => {
+  isLoadingAnalytics.value = true
+
+  try {
+    await Promise.all([
+      fetchOverviewStats(),
+      fetchCitizenCharter(),
+    ])
+  } catch (error) {
+    console.error('Error fetching CSM analytics:', error)
+    stats.value = {
+      totalTransactions: 0,
+      ccAwareness: 0,
+      ccVisibility: 0,
+      ccHelpfulness: 0,
+      overallScore: 0,
+    }
+    ccData.value = getDefaultCcData()
+  } finally {
+    isLoadingAnalytics.value = false
+  }
+}
+
+const applyDateFilterAndReload = async () => {
+  isApplyingDateFilter.value = true
+  await fetchCsmAnalytics()
+  isApplyingDateFilter.value = false
+}
+
+watch(selectedServiceType, () => {
+  fetchCsmAnalytics()
+})
+
+watch(selectedDateRange, () => {
+  applyDateFilterAndReload()
+})
+
+watch(selectedDate, () => {
+  if (selectedDateRange.value !== 'daily') return
+  applyDateFilterAndReload()
+})
+
+watch([selectedMonthIndex, selectedMonthYear], () => {
+  if (selectedDateRange.value !== 'monthly') return
+  applyDateFilterAndReload()
+})
+
+watch(selectedYear, () => {
+  if (selectedDateRange.value !== 'yearly') return
+  applyDateFilterAndReload()
+})
+
+onMounted(() => {
+  fetchCsmAnalytics()
+})
 </script>
 
 

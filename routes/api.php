@@ -17,6 +17,7 @@ use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\OfficeManagementController;
 use App\Http\Controllers\ServiceManagementController;
 use App\Http\Controllers\FrontdeskAnalyticsController;
+use App\Http\Controllers\CsmAnalyticsController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -117,6 +118,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
     Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
     Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
+
+    // CSM Analytics
+    Route::get('/analytics/csm/overview', [CsmAnalyticsController::class, 'getOverviewStats']);
+    Route::get('/analytics/csm/citizen-charter', [CsmAnalyticsController::class, 'getCitizenCharterCounts']);
+    Route::get('/analytics/csm/sqd-results', [CsmAnalyticsController::class, 'getSqdResults']);
+    Route::get('/analytics/csm/demographic-profile', [CsmAnalyticsController::class, 'getDemographicProfile']);
+    Route::get('/analytics/csm/overall-score-per-service', [CsmAnalyticsController::class, 'getOverallScorePerService']);
 
     // Counter Management
     Route::get('/counters', [CounterController::class, 'index']);

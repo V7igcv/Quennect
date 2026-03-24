@@ -2,18 +2,18 @@
   <Card class="w-full">
     <CardHeader class="flex flex-row items-start justify-between space-y-0 pb-2">
       <div>
-        <CardTitle class="text-lg font-semibold">{{ selectedSDQ }}</CardTitle>
+        <CardTitle class="text-lg font-semibold">{{ selectedSQD }}</CardTitle>
         <CardDescription class="text-sm text-gray-500 mt-1">
-          {{ getSDQDescription(selectedSDQ) }}
+          {{ getSQDDescription(selectedSQD) }}
         </CardDescription>
       </div>
-      <Select v-model="selectedSDQ">
+      <Select v-model="selectedSQD">
         <SelectTrigger class="w-[180px]">
-          <SelectValue placeholder="Select SDQ" />
+          <SelectValue placeholder="Select SQD" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem v-for="sdq in sdqOptions" :key="sdq" :value="sdq">
-            {{ sdq }}
+          <SelectItem v-for="sqd in sqdOptions" :key="sqd" :value="sqd">
+            {{ sqd }}
           </SelectItem>
         </SelectContent>
       </Select>
@@ -76,6 +76,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import api from '@/services/api'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import {
   Select,
@@ -91,66 +92,52 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 
-// Props
 const props = defineProps({
   serviceType: {
     type: String,
-    default: 'external'
+    default: 'external',
   },
   dateRange: {
     type: String,
-    default: 'monthly'
-  }
+    default: 'monthly',
+  },
+  filterParams: {
+    type: Object,
+    default: () => ({}),
+  },
 })
 
-// State
-const selectedSDQ = ref('SDQ0')
+const selectedSQD = ref('SQD0')
+const sqdDescription = ref('')
+const chartData = ref([])
+const totalResponses = ref(0)
+const overallPercentage = ref(0)
 
-// SDQ Options
-const sdqOptions = ['SDQ0', 'SDQ1', 'SDQ2', 'SDQ3', 'SDQ4', 'SDQ5', 'SDQ6', 'SDQ7', 'SDQ8']
+const sqdOptions = ['SQD0', 'SQD1', 'SQD2', 'SQD3', 'SQD4', 'SQD5', 'SQD6', 'SQD7', 'SQD8']
 
-// SDQ Descriptions mapping
-const sdqDescriptions = {
-  'SDQ0': 'I am satisfied with the service that I availed.',
-  'SDQ1': 'I spent a reasonable amount of time for my transaction.',
-  'SDQ2': 'The office followed the transactions requirements and steps based on the information provided',
-  'SDQ3': 'The steps (including payment) I needed to do for my transaction were easy and simple.',
-  'SDQ4': 'I easily found information about my transaction from the office or its website.',
-  'SDQ5': 'I paid a reasonable amount of fees for my transaction.',
-  'SDQ6': 'I feel the office was fair to everyone, or "walang palakasan", during my transaction.',
-  'SDQ7': 'I was treated courteously by the staff, and (if asked for help) the staff was helpful.',
-  'SDQ8': 'I got what I needed from the government office, or (if denied) denial of request was sufficiently explained to me.'
+const sqdDescriptions = {
+  SQD0: 'I am satisfied with the service that I availed.',
+  SQD1: 'I spent a reasonable amount of time for my transaction.',
+  SQD2: 'The office followed the transactions requirements and steps based on the information provided',
+  SQD3: 'The steps (including payment) I needed to do for my transaction were easy and simple.',
+  SQD4: 'I easily found information about my transaction from the office or its website.',
+  SQD5: 'I paid a reasonable amount of fees for my transaction.',
+  SQD6: 'I feel the office was fair to everyone, or "walang palakasan", during my transaction.',
+  SQD7: 'I was treated courteously by the staff, and (if asked for help) the staff was helpful.',
+  SQD8: 'I got what I needed from the government office, or (if denied) denial of request was sufficiently explained to me.',
 }
 
-// Mock data for the chart (replace with actual API data)
-const mockChartData = {
-  'SDQ0': [
-    { criteria: 'Strongly Disagree', value: 45 },
-    { criteria: 'Disagree', value: 62 },
-    { criteria: 'Neither', value: 88 },
-    { criteria: 'Agree', value: 124 },
-    { criteria: 'Strongly Agree', value: 156 },
-    { criteria: 'N/A', value: 23 }
-  ],
-  'SDQ1': [
-    { criteria: 'Strongly Disagree', value: 32 },
-    { criteria: 'Disagree', value: 54 },
-    { criteria: 'Neither', value: 76 },
-    { criteria: 'Agree', value: 145 },
-    { criteria: 'Strongly Agree', value: 134 },
-    { criteria: 'N/A', value: 18 }
-  ]
-  // Add more SDQ data as needed
-}
-
-// Computed property for chart data based on selected SDQ
-const chartData = computed(() => {
-  return mockChartData[selectedSDQ.value] || mockChartData['SDQ0']
-})
-
+const defaultDistribution = () => ([
+  { criteria: 'Strongly Disagree', value: 0 },
+  { criteria: 'Disagree', value: 0 },
+  { criteria: 'Neither Agree nor Disagree', value: 0 },
+  { criteria: 'Agree', value: 0 },
+  { criteria: 'Strongly Agree', value: 0 },
+  { criteria: 'Not Applicable', value: 0 },
+])
 
 const maxChartValue = computed(() => {
-  const values = chartData.value.map(item => item.value)
+  const values = chartData.value.map((item) => item.value)
   return values.length ? Math.max(...values) : 1
 })
 
@@ -159,42 +146,26 @@ const getBarHeight = (value) => {
   return Math.max((value / maxChartValue.value) * 100, 6)
 }
 
-// Computed property for total responses
-const totalResponses = computed(() => {
-  return chartData.value.reduce((sum, item) => sum + item.value, 0)
-})
+const getSQDDescription = (sqd) => {
+  if (sqdDescription.value) {
+    return sqdDescription.value
+  }
 
-// Computed property for overall percentage
-const overallPercentage = computed(() => {
-  const data = chartData.value
-  const stronglyAgree = data.find(d => d.criteria === 'Strongly Agree')?.value || 0
-  const agree = data.find(d => d.criteria === 'Agree')?.value || 0
-  const na = data.find(d => d.criteria === 'N/A')?.value || 0
-  
-  if (totalResponses.value - na === 0) return 0
-  
-  return Math.round(((stronglyAgree + agree) / (totalResponses.value - na)) * 100)
-})
-
-// Get SDQ description
-const getSDQDescription = (sdq) => {
-  return sdqDescriptions[sdq] || 'No description available'
+  return sqdDescriptions[sqd] || 'No description available'
 }
 
-// Get bar color based on criteria
 const getBarColor = (criteria) => {
   const colors = {
-    'Strongly Disagree': '#EF4444', // Red
-    'Disagree': '#F97316', // Orange
-    'Neither': '#EAB308', // Yellow
-    'Agree': '#22C55E', // Green
-    'Strongly Agree': '#10B981', // Emerald
-    'N/A': '#6B7280' // Gray
+    'Strongly Disagree': '#EF4444',
+    Disagree: '#F97316',
+    'Neither Agree nor Disagree': '#EAB308',
+    Agree: '#22C55E',
+    'Strongly Agree': '#10B981',
+    'Not Applicable': '#6B7280',
   }
   return colors[criteria] || '#3B82F6'
 }
 
-// Get color class for percentage based on performance scale
 const getPercentageColorClass = (percentage) => {
   if (percentage >= 95) return 'text-green-600'
   if (percentage >= 90) return 'text-blue-600'
@@ -203,15 +174,42 @@ const getPercentageColorClass = (percentage) => {
   return 'text-red-600'
 }
 
-// Watch for changes in service type or date range to fetch new data
-watch([() => props.serviceType, () => props.dateRange, selectedSDQ], () => {
-  // In a real implementation, you would fetch new data here based on the filters
-  console.log('Fetching SDQ data for:', {
-    serviceType: props.serviceType,
-    dateRange: props.dateRange,
-    sdq: selectedSDQ.value
-  })
-}, { immediate: true })
+const fetchSqdData = async () => {
+  try {
+    const response = await api.get('/frontdesk/analytics/csm/sqd-results', {
+      params: {
+        ...props.filterParams,
+        service_type: props.serviceType,
+        sqd: selectedSQD.value,
+      },
+    })
+
+    const payload = response?.data?.data || {}
+    chartData.value = payload.distribution?.length
+      ? payload.distribution.map((item) => ({
+          criteria: item.criteria,
+          value: item.value ?? 0,
+        }))
+      : defaultDistribution()
+    totalResponses.value = payload.total_responses ?? 0
+    overallPercentage.value = payload.overall_percentage ?? 0
+    sqdDescription.value = payload.description || ''
+  } catch (error) {
+    console.error('Error fetching SQD data:', error)
+    chartData.value = defaultDistribution()
+    totalResponses.value = 0
+    overallPercentage.value = 0
+    sqdDescription.value = ''
+  }
+}
+
+watch(
+  [() => props.serviceType, () => props.filterParams.period, () => props.filterParams.date, () => props.filterParams.month, () => props.filterParams.year, selectedSQD],
+  () => {
+    fetchSqdData()
+  },
+  { immediate: true }
+)
 </script>
 
 

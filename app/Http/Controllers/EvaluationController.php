@@ -226,11 +226,14 @@ class EvaluationController extends Controller
             // Save multiple choice responses
             if (!empty($multipleChoiceResponses)) {
                 foreach ($multipleChoiceResponses as $questionId => $answerValue) {
+                    $answerOption = $this->extractOptionNumber((string) $answerValue);
+
                     EvaluationResponse::create([
                         'queue_transaction_id' => $transaction->id,
                         'evaluation_session_id' => $evaluationSession->id,
                         'question_id' => $questionId,
                         'answer_value' => $answerValue,
+                        'answer_option' => $answerOption,
                         'rating_value' => null
                     ]);
                 }
@@ -253,6 +256,7 @@ class EvaluationController extends Controller
                         'evaluation_session_id' => $evaluationSession->id,
                         'question_id' => $questionId,
                         'answer_value' => $value,
+                        'answer_option' => $ratingValue,
                         'rating_value' => $ratingValue
                     ]);
                 }
@@ -329,6 +333,21 @@ class EvaluationController extends Controller
         }
 
         return $fallback;
+    }
+
+    private function extractOptionNumber(string $answerValue): ?int
+    {
+        $trimmed = trim($answerValue);
+
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (preg_match('/^(\d+)/', $trimmed, $matches) === 1) {
+            return (int) $matches[1];
+        }
+
+        return null;
     }
 
     /**

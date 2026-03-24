@@ -31,8 +31,7 @@
                     </div>
                   </TooltipTrigger>
                   <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
-                    <p class="font-semibold text-gray-900">{{ entry.name }}</p>
-                    <p class="mt-1 text-gray-600">{{ entry.description }}</p>
+                    <p class="font-semibold text-gray-900">{{ entry.service_name || entry.name }}</p>
                     <p class="text-gray-600">Score: <span class="font-semibold">{{ entry.percentage }}%</span></p>
                     <p class="text-gray-600">Rating: <span class="font-semibold">{{ getRatingText(entry.percentage) }}</span></p>
                   </TooltipContent>
@@ -118,7 +117,8 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { ref, watch } from 'vue'
+import api from '@/services/api'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -134,99 +134,37 @@ import {
 } from '@/components/ui/tooltip'
 import { Info } from 'lucide-vue-next'
 
-// Props
 const props = defineProps({
   serviceType: {
     type: String,
-    default: 'external'
+    default: 'external',
   },
   dateRange: {
     type: String,
-    default: 'monthly'
-  }
+    default: 'monthly',
+  },
+  filterParams: {
+    type: Object,
+    default: () => ({}),
+  },
 })
 
-// Mock data for different service types
-const mockData = {
-  external: [
-    { name: 'Service A', percentage: 95.5, description: 'Front Desk Services' },
-    { name: 'Service B', percentage: 88.2, description: 'Document Processing' },
-    { name: 'Service C', percentage: 92.8, description: 'Payment Services' },
-    { name: 'Service D', percentage: 76.4, description: 'Inquiry Services' },
-    { name: 'Service E', percentage: 83.1, description: 'Complaint Handling' }
-  ],
-  internal: [
-    { name: 'Service X', percentage: 91.2, description: 'HR Services' },
-    { name: 'Service Y', percentage: 84.7, description: 'IT Support' },
-    { name: 'Service Z', percentage: 78.9, description: 'Administrative' }
-  ],
-  all: [
-    { name: 'Service A', percentage: 95.5, description: 'Front Desk Services' },
-    { name: 'Service B', percentage: 88.2, description: 'Document Processing' },
-    { name: 'Service C', percentage: 92.8, description: 'Payment Services' },
-    { name: 'Service D', percentage: 76.4, description: 'Inquiry Services' },
-    { name: 'Service E', percentage: 83.1, description: 'Complaint Handling' },
-    { name: 'Service X', percentage: 91.2, description: 'HR Services' },
-    { name: 'Service Y', percentage: 84.7, description: 'IT Support' },
-    { name: 'Service Z', percentage: 78.9, description: 'Administrative' }
-  ]
-}
+const chartData = ref([])
+const serviceTotalLabel = ref('Service Total')
+const serviceTotalPercentage = ref(0)
 
-// Computed property for service type label
-const getServiceTypeLabel = computed(() => {
-  switch(props.serviceType) {
-    case 'external':
-      return 'External'
-    case 'internal':
-      return 'Internal'
-    case 'all':
-      return 'All'
-    default:
-      return 'External'
-  }
-})
-
-// Computed property for chart data based on service type
-const chartData = computed(() => {
-  return mockData[props.serviceType] || mockData['external']
-})
-
-// Computed property for service total label
-const serviceTotalLabel = computed(() => {
-  switch(props.serviceType) {
-    case 'external':
-      return 'External Service Total'
-    case 'internal':
-      return 'Internal Service Total'
-    case 'all':
-      return 'Overall Service Total'
-    default:
-      return 'Service Total'
-  }
-})
-
-// Computed property for service total percentage (average of all services)
-const serviceTotalPercentage = computed(() => {
-  const data = chartData.value
-  if (data.length === 0) return 0
-  const sum = data.reduce((acc, curr) => acc + curr.percentage, 0)
-  return Math.round((sum / data.length) * 10) / 10 // Round to 1 decimal
-})
-
-// Get color for bar based on percentage
 const getScoreColor = (percentage) => {
-  if (percentage >= 95) return '#22C55E' // Green
-  if (percentage >= 90) return '#3B82F6' // Blue
-  if (percentage >= 80) return '#EAB308' // Yellow
-  if (percentage >= 60) return '#F97316' // Orange
-  return '#EF4444' // Red
+  if (percentage >= 95) return '#22C55E'
+  if (percentage >= 90) return '#3B82F6'
+  if (percentage >= 80) return '#EAB308'
+  if (percentage >= 60) return '#F97316'
+  return '#EF4444'
 }
 
 const getBarHeight = (percentage) => {
   return Math.max(percentage, 6)
 }
 
-// Get color class for text based on percentage
 const getScoreColorClass = (percentage) => {
   if (percentage >= 95) return 'text-green-600'
   if (percentage >= 90) return 'text-blue-600'
@@ -235,7 +173,6 @@ const getScoreColorClass = (percentage) => {
   return 'text-red-600'
 }
 
-// Get rating badge class
 const getRatingBadgeClass = (percentage) => {
   if (percentage >= 95) return 'bg-green-100 text-green-700'
   if (percentage >= 90) return 'bg-blue-100 text-blue-700'
@@ -244,7 +181,6 @@ const getRatingBadgeClass = (percentage) => {
   return 'bg-red-100 text-red-700'
 }
 
-// Get rating text
 const getRatingText = (percentage) => {
   if (percentage >= 95) return 'Outstanding'
   if (percentage >= 90) return 'Very Satisfactory'
@@ -253,16 +189,32 @@ const getRatingText = (percentage) => {
   return 'Poor'
 }
 
-// Watch for changes in service type or date range to fetch new data
-watch(
-  [() => props.serviceType, () => props.dateRange], 
-  () => {
-    // In a real implementation, you would fetch new data here based on the filters
-    console.log('Fetching overall score data for:', {
-      serviceType: props.serviceType,
-      dateRange: props.dateRange
+const fetchOverallScore = async () => {
+  try {
+    const response = await api.get('/frontdesk/analytics/csm/overall-score-per-service', {
+      params: {
+        ...props.filterParams,
+        service_type: props.serviceType,
+      },
     })
-  }, 
+
+    const payload = response?.data?.data || {}
+    chartData.value = payload.chart_data || []
+    serviceTotalLabel.value = payload.service_total_label || 'Service Total'
+    serviceTotalPercentage.value = payload.service_total_percentage ?? 0
+  } catch (error) {
+    console.error('Error fetching overall score per service:', error)
+    chartData.value = []
+    serviceTotalLabel.value = 'Service Total'
+    serviceTotalPercentage.value = 0
+  }
+}
+
+watch(
+  [() => props.serviceType, () => props.filterParams.period, () => props.filterParams.date, () => props.filterParams.month, () => props.filterParams.year],
+  () => {
+    fetchOverallScore()
+  },
   { immediate: true }
 )
 </script>
