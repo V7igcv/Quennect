@@ -6,7 +6,7 @@ return [
     | SMS Driver
     |--------------------------------------------------------------------------
     |
-    | Supported drivers: "null", "smsapiph", "semaphore"
+    | Supported drivers: "null", "smsapiph", "twilio", "semaphore"
     | The "null" driver is safe for local development because it performs
     | no outbound HTTP requests.
     |
@@ -28,5 +28,13 @@ return [
         'base_url' => env('SEMAPHORE_BASE_URL', 'https://api.semaphore.co/api/v4'),
         'api_key' => env('SEMAPHORE_API_KEY'),
         'sender' => env('SEMAPHORE_SENDER'),
+    ],
+
+    'twilio' => [
+        'base_url' => env('TWILIO_BASE_URL', 'https://api.twilio.com/2010-04-01'),
+        'account_sid' => env('TWILIO_ACCOUNT_SID'),
+        'auth_token' => env('TWILIO_AUTH_TOKEN'),
+        'from_number' => env('TWILIO_FROM_NUMBER'),
+        'timeout' => (int) env('TWILIO_TIMEOUT', 10),
     ],
 ];
