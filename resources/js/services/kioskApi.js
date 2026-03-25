@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Kiosk API - NO AUTH required
 const kioskApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
