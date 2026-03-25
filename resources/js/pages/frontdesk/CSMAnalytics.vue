@@ -644,6 +644,8 @@ const getDefaultCcData = () => ({
     { option: 1, label: 'Option 1', description: 'Option 1', count: 0, percentage: 0 },
     { option: 2, label: 'Option 2', description: 'Option 2', count: 0, percentage: 0 },
     { option: 3, label: 'Option 3', description: 'Option 3', count: 0, percentage: 0 },
+    { option: 4, label: 'Option 4', description: 'Option 4', count: 0, percentage: 0 },
+    { option: 5, label: 'Option 5', description: 'Option 5', count: 0, percentage: 0 },
   ],
   helpfulness: [
     { option: 1, label: 'Option 1', description: 'Option 1', count: 0, percentage: 0 },
@@ -657,7 +659,7 @@ const ccData = ref(getDefaultCcData())
 
 const ccShadeMap = {
   awareness: ['bg-[#DC2626]', 'bg-[#E55353]', 'bg-[#EF8080]', 'bg-[#F7B3B3]'],
-  visibility: ['bg-[#F5700B]', 'bg-[#F78A36]', 'bg-[#F9A461]', 'bg-[#FBC08D]'],
+  visibility: ['bg-[#F5700B]', 'bg-[#F78A36]', 'bg-[#F9A461]', 'bg-[#FBC08D]', 'bg-[#FDE2CE]'],
   helpfulness: ['bg-[#9626DC]', 'bg-[#AB53E3]', 'bg-[#C080EA]', 'bg-[#D9B3F3]'],
 }
 

@@ -28,7 +28,7 @@ class CsmAnalyticsController extends Controller
             'key' => 'visibility',
             'label' => 'Visibility',
             'default_question' => 'If aware of CC, would you say that the CC of this office was...?',
-            'allowed_options' => [1, 2, 3],
+            'allowed_options' => [1, 2, 3, 4, 5],
         ],
         'CC3' => [
             'key' => 'helpfulness',
@@ -644,7 +644,7 @@ class CsmAnalyticsController extends Controller
      * Get CSM Overall Score Per Service chart data.
      *
      * Formula per service:
-     * ((Strongly Agree + Agree) / (Total Answers - N/A)) * 100
+    * ((Strongly Agree + Agree) / (Total SQD Answers - N/A)) * 100
      *
      * Service total formula:
      * (Sum of service percentages / Number of services)
@@ -1466,15 +1466,19 @@ class CsmAnalyticsController extends Controller
         string $endDate
     ): array {
         $answerOptionExpression = $this->getAnswerOptionExpression();
+        $sqdCodes = ['SQD0', 'SQD1', 'SQD2', 'SQD3', 'SQD4', 'SQD5', 'SQD6', 'SQD7', 'SQD8'];
 
         $query = DB::table('evaluation_responses as er')
             ->join('evaluation_questions as eq', 'eq.id', '=', 'er.question_id')
-            // Use SQD0 as the single respondent-level overall basis for service scoring.
-            ->where(function ($innerQuery) {
+            // Use all SQD questions (SQD0-SQD8) for per-service overall scoring.
+            ->where(function ($innerQuery) use ($sqdCodes) {
                 $innerQuery->where('eq.question_type', 'LIKERT')
-                    ->where(function ($q) {
-                        $q->where('eq.question_code', 'SQD0')
-                            ->orWhere('eq.question_text', 'like', 'SQD0%');
+                    ->where(function ($q) use ($sqdCodes) {
+                        $q->whereIn('eq.question_code', $sqdCodes);
+
+                        foreach ($sqdCodes as $sqdCode) {
+                            $q->orWhere('eq.question_text', 'like', $sqdCode . '%');
+                        }
                     });
             })
             ->selectRaw('s.id AS service_id')
@@ -1482,14 +1486,14 @@ class CsmAnalyticsController extends Controller
             ->selectRaw('s.service_name AS service_name')
             ->selectRaw("SUM(CASE WHEN {$answerOptionExpression} = 4 THEN 1 ELSE 0 END) AS agree_count")
             ->selectRaw("SUM(CASE WHEN {$answerOptionExpression} = 5 THEN 1 ELSE 0 END) AS strongly_agree_count")
-            ->selectRaw("SUM(CASE WHEN {$answerOptionExpression} = 0 OR {$answerOptionExpression} IS NULL THEN 1 ELSE 0 END) AS na_count");
+            ->selectRaw("SUM(CASE WHEN {$answerOptionExpression} = 0 OR {$answerOptionExpression} IS NULL THEN 1 ELSE 0 END) AS na_count")
+            ->selectRaw('COUNT(*) AS total_answers');
 
         if ($source === 'external') {
             $query
                 ->join('queue_transactions as qt', 'qt.id', '=', 'er.queue_transaction_id')
                 ->join('queue_transaction_services as qts', 'qts.queue_transaction_id', '=', 'qt.id')
                 ->join('services as s', 's.id', '=', 'qts.service_id')
-                ->selectRaw('COUNT(DISTINCT qt.id) AS total_respondents')
                 ->where('qt.office_id', $officeId)
                 ->where('qt.status', 'COMPLETED')
                 ->where('s.service_type', 'External')
@@ -1502,7 +1506,6 @@ class CsmAnalyticsController extends Controller
                 ->join('internal_transactions as it', 'it.id', '=', 'er.internal_transaction_id')
                 ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
                 ->join('services as s', 's.id', '=', 'qts.service_id')
-                ->selectRaw('COUNT(DISTINCT it.id) AS total_respondents')
                 ->where('it.office_id', $officeId)
                 ->where('it.status', 'COMPLETED')
                 ->where('s.service_type', 'Internal')
@@ -1518,7 +1521,7 @@ class CsmAnalyticsController extends Controller
                     'service_id' => (int) $row->service_id,
                     'service_code' => (string) ($row->service_code ?? ''),
                     'service_name' => (string) $row->service_name,
-                    'total_respondents' => (int) ($row->total_respondents ?? 0),
+                    'total_answers' => (int) ($row->total_answers ?? 0),
                     'agree_count' => (int) ($row->agree_count ?? 0),
                     'strongly_agree_count' => (int) ($row->strongly_agree_count ?? 0),
                     'na_count' => (int) ($row->na_count ?? 0),
@@ -1544,14 +1547,14 @@ class CsmAnalyticsController extends Controller
                     'service_id' => $serviceId,
                     'service_code' => (string) ($row['service_code'] ?? ''),
                     'service_name' => (string) ($row['service_name'] ?? ''),
-                    'total_respondents' => 0,
+                    'total_answers' => 0,
                     'agree_count' => 0,
                     'strongly_agree_count' => 0,
                     'na_count' => 0,
                 ];
             }
 
-            $mergedByService[$serviceId]['total_respondents'] += (int) ($row['total_respondents'] ?? 0);
+            $mergedByService[$serviceId]['total_answers'] += (int) ($row['total_answers'] ?? 0);
             $mergedByService[$serviceId]['agree_count'] += (int) ($row['agree_count'] ?? 0);
             $mergedByService[$serviceId]['strongly_agree_count'] += (int) ($row['strongly_agree_count'] ?? 0);
             $mergedByService[$serviceId]['na_count'] += (int) ($row['na_count'] ?? 0);
@@ -1567,10 +1570,10 @@ class CsmAnalyticsController extends Controller
         $sumPercentages = 0.0;
 
         foreach ($services as $service) {
-            $totalRespondents = (int) ($service['total_respondents'] ?? 0);
+            $totalAnswers = (int) ($service['total_answers'] ?? 0);
             $naCount = (int) ($service['na_count'] ?? 0);
             $numerator = (int) ($service['agree_count'] ?? 0) + (int) ($service['strongly_agree_count'] ?? 0);
-            $denominator = $totalRespondents - $naCount;
+            $denominator = $totalAnswers - $naCount;
 
             $percentage = $denominator <= 0
                 ? 0.0
@@ -1595,7 +1598,7 @@ class CsmAnalyticsController extends Controller
                     'strongly_agree' => (int) ($service['strongly_agree_count'] ?? 0),
                     'agree' => (int) ($service['agree_count'] ?? 0),
                     'na' => $naCount,
-                    'total_respondents' => $totalRespondents,
+                    'total_answers' => $totalAnswers,
                     'denominator' => max($denominator, 0),
                 ],
             ];
