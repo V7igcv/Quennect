@@ -23,7 +23,10 @@
           {{ selectedServiceView }}
           <Repeat2 class="w-4 h-4" />
         </button>
-        <Button class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isLoading || isSubmitting" @click="showAddModal = true">Add Service</Button>
+        <Button class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white inline-flex items-center gap-2" :disabled="isLoading || isSubmitting" @click="showAddModal = true">
+          <Plus class="w-4 h-4" />
+          Add Service
+        </Button>
       </div>
     </div>
 
@@ -353,7 +356,7 @@
     <Teleport to="body">
       <div
         v-if="activeDropdown && dropdownPos"
-        class="fixed z-50 w-36 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden"
+        class="absolute z-50 w-36 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden"
         :style="{ top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
       >
         <button
@@ -385,7 +388,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table'
 import {
-  ChevronRight, ChevronDown, SquarePen, Trash2, X, MoreHorizontal, Lock, LockOpen, Repeat2, CheckCircle, CircleAlert
+  ChevronRight, ChevronDown, SquarePen, Trash2, X, MoreHorizontal, Lock, LockOpen, Repeat2, CheckCircle, CircleAlert, Plus
 } from 'lucide-vue-next'
 import { serviceManagementService } from '@/services/serviceManagement'
 

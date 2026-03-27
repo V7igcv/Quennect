@@ -2,7 +2,10 @@
   <div class="max-w-7xl mx-auto px-2 sm:px-2 lg:px-2 py-2">
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-gray-800">User Management</h2>
-      <Button class="px-4 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isLoading || isSubmitting" @click="showAddModal = true">Add User</Button>
+      <Button class="px-4 py-2 rounded-sm bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white inline-flex items-center gap-2" :disabled="isLoading || isSubmitting" @click="showAddModal = true">
+        <Plus class="w-4 h-4" />
+        Add User
+      </Button>
     </div>
 
     <div v-if="errorMessage" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -38,7 +41,7 @@
             </TableCell>
             <TableCell class="text-center">
               <button
-                @click.stop="toggleDropdown(user, $event)"
+                @click.stop="openEditModal(user)"
                 class="p-1 rounded hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 <MoreHorizontal class="w-5 h-5 text-gray-500" />
@@ -82,24 +85,6 @@
         </button>
       </div>
     </div>
-
-    <div v-if="activeDropdown" class="fixed inset-0 z-10" @click="closeDropdown"></div>
-
-    <Teleport to="body">
-      <div
-        v-if="activeDropdown && dropdownPos"
-        class="fixed z-50 w-36 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden"
-        :style="{ top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
-      >
-        <button
-          @click="openEditModal(activeUser)"
-          class="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-        >
-          <SquarePen class="w-4 h-4" />
-          Edit
-        </button>
-      </div>
-    </Teleport>
 
     <Teleport to="body">
       <Transition name="modal-fade">
@@ -263,7 +248,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table'
 import {
-  SquarePen, X, MoreHorizontal, Eye, EyeOff, ChevronDown, CheckCircle
+  X, MoreHorizontal, Eye, EyeOff, ChevronDown, CheckCircle, Plus
 } from 'lucide-vue-next'
 import { userManagementService } from '@/services/userManagement'
 
@@ -307,32 +292,6 @@ const totalPages = computed(() => Math.max(1, Math.ceil(users.value.length / pag
 const paginatedUsers = computed(() =>
   users.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
 )
-
-const activeDropdown = ref(null)
-const activeUser = ref(null)
-const dropdownPos = ref(null)
-
-const closeDropdown = () => {
-  activeDropdown.value = null
-  activeUser.value = null
-  dropdownPos.value = null
-}
-
-const toggleDropdown = (user, event) => {
-  if (activeDropdown.value === user.id) {
-    closeDropdown()
-    return
-  }
-
-  const btn = event.currentTarget
-  const rect = btn.getBoundingClientRect()
-  dropdownPos.value = {
-    top: rect.bottom + window.scrollY + 4,
-    left: rect.right + window.scrollX - 144
-  }
-  activeDropdown.value = user.id
-  activeUser.value = user
-}
 
 const showAddModal = ref(false)
 const showNewPassword = ref(false)
@@ -432,7 +391,6 @@ const openEditModal = (user) => {
   editUser.value = { username: user.username, password: '', role: user.role, officeId: user.officeId ?? null }
   showEditModal.value = true
   formError.value = ''
-  closeDropdown()
 }
 
 const closeEditModal = () => {

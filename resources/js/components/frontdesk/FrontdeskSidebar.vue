@@ -1,6 +1,6 @@
 <template>
   <aside 
-    class="bg-[#FFFFFF] text-white h-screen fixed left-0 top-0 z-40 flex flex-col overflow-visible border border-[rgba(107,114,128,0.25)] transition-[width] duration-300 ease-in-out"
+    class="bg-[#FFFFFF] text-white h-screen fixed left-0 top-0 z-60 flex flex-col overflow-visible border border-[rgba(107,114,128,0.25)] transition-[width] duration-300 ease-in-out"
     :class="isCollapsed ? 'w-20' : 'w-64'"
   >
     <!-- Logo and System Name Area -->
@@ -179,7 +179,7 @@
       <div class="mb-3 overflow-hidden transition-all duration-200 ease-in-out">
         <!-- Username - hidden when collapsed -->
         <div
-          class="px-3 overflow-hidden transition-all duration-200 ease-in-out"
+          class="px-2 overflow-hidden transition-all duration-200 ease-in-out"
           :class="isCollapsed ? 'max-h-0 max-w-0 opacity-0 px-0' : 'max-h-10 max-w-40 opacity-100'"
         >
           <p class="text-md font-medium text-[#474C55] truncate">{{ userData?.username || 'Loading...' }}</p>

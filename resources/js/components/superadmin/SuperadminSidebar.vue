@@ -1,6 +1,6 @@
 <template>
   <aside 
-    class="bg-[#FFFFFF] text-white h-screen fixed left-0 top-0 z-40 flex flex-col overflow-visible border border-[rgba(107,114,128,0.25)] transition-[width] duration-300 ease-in-out"
+    class="bg-[#FFFFFF] text-white h-screen fixed left-0 top-0 z-60 flex flex-col overflow-visible border border-[rgba(107,114,128,0.25)] transition-[width] duration-300 ease-in-out"
     :class="isCollapsed ? 'w-20' : 'w-64'"
   >
     <!-- Logo and System Name Area -->

@@ -2,8 +2,9 @@
   <div class="max-w-7xl mx-auto px-2 sm:px-2 lg:px-2 py-2">
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-gray-800">Office Management</h2>
-      <Button class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white" :disabled="isLoading || isSubmitting" @click="showAddModal = true">
-        Add New Office
+      <Button class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white inline-flex items-center gap-2" :disabled="isLoading || isSubmitting" @click="showAddModal = true">
+        <Plus class="w-4 h-4" />
+        Add Office
       </Button>
     </div>
 
@@ -289,7 +290,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, ChevronDown, ImagePlus, SquarePen, Trash2, X } from 'lucide-vue-next'
+import { CheckCircle, ChevronDown, ImagePlus, Plus, SquarePen, Trash2, X } from 'lucide-vue-next'
 import { officeManagementService } from '@/services/officeManagement'
 
 const router = useRouter()

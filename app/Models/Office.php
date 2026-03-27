@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Office extends Model
 {
@@ -26,7 +27,29 @@ class Office extends Model
     // Optional: Add an accessor for logo URL
     public function getLogoUrlAttribute()
     {
-        return $this->logo ? asset('storage/logos/' . $this->logo) : asset('images/default-office-logo.png');
+        if (!$this->logo) {
+            return asset('images/default-office-logo.png');
+        }
+
+        $logo = ltrim(trim($this->logo), '/');
+
+        // Accept full/absolute URLs as-is.
+        if (Str::startsWith($logo, ['http://', 'https://', '//'])) {
+            return $this->logo;
+        }
+
+        // Stored as storage/... path.
+        if (Str::startsWith($logo, 'storage/')) {
+            return asset($logo);
+        }
+
+        // Stored as logos/... path from public disk.
+        if (Str::startsWith($logo, 'logos/')) {
+            return asset('storage/' . $logo);
+        }
+
+        // Stored as raw filename.
+        return asset('storage/logos/' . $logo);
     }
 
     /**

@@ -11,7 +11,7 @@
     </div>
 
     <!-- Stat Cards -->
-    <div class="grid grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
 
       <StatCard class="border-l-4 border-orange-300"
         title="Waiting"
@@ -52,73 +52,75 @@
     </div>
 
     <!-- Queue Management Table -->
-    <div class="mt-6 flex gap-6">
+    <div class="mt-6 flex flex-col xl:flex-row gap-6">
 
-      <div class="flex-2">
+      <div class="w-full xl:flex-2">
         <h2 class="text-xl font-semibold mb-4">
           Queue Management
         </h2>
 
-        <div class="bg-white rounded-xl shadow-sm p-6">
-          <Table class="w-full">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Queue No.</TableHead>
-                <TableHead>Client Name</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Lane Type</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+        <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+          <div class="overflow-x-auto">
+            <Table class="w-full min-w-max">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Queue No.</TableHead>
+                  <TableHead>Client Name</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Lane Type</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
 
-            <TableBody>
-              <TableRow v-for="queue in filteredQueueEntries" :key="queue.id">
-                <TableCell>{{ queue.queue_number }}</TableCell>
-                <TableCell>{{ queue.client_name }}</TableCell>
-                <TableCell>{{ queue.services }}</TableCell>
-                <TableCell>{{ queue.lane_type }}</TableCell>
-                <TableCell>{{ queue.time }}</TableCell>
+              <TableBody>
+                <TableRow v-for="queue in filteredQueueEntries" :key="queue.id">
+                  <TableCell>{{ queue.queue_number }}</TableCell>
+                  <TableCell>{{ queue.client_name }}</TableCell>
+                  <TableCell>{{ queue.services }}</TableCell>
+                  <TableCell>{{ queue.lane_type }}</TableCell>
+                  <TableCell>{{ queue.time }}</TableCell>
 
-                <TableCell class="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    class="bg-[#16A34A] hover:bg-[#15803D] text-white"
-                    @click="openCounterDropdown(queue)"
-                  >
-                    <Megaphone class="w-4 h-4" />
-                    Call
-                  </Button>
+                  <TableCell class="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      class="bg-[#16A34A] hover:bg-[#15803D] text-white"
+                      @click="openCounterDropdown(queue)"
+                    >
+                      <Megaphone class="w-4 h-4" />
+                      Call
+                    </Button>
 
-                  <Button 
-                    size="sm" 
-                    variant="destructive" 
-                    class="bg-[#DC2626] hover:bg-[#B91C1C] text-white"
-                    @click="skipQueue(queue.id)"
-                  >
-                    <X class="w-4 h-4" />
-                    Skip
-                  </Button>
-                </TableCell>
-              </TableRow>
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      class="bg-[#DC2626] hover:bg-[#B91C1C] text-white"
+                      @click="skipQueue(queue.id)"
+                    >
+                      <X class="w-4 h-4" />
+                      Skip
+                    </Button>
+                  </TableCell>
+                </TableRow>
 
-              <!-- Empty state -->
-              <TableRow v-if="!isLoadingQueue && filteredQueueEntries.length === 0">
-                <TableCell colspan="6" class="text-center text-gray-500 py-8">
-                  No waiting queues at this time
-                </TableCell>
-              </TableRow>
+                <!-- Empty state -->
+                <TableRow v-if="!isLoadingQueue && filteredQueueEntries.length === 0">
+                  <TableCell colspan="6" class="text-center text-gray-500 py-8">
+                    No waiting queues at this time
+                  </TableCell>
+                </TableRow>
 
-              <TableRow v-if="isLoadingQueue">
-                <TableCell colspan="6" class="text-center text-gray-500 py-8">
-                  Loading queue data...
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+                <TableRow v-if="isLoadingQueue">
+                  <TableCell colspan="6" class="text-center text-gray-500 py-8">
+                    Loading queue data...
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
 
           <!-- Pagination -->
-          <div class="flex items-center justify-between mt-3">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mt-3">
 
             <!-- LEFT SIDE -->
             <p class="text-sm text-gray-500">
@@ -126,7 +128,7 @@
             </p>
 
             <!-- RIGHT SIDE -->
-            <div class="flex items-center gap-6">
+            <div class="flex flex-wrap items-center gap-4 sm:gap-6">
 
               <!-- Rows per page -->
               <div class="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
@@ -217,15 +219,16 @@
 
       </div>
 
-      <div class="flex-1">
-        <div class="flex justify-between">
+      <div class="w-full xl:flex-1">
+        <div class="flex items-center justify-between gap-3">
           <h2 class="text-xl font-semibold mb-4">
             Counters
           </h2> 
           <Button 
-            class="h-8 p-3 bg-[#0F5C5C] hover:bg-[#167D7F] text-white"
+            class="h-8 p-3 bg-[#0F5C5C] hover:bg-[#167D7F] text-white inline-flex items-center gap-2"
             @click="showAddCounterModal = true"
           >
+            <Plus class="w-4 h-4" />
             Add Counter
           </Button> 
         </div>
@@ -280,8 +283,8 @@
                   </button>
                   <button
                     @click="openDeleteConfirmModal(counter)"
-                    :disabled="counter.current_queue"
-                    :class="counter.current_queue ? 'opacity-50 cursor-not-allowed' : ''"
+                    :disabled="counter.current_queue || counters.length <= 1"
+                    :class="(counter.current_queue || counters.length <= 1) ? 'opacity-50 cursor-not-allowed' : ''"
                     class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition"
                   >
                     Delete
@@ -414,7 +417,7 @@ import api from '@/services/api'
 import StatCard from '@/components/common/StatCard.vue'
 import EvaluationModal from '@/components/modals/EvaluationModal.vue'
 
-import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone, ChevronDown, Loader2 } from 'lucide-vue-next'
+import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone, ChevronDown, Loader2, Plus } from 'lucide-vue-next'
 
 import {
   Table,
@@ -720,6 +723,11 @@ const toggleCounterStatus = async (counter) => {
 }
 
 const openDeleteConfirmModal = (counter) => {
+  if (counters.value.length <= 1) {
+    alert('Each office must have at least 1 counter. You cannot delete the last counter.')
+    return
+  }
+
   // Check if counter is currently serving
   if (counter.current_queue) {
     alert('Cannot delete counter while it is serving a queue.')

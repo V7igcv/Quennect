@@ -234,6 +234,14 @@ class CounterController extends Controller
                 ], 404);
             }
 
+            $officeCounterCount = Counter::where('office_id', $user->office_id)->count();
+
+            if ($officeCounterCount <= 1) {
+                return response()->json([
+                    'message' => 'Each office must have at least 1 counter. You cannot delete the last counter.'
+                ], 400);
+            }
+
             // Check if counter has any serving or waiting queues today
             $activeQueues = QueueTransaction::where('counter_id', $counter->id)
                 ->whereIn('status', ['WAITING', 'SERVING'])

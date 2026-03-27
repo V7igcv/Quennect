@@ -248,7 +248,7 @@
           <!-- Main Card containing all CC charts -->
           <Card class="rounded-2xl border border-gray-200 shadow-sm">
             <CardContent class="p-6 lg:p-8">
-              <div class="grid grid-cols-1 md:grid-cols-3 md:divide-x md:divide-gray-200">
+              <div class="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-0 md:divide-x md:divide-gray-200">
 
                 <!-- CC1 - Awareness -->
                 <div class="space-y-5 md:pr-10 md:pt-0">

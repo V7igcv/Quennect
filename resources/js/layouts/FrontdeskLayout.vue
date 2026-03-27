@@ -1,37 +1,53 @@
 <template>
   <div class="min-h-screen bg-[#FCFCFC]">
-    <!-- Sidebar -->
-    <FrontdeskSidebar 
-      :is-collapsed="sidebarCollapsed"
-      :user-data="currentUser"
-      @toggle-collapse="toggleSidebar"
-      @logout="handleLogout"
-    />
+    <!-- Desktop Sidebar -->
+    <div class="hidden lg:block">
+      <FrontdeskSidebar 
+        :is-collapsed="sidebarCollapsed"
+        :user-data="currentUser"
+        @toggle-collapse="toggleSidebar"
+        @logout="handleLogout"
+      />
+    </div>
     
     <!-- Main content -->
     <div class="transition-all duration-300" :class="sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
+      <!-- Mobile menu button -->
+      <button
+        class="lg:hidden fixed top-3 left-3 z-60 bg-[#0F5C5C] text-white p-2 rounded-md shadow-md"
+        @click="toggleMobileSidebar"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
       <!-- Header -->
       <Header />
       
       <!-- Mobile sidebar overlay (for small screens) -->
-      <div 
-        v-if="mobileSidebarOpen" 
-        class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-        @click="mobileSidebarOpen = false"
-      ></div>
+      <Transition name="mobile-overlay-fade">
+        <div 
+          v-if="mobileSidebarOpen" 
+          class="fixed inset-0 bg-black/50 z-50 lg:hidden"
+          @click="mobileSidebarOpen = false"
+        ></div>
+      </Transition>
       
       <!-- Mobile sidebar (for small screens) -->
-      <div 
-        v-if="mobileSidebarOpen" 
-        class="fixed inset-y-0 left-0 z-40 lg:hidden"
-      >
-        <FrontdeskSidebar 
-          :is-collapsed="false"
-          :user-data="currentUser"
-          @toggle-collapse="mobileSidebarOpen = false"
-          @logout="handleLogout"
-        />
-      </div>
+      <Transition name="mobile-sidebar-slide">
+        <div 
+          v-if="mobileSidebarOpen" 
+          class="fixed inset-y-0 left-0 z-60 lg:hidden"
+        >
+          <FrontdeskSidebar 
+            :is-collapsed="false"
+            :user-data="currentUser"
+            @toggle-collapse="mobileSidebarOpen = false"
+            @logout="handleLogout"
+          />
+        </div>
+      </Transition>
       
       <!-- Page Content -->
       <main class="p-6">
@@ -128,3 +144,25 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.mobile-overlay-fade-enter-active,
+.mobile-overlay-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.mobile-overlay-fade-enter-from,
+.mobile-overlay-fade-leave-to {
+  opacity: 0;
+}
+
+.mobile-sidebar-slide-enter-active,
+.mobile-sidebar-slide-leave-active {
+  transition: transform 0.25s ease;
+}
+
+.mobile-sidebar-slide-enter-from,
+.mobile-sidebar-slide-leave-to {
+  transform: translateX(-100%);
+}
+</style>
