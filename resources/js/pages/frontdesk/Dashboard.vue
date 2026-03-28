@@ -387,7 +387,7 @@
     </div>
 
     <!-- Alert Modal -->
-    <div v-if="showAlertModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
+    <div v-if="showAlertModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-60">
       <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <h3 class="text-lg font-semibold mb-2">{{ alertTitle }}</h3>
         <p class="text-gray-600 mb-4">{{ alertMessage }}</p>
@@ -821,6 +821,8 @@ const handleEvaluationSubmit = async (formData) => {
     const response = await api.post(`/frontdesk/evaluation/submit/${selectedQueueId.value}`, evaluationData)
 
     if (response.data.message) {
+      const smsSent = Boolean(response.data?.data?.sms_sent)
+
       // Success - refresh counters and stats
       await fetchCounters()
       await fetchDashboardStats()
@@ -833,7 +835,9 @@ const handleEvaluationSubmit = async (formData) => {
       selectedBarangay.value = ''
       
       alertTitle.value = 'Success'
-      alertMessage.value = 'Evaluation submitted successfully!'
+      alertMessage.value = smsSent
+        ? 'Evaluation submitted successfully. SMS sent to client.'
+        : 'Evaluation submitted successfully, but SMS was not sent. Please check Semaphore configuration/logs.'
       showAlertModal.value = true
     }
   } catch (error) {
