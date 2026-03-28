@@ -178,8 +178,8 @@ export default {
       isLoading: true,
       error: null,
       
-      // Polling
-      pollInterval: null
+      // Realtime
+      monitorChannelName: null
     }
   },
   computed: {
@@ -204,30 +204,57 @@ export default {
     
     // Initial data fetch
     await this.fetchMonitorData()
-    
-    // Set up polling for real-time updates (every 5 seconds)
-    this.pollInterval = setInterval(async () => {
-      await this.fetchMonitorData()
-    }, 5000)
+
+    // Subscribe to websocket updates after initial payload is loaded.
+    this.subscribeToMonitorUpdates()
   },
   beforeUnmount() {
     clearInterval(this.timer)
-    if (this.pollInterval) {
-      clearInterval(this.pollInterval)
+
+    if (this.monitorChannelName && window.Echo) {
+      window.Echo.leave(this.monitorChannelName)
     }
   },
   methods: {
+    applyMonitorData(payload) {
+      this.office = payload.office
+      this.currentServing = payload.current_serving || []
+      this.nowServing = payload.now_serving
+      this.counters = payload.counters || []
+      this.waitingQueues = payload.waiting_list || []
+      this.error = null
+      this.isLoading = false
+    },
+    subscribeToMonitorUpdates() {
+      if (!window.Echo) {
+        console.warn('Echo is not available. Falling back to API-only monitor updates.')
+        return
+      }
+
+      this.monitorChannelName = `monitor.office.${this.officeId}`
+
+      window.Echo
+        .channel(this.monitorChannelName)
+        .listen('.monitor.updated', (event) => {
+          if (event?.data) {
+            this.applyMonitorData(event.data)
+            return
+          }
+
+          // Keep monitor usable even if payload changes unexpectedly.
+          this.fetchMonitorData()
+        })
+        .error((socketError) => {
+          console.error('Monitor websocket error:', socketError)
+        })
+    },
     async fetchMonitorData() {
       try {
         this.error = null
         const response = await monitorService.getMonitorData(this.officeId)
         
         if (response.success) {
-          this.office = response.data.office
-          this.currentServing = response.data.current_serving
-          this.nowServing = response.data.now_serving
-          this.counters = response.data.counters || []
-          this.waitingQueues = response.data.waiting_list
+          this.applyMonitorData(response.data)
         } else {
           this.error = 'Failed to load monitor data'
         }

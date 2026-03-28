@@ -412,7 +412,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onBeforeUnmount, onMounted } from 'vue'
 import api from '@/services/api'
 import StatCard from '@/components/common/StatCard.vue'
 import EvaluationModal from '@/components/modals/EvaluationModal.vue'
@@ -486,12 +486,98 @@ const likertQuestions = ref([])
 const showAlertModal = ref(false)
 const alertTitle = ref('')
 const alertMessage = ref('')
+const dashboardChannelName = ref(null)
+const realtimeRefreshTimeout = ref(null)
+const isRealtimeSyncing = ref(false)
 
 // Methods
 const handleAlert = ({ title, message }) => {
   alertTitle.value = title
   alertMessage.value = message
   showAlertModal.value = true
+}
+
+const getFrontdeskOfficeId = () => {
+  try {
+    const rawUser = localStorage.getItem('user')
+
+    if (!rawUser) {
+      return null
+    }
+
+    const parsedUser = JSON.parse(rawUser)
+    const officeId = Number(
+      parsedUser?.office_id
+      ?? parsedUser?.officeId
+      ?? parsedUser?.office?.id
+    )
+
+    return Number.isFinite(officeId) && officeId > 0 ? officeId : null
+  } catch (error) {
+    console.error('Failed to parse current user office_id:', error)
+    return null
+  }
+}
+
+const refreshDashboardRealtime = async () => {
+  if (isRealtimeSyncing.value) {
+    return
+  }
+
+  isRealtimeSyncing.value = true
+
+  try {
+    await Promise.all([
+      fetchDashboardStats(),
+      fetchQueueTable(),
+      fetchCounters(),
+    ])
+  } finally {
+    isRealtimeSyncing.value = false
+  }
+}
+
+const scheduleRealtimeRefresh = () => {
+  if (realtimeRefreshTimeout.value) {
+    clearTimeout(realtimeRefreshTimeout.value)
+  }
+
+  // Coalesce burst events into one refresh cycle.
+  realtimeRefreshTimeout.value = setTimeout(async () => {
+    realtimeRefreshTimeout.value = null
+    await refreshDashboardRealtime()
+  }, 150)
+}
+
+const subscribeToDashboardRealtime = () => {
+  const officeId = getFrontdeskOfficeId()
+
+  if (!officeId || !window.Echo) {
+    console.warn('Realtime dashboard updates are unavailable (missing officeId or Echo).')
+    return
+  }
+
+  dashboardChannelName.value = `monitor.office.${officeId}`
+
+  window.Echo
+    .channel(dashboardChannelName.value)
+    .listen('.monitor.updated', () => {
+      scheduleRealtimeRefresh()
+    })
+    .error((socketError) => {
+      console.error('Dashboard websocket error:', socketError)
+    })
+}
+
+const unsubscribeFromDashboardRealtime = () => {
+  if (realtimeRefreshTimeout.value) {
+    clearTimeout(realtimeRefreshTimeout.value)
+    realtimeRefreshTimeout.value = null
+  }
+
+  if (dashboardChannelName.value && window.Echo) {
+    window.Echo.leave(dashboardChannelName.value)
+  }
 }
 
 const fetchEvaluationQuestions = async () => {
@@ -865,5 +951,10 @@ onMounted(() => {
   }
 
   loadDashboard()
+  subscribeToDashboardRealtime()
+})
+
+onBeforeUnmount(() => {
+  unsubscribeFromDashboardRealtime()
 })
 </script>

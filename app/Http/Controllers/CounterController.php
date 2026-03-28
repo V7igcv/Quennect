@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MonitorUpdated;
 use App\Models\Counter;
 use App\Models\QueueTransaction;
+use App\Services\MonitorDataService;
 use App\Services\QueueService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,10 +17,12 @@ class CounterController extends Controller
 {
 
     protected $queueService;
+    protected $monitorDataService;
 
-    public function __construct(QueueService $queueService)
+    public function __construct(QueueService $queueService, MonitorDataService $monitorDataService)
     {
         $this->queueService = $queueService;
+        $this->monitorDataService = $monitorDataService;
     }
 
     /**
@@ -124,6 +128,7 @@ class CounterController extends Controller
             ]);
 
             DB::commit();
+            $this->broadcastMonitorUpdate((int) $user->office_id);
 
             return response()->json([
                 'message' => 'Counter created successfully',
@@ -191,6 +196,7 @@ class CounterController extends Controller
             $counter->save();
 
             DB::commit();
+            $this->broadcastMonitorUpdate((int) $user->office_id);
 
             return response()->json([
                 'message' => $request->is_enabled ? 'Counter enabled successfully' : 'Counter disabled successfully',
@@ -261,6 +267,7 @@ class CounterController extends Controller
             $counter->delete();
 
             DB::commit();
+            $this->broadcastMonitorUpdate((int) $user->office_id);
 
             return response()->json([
                 'message' => 'Counter deleted successfully'
@@ -318,5 +325,21 @@ class CounterController extends Controller
             'success' => true,
             'data' => $availableCounters
         ]);
+    }
+
+    private function broadcastMonitorUpdate(int $officeId): void
+    {
+        try {
+            $monitorData = $this->monitorDataService->getOfficeMonitorData($officeId);
+
+            if ($monitorData) {
+                event(new MonitorUpdated($officeId, $monitorData));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to broadcast monitor update from counter action', [
+                'office_id' => $officeId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MonitorUpdated;
 use App\Models\EvaluationQuestion;
 use App\Models\EvaluationResponse;
 use App\Models\EvaluationSession;
 use App\Models\QueueTransaction;
+use App\Services\MonitorDataService;
 use App\Services\Sms\SmsNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +17,10 @@ use Illuminate\Validation\ValidationException;
 
 class EvaluationController extends Controller
 {
+    public function __construct(protected MonitorDataService $monitorDataService)
+    {
+    }
+
     /**
      * Get all evaluation questions grouped by type
      * 
@@ -279,6 +285,8 @@ class EvaluationController extends Controller
 
             DB::commit();
 
+            $this->broadcastMonitorUpdate((int) $transaction->office_id);
+
             $smsSent = false;
 
             try {
@@ -413,6 +421,22 @@ class EvaluationController extends Controller
                 'message' => 'Error fetching evaluation results',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    private function broadcastMonitorUpdate(int $officeId): void
+    {
+        try {
+            $monitorData = $this->monitorDataService->getOfficeMonitorData($officeId);
+
+            if ($monitorData) {
+                event(new MonitorUpdated($officeId, $monitorData));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to broadcast monitor update from evaluation submit', [
+                'office_id' => $officeId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

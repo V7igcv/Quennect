@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MonitorUpdated;
 use App\Models\QueueTransaction;
 use App\Models\Counter;
+use App\Services\MonitorDataService;
 use App\Services\QueueService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,10 +16,12 @@ class FrontdeskController extends Controller
 {
 
     protected $queueService;
+    protected $monitorDataService;
 
-    public function __construct(QueueService $queueService)
+    public function __construct(QueueService $queueService, MonitorDataService $monitorDataService)
     {
         $this->queueService = $queueService;
+        $this->monitorDataService = $monitorDataService;
     }
 
     /**
@@ -208,6 +212,7 @@ class FrontdeskController extends Controller
             $queue->save();
 
             DB::commit();
+            $this->broadcastMonitorUpdate((int) $user->office_id);
 
             return response()->json([
                 'message' => 'Queue called successfully',
@@ -256,6 +261,7 @@ class FrontdeskController extends Controller
             $queue->save();
 
             DB::commit();
+            $this->broadcastMonitorUpdate((int) $user->office_id);
 
             return response()->json([
                 'message' => 'Queue skipped successfully'
@@ -300,6 +306,7 @@ class FrontdeskController extends Controller
             $queue->save();
 
             DB::commit();
+            $this->broadcastMonitorUpdate((int) $user->office_id);
 
             return response()->json([
                 'message' => 'Queue skipped successfully from counter'
@@ -351,6 +358,7 @@ class FrontdeskController extends Controller
             $queue->save();
 
             DB::commit();
+            $this->broadcastMonitorUpdate((int) $user->office_id);
 
             return response()->json([
                 'message' => 'Transaction completed successfully',
@@ -369,6 +377,22 @@ class FrontdeskController extends Controller
                 'message' => 'Error completing transaction',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    private function broadcastMonitorUpdate(int $officeId): void
+    {
+        try {
+            $monitorData = $this->monitorDataService->getOfficeMonitorData($officeId);
+
+            if ($monitorData) {
+                event(new MonitorUpdated($officeId, $monitorData));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to broadcast monitor update', [
+                'office_id' => $officeId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

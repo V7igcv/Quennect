@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Office;
 use App\Models\QueueTransaction;
 use App\Models\Counter;
+use App\Services\MonitorDataService;
 use App\Services\QueueService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -13,10 +14,12 @@ use Illuminate\Support\Facades\DB;
 class MonitorController extends Controller
 {
     protected $queueService;
+    protected $monitorDataService;
 
-    public function __construct(QueueService $queueService)
+    public function __construct(QueueService $queueService, MonitorDataService $monitorDataService)
     {
         $this->queueService = $queueService;
+        $this->monitorDataService = $monitorDataService;
     }
 
     /**
@@ -196,93 +199,17 @@ class MonitorController extends Controller
     public function getMonitorData($officeId)
     {
         try {
-            $today = $this->queueService->getTodayDate();
+            $monitorData = $this->monitorDataService->getOfficeMonitorData($officeId);
 
-            // Check if office exists and is active
-            $office = Office::where('id', $officeId)
-                ->where('is_active', true)
-                ->first();
-
-            if (!$office) {
+            if (! $monitorData) {
                 return response()->json([
                     'message' => 'Office not found or inactive.'
                 ], 404);
             }
 
-            // Get all serving queues
-            $servingQueueModels = QueueTransaction::with('counter')
-                ->where('office_id', $officeId)
-                ->whereDate('queue_date', $today)
-                ->where('status', 'SERVING')
-                ->whereNotNull('counter_id')
-                ->orderBy('called_at', 'asc')
-                ->get();
-
-            $servingQueues = $servingQueueModels
-                ->map(function($queue) {
-                    return [
-                        'queue_number' => $queue->full_queue_number,
-                        'counter' => $queue->counter->counter_number
-                    ];
-                });
-
-            $servingByCounter = $servingQueueModels->keyBy('counter_id');
-
-            $counters = Counter::where('office_id', $officeId)
-                ->orderBy('counter_number', 'asc')
-                ->get()
-                ->map(function ($counter) use ($servingByCounter) {
-                    $servingQueue = $servingByCounter->get($counter->id);
-
-                    return [
-                        'id' => $counter->id,
-                        'counter_number' => $counter->counter_number,
-                        'is_enabled' => (bool) $counter->is_enabled,
-                        'queue_number' => $servingQueue?->full_queue_number,
-                    ];
-                });
-
-            // Get latest serving for "Now Serving"
-            $latestServing = $servingQueues->isNotEmpty() ? $servingQueues->last() : null;
-            
-            $nowServing = null;
-            if ($latestServing) {
-                $nowServing = [
-                    'queue_number' => $latestServing['queue_number'],
-                    'counter' => $latestServing['counter'],
-                    'message' => "Please proceed to counter {$latestServing['counter']}"
-                ];
-            }
-
-            // Get waiting list (12 most recent)
-            $waitingList = QueueTransaction::where('office_id', $officeId)
-                ->whereDate('queue_date', $today)
-                ->where('status', 'WAITING')
-                ->orderBy('created_at', 'asc')
-                ->limit(12)
-                ->get()
-                ->map(function($queue) {
-                    return [
-                        'queue_number' => $queue->full_queue_number
-                    ];
-                });
-
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'office' => [
-                        'id' => $office->id,
-                        'name' => $office->office_name,
-                        'acronym' => $office->office_acronym,
-                        'logo_url' => $office->logo_url
-                    ],
-                    'current_serving' => $servingQueues,
-                    'now_serving' => $nowServing,
-                    'counters' => $counters,
-                    'waiting_list' => $waitingList,
-                    'date' => $today,
-                    'server_time' => now()->toDateTimeString()
-                ]
+                'data' => $monitorData
             ]);
 
         } catch (\Exception $e) {

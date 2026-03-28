@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MonitorUpdated;
 use App\Models\QueueTransaction;
 use App\Models\Office;
 use App\Http\Requests\GenerateQueueRequest;
 use App\Enums\TransactionStatus;
+use App\Services\MonitorDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +15,10 @@ use Illuminate\Support\Facades\Log;
 
 class QueueController extends Controller
 {
+    public function __construct(protected MonitorDataService $monitorDataService)
+    {
+    }
+
     /**
      * Generate new queue number
      */
@@ -113,6 +119,8 @@ class QueueController extends Controller
 
             DB::commit();
             Log::info('13. TRANSACTION COMMITTED SUCCESSFULLY!');
+
+            $this->broadcastMonitorUpdate((int) $office->id);
 
             // Load relationships for response
             $queueTransaction->load(['office', 'services', 'prioritySectors', 'barangay']);
@@ -278,5 +286,21 @@ class QueueController extends Controller
         'completed_at' => $queue->completed_at?->format('h:i A')
     ];
 }
+
+    private function broadcastMonitorUpdate(int $officeId): void
+    {
+        try {
+            $monitorData = $this->monitorDataService->getOfficeMonitorData($officeId);
+
+            if ($monitorData) {
+                event(new MonitorUpdated($officeId, $monitorData));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to broadcast monitor update from queue store', [
+                'office_id' => $officeId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
     
 }
