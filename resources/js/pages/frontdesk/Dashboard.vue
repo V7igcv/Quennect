@@ -95,7 +95,7 @@
                       size="sm" 
                       variant="destructive" 
                       class="bg-[#DC2626] hover:bg-[#B91C1C] text-white"
-                      @click="skipQueue(queue.id)"
+                      @click="openSkipQueueConfirmModal({ id: queue.id, queueNumber: queue.queue_number, source: 'table' })"
                     >
                       <X class="w-4 h-4" />
                       Skip
@@ -317,7 +317,7 @@
                 size="sm" 
                 variant="destructive" 
                 class="flex-1 bg-[#DC2626] hover:bg-[#B91C1C] text-white"
-                @click="skipFromCounter(counter.current_queue.id)"
+                @click="openSkipQueueConfirmModal({ id: counter.current_queue.id, queueNumber: counter.current_queue.queue_number, source: 'counter' })"
               >
                 <X class="w-4 h-4" />
                 Skip
@@ -384,6 +384,30 @@
         </div>
       </div>
 
+    </div>
+
+    <!-- Queue Action Confirmation Modal -->
+    <div v-if="showQueueActionConfirmModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-60">
+      <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold mb-2">{{ queueActionConfirmTitle }}</h3>
+        <p class="text-gray-600 mb-4">{{ queueActionConfirmMessage }}</p>
+        <div class="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            :disabled="isProcessingQueueAction"
+            @click="closeQueueActionConfirmModal"
+          >
+            Cancel
+          </Button>
+          <Button
+            class="text-white bg-[#DC2626] hover:bg-[#B91C1C]"
+            :disabled="isProcessingQueueAction"
+            @click="confirmQueueAction"
+          >
+            {{ isProcessingQueueAction ? 'Processing...' : queueActionConfirmButtonLabel }}
+          </Button>
+        </div>
+      </div>
     </div>
 
     <!-- Alert Modal -->
@@ -488,7 +512,14 @@ const alertTitle = ref('')
 const alertMessage = ref('')
 const dashboardChannelName = ref(null)
 const realtimeRefreshTimeout = ref(null)
+const midnightRefreshTimeout = ref(null)
 const isRealtimeSyncing = ref(false)
+const showQueueActionConfirmModal = ref(false)
+const isProcessingQueueAction = ref(false)
+const queueActionConfirmTitle = ref('')
+const queueActionConfirmMessage = ref('')
+const queueActionConfirmButtonLabel = ref('Confirm')
+const pendingQueueAction = ref(null)
 
 // Methods
 const handleAlert = ({ title, message }) => {
@@ -578,6 +609,28 @@ const unsubscribeFromDashboardRealtime = () => {
   if (dashboardChannelName.value && window.Echo) {
     window.Echo.leave(dashboardChannelName.value)
   }
+}
+
+const clearMidnightRefreshSchedule = () => {
+  if (midnightRefreshTimeout.value) {
+    clearTimeout(midnightRefreshTimeout.value)
+    midnightRefreshTimeout.value = null
+  }
+}
+
+const scheduleMidnightRefresh = () => {
+  clearMidnightRefreshSchedule()
+
+  const now = new Date()
+  const nextMidnight = new Date(now)
+  nextMidnight.setHours(24, 0, 0, 0)
+
+  const delayMs = Math.max(nextMidnight.getTime() - now.getTime(), 0)
+
+  midnightRefreshTimeout.value = setTimeout(async () => {
+    await refreshDashboardRealtime()
+    scheduleMidnightRefresh()
+  }, delayMs)
 }
 
 const fetchEvaluationQuestions = async () => {
@@ -678,6 +731,50 @@ const callQueue = async (counterId) => {
   } catch (error) {
     console.error('Error calling queue:', error)
     alert(error.response?.data?.message || 'Error calling queue')
+  }
+}
+
+const closeQueueActionConfirmModal = () => {
+  if (isProcessingQueueAction.value) {
+    return
+  }
+
+  showQueueActionConfirmModal.value = false
+  pendingQueueAction.value = null
+}
+
+const openSkipQueueConfirmModal = ({ id, queueNumber, source }) => {
+  pendingQueueAction.value = {
+    type: source === 'counter' ? 'skip-counter' : 'skip-table',
+    queueId: id,
+  }
+
+  queueActionConfirmTitle.value = 'Skip Queue Number?'
+  queueActionConfirmMessage.value = `Skip ${queueNumber}?`
+  queueActionConfirmButtonLabel.value = 'Skip'
+  showQueueActionConfirmModal.value = true
+}
+
+const confirmQueueAction = async () => {
+  if (!pendingQueueAction.value || isProcessingQueueAction.value) {
+    return
+  }
+
+  isProcessingQueueAction.value = true
+
+  try {
+    if (pendingQueueAction.value.type === 'skip-table') {
+      await skipQueue(pendingQueueAction.value.queueId)
+    }
+
+    if (pendingQueueAction.value.type === 'skip-counter') {
+      await skipFromCounter(pendingQueueAction.value.queueId)
+    }
+
+    showQueueActionConfirmModal.value = false
+    pendingQueueAction.value = null
+  } finally {
+    isProcessingQueueAction.value = false
   }
 }
 
@@ -952,9 +1049,11 @@ onMounted(() => {
 
   loadDashboard()
   subscribeToDashboardRealtime()
+  scheduleMidnightRefresh()
 })
 
 onBeforeUnmount(() => {
   unsubscribeFromDashboardRealtime()
+  clearMidnightRefreshSchedule()
 })
 </script>

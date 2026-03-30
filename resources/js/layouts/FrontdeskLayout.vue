@@ -6,7 +6,7 @@
         :is-collapsed="sidebarCollapsed"
         :user-data="currentUser"
         @toggle-collapse="toggleSidebar"
-        @logout="handleLogout"
+        @logout="openLogoutConfirmModal"
       />
     </div>
     
@@ -44,7 +44,7 @@
             :is-collapsed="false"
             :user-data="currentUser"
             @toggle-collapse="mobileSidebarOpen = false"
-            @logout="handleLogout"
+            @logout="openLogoutConfirmModal"
           />
         </div>
       </Transition>
@@ -53,6 +53,32 @@
       <main class="p-6">
         <router-view />
       </main>
+
+      <div v-if="showLogoutConfirmModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-60 px-4">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+          <h3 class="text-lg font-semibold mb-2">Log out?</h3>
+          <p class="text-gray-600 mb-4">Are you sure you want to log out of your account?</p>
+
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              class="px-4 py-2 border rounded-md hover:bg-gray-100"
+              :disabled="isLoggingOut"
+              @click="showLogoutConfirmModal = false"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="px-4 py-2 bg-[#DC2626] text-white rounded-md hover:bg-[#B91C1C]"
+              :disabled="isLoggingOut"
+              @click="handleLogout"
+            >
+              {{ isLoggingOut ? 'Logging out...' : 'Log out' }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -75,6 +101,8 @@ export default {
     const sidebarCollapsed = ref(false)
     const mobileSidebarOpen = ref(false)
     const isRefreshing = ref(false)
+    const showLogoutConfirmModal = ref(false)
+    const isLoggingOut = ref(false)
 
     // Initialize with stored user data immediately - this prevents "Loading..." flash
     const currentUser = ref(authService.getCurrentUser())
@@ -121,14 +149,28 @@ export default {
     const toggleMobileSidebar = () => {
       mobileSidebarOpen.value = !mobileSidebarOpen.value
     }
+
+    const openLogoutConfirmModal = () => {
+      mobileSidebarOpen.value = false
+      showLogoutConfirmModal.value = true
+    }
     
     const handleLogout = async () => {
+      if (isLoggingOut.value) {
+        return
+      }
+
+      isLoggingOut.value = true
+
       try {
         await authService.logout()
         router.push('/login')
       } catch (error) {
         console.error('Logout failed:', error)
         router.push('/login')
+      } finally {
+        isLoggingOut.value = false
+        showLogoutConfirmModal.value = false
       }
     }
     
@@ -136,9 +178,12 @@ export default {
       sidebarCollapsed,
       mobileSidebarOpen,
       isRefreshing,
+      showLogoutConfirmModal,
+      isLoggingOut,
       currentUser,
       toggleSidebar,
       toggleMobileSidebar,
+      openLogoutConfirmModal,
       handleLogout
     }
   }
