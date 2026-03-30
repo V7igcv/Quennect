@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class CsmAnalyticsController extends Controller
 {
@@ -107,40 +109,23 @@ class CsmAnalyticsController extends Controller
                 $month,
                 $year
             ) {
-                $queueTransactionsQuery = QueueTransaction::query()
-                    ->where('office_id', $officeId)
-                    ->whereHas('services', function (Builder $query) {
-                        $query->where('service_type', 'External');
-                    });
-
-                $filteredQueueTransactionsQuery = $this->applyQueueDateFilter(
-                    $queueTransactionsQuery,
-                    $period,
-                    $date,
-                    $month,
-                    $year
+                $externalTransactionCount = $this->getServiceWeightedTransactionCountForSource(
+                    source: 'external',
+                    officeId: $officeId,
+                    period: $period,
+                    date: $date,
+                    month: $month,
+                    year: $year,
                 );
 
-                $internalTransactionsQuery = InternalTransaction::query()
-                    ->where('office_id', $officeId);
-
-                $filteredInternalTransactionsQuery = $this->applyInternalDateFilter(
-                    $internalTransactionsQuery,
-                    $period,
-                    $date,
-                    $month,
-                    $year
+                $internalTransactionCount = $this->getServiceWeightedTransactionCountForSource(
+                    source: 'internal',
+                    officeId: $officeId,
+                    period: $period,
+                    date: $date,
+                    month: $month,
+                    year: $year,
                 );
-
-                // Count only queue respondents that actually submitted an evaluation.
-                $externalTransactionCount = (clone $filteredQueueTransactionsQuery)
-                    ->whereExists(function ($subQuery) {
-                        $subQuery->selectRaw('1')
-                            ->from('evaluation_sessions as es')
-                            ->whereColumn('es.queue_transaction_id', 'queue_transactions.id');
-                    })
-                    ->count();
-                $internalTransactionCount = (clone $filteredInternalTransactionsQuery)->count();
 
                 [$startDate, $endDate] = $this->resolveDateRange($period, $date, $month, $year);
                 $overallScoreData = $this->computeOverallScorePerServiceData(
@@ -729,6 +714,1180 @@ class CsmAnalyticsController extends Controller
         }
     }
 
+    /**
+     * Export selected CSM analytics tables as a multi-sheet Excel file.
+     *
+        * Current implementation supports Overview, Surveyed Services,
+    * Citizen's Charter Count, and Overall Score Per Service sheets.
+     */
+    public function exportTables(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'tables' => 'required|array|min:1',
+                'tables.*' => 'string|in:overview,surveyed-services,citizens-charter-count,overall-score-per-service,age,sex,customer-type,external-sqd-results,internal-sqd-results',
+                'service_type' => 'nullable|in:external,internal,all',
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+            ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
+
+            $selectedTables = collect($validated['tables'] ?? [])->unique()->values()->all();
+            $unsupportedTables = array_values(array_diff($selectedTables, [
+                'overview',
+                'surveyed-services',
+                'citizens-charter-count',
+                'overall-score-per-service',
+                'age',
+                'sex',
+                'customer-type',
+                'external-sqd-results',
+                'internal-sqd-results',
+            ]));
+
+            if (!empty($unsupportedTables)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Only Overview, Surveyed Services, Citizen's Charter Count, Overall Score Per Service, Demographic Profile, and SQD Results table exports are currently supported.",
+                    'unsupported_tables' => $unsupportedTables,
+                ], 422);
+            }
+
+            $selectedDemographicKeys = collect($selectedTables)
+                ->intersect(['age', 'sex', 'customer-type'])
+                ->values()
+                ->all();
+            $hasDemographicSelection = !empty($selectedDemographicKeys);
+            $demographicSheetGenerated = false;
+
+            $selectedSqdKeys = collect($selectedTables)
+                ->intersect(['external-sqd-results', 'internal-sqd-results'])
+                ->values()
+                ->all();
+            $hasSqdSelection = !empty($selectedSqdKeys);
+            $sqdSheetGenerated = false;
+
+            $serviceType = $validated['service_type'] ?? 'external';
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+
+            [$startDate, $endDate] = $this->resolveDateRange($period, $date, $month, $year);
+
+            $spreadsheet = new Spreadsheet();
+            $sheetIndex = 0;
+
+            foreach ($selectedTables as $tableKey) {
+                if ($tableKey === 'overview') {
+                    $overviewRows = $this->buildOverviewExportRows(
+                        officeId: $officeId,
+                        serviceType: $serviceType,
+                        period: $period,
+                        date: $date,
+                        month: $month,
+                        year: $year,
+                        startDate: $startDate,
+                        endDate: $endDate,
+                    );
+
+                    $sheet = $sheetIndex === 0
+                        ? $spreadsheet->getActiveSheet()
+                        : $spreadsheet->createSheet($sheetIndex);
+
+                    $sheet->setTitle('Overview');
+                    $sheet->fromArray($overviewRows, null, 'A1', true);
+                    $sheet->getStyle('A1:B1')->getFont()->setBold(true);
+                    $sheet->getColumnDimension('A')->setAutoSize(true);
+                    $sheet->getColumnDimension('B')->setAutoSize(true);
+                    $sheetIndex++;
+                    continue;
+                }
+
+                if ($tableKey === 'surveyed-services') {
+                    $surveyedPayload = $this->buildSurveyedServicesExportRows(
+                        officeId: $officeId,
+                        period: $period,
+                        date: $date,
+                        month: $month,
+                        year: $year,
+                    );
+
+                    $sheet = $sheetIndex === 0
+                        ? $spreadsheet->getActiveSheet()
+                        : $spreadsheet->createSheet($sheetIndex);
+
+                    $sheet->setTitle('Surveyed Services');
+                    $sheet->fromArray($surveyedPayload['rows'], null, 'A1', true);
+
+                    foreach ($surveyedPayload['bold_rows'] as $boldRow) {
+                        $sheet->getStyle("A{$boldRow}:C{$boldRow}")->getFont()->setBold(true);
+                    }
+
+                    $sheet->getColumnDimension('A')->setAutoSize(true);
+                    $sheet->getColumnDimension('B')->setAutoSize(true);
+                    $sheet->getColumnDimension('C')->setAutoSize(true);
+
+                    $sheetIndex++;
+                    continue;
+                }
+
+                if ($tableKey === 'citizens-charter-count') {
+                    $citizenCharterPayload = $this->buildCitizenCharterCountExportRows(
+                        officeId: $officeId,
+                        serviceType: $serviceType,
+                        startDate: $startDate,
+                        endDate: $endDate,
+                    );
+
+                    $sheet = $sheetIndex === 0
+                        ? $spreadsheet->getActiveSheet()
+                        : $spreadsheet->createSheet($sheetIndex);
+
+                    $sheet->setTitle("Citizen's Charter Count");
+                    $sheet->fromArray($citizenCharterPayload['rows'], null, 'A1', true);
+
+                    foreach ($citizenCharterPayload['bold_rows'] as $boldRow) {
+                        $sheet->getStyle("A{$boldRow}:C{$boldRow}")->getFont()->setBold(true);
+                    }
+
+                    $sheet->getColumnDimension('A')->setAutoSize(true);
+                    $sheet->getColumnDimension('B')->setAutoSize(true);
+                    $sheet->getColumnDimension('C')->setAutoSize(true);
+
+                    $sheetIndex++;
+                    continue;
+                }
+
+                if ($tableKey === 'overall-score-per-service') {
+                    $overallScorePayload = $this->buildOverallScorePerServiceExportRows(
+                        officeId: $officeId,
+                        startDate: $startDate,
+                        endDate: $endDate,
+                    );
+
+                    $sheet = $sheetIndex === 0
+                        ? $spreadsheet->getActiveSheet()
+                        : $spreadsheet->createSheet($sheetIndex);
+
+                    $sheet->setTitle('Overall Score Per Service');
+                    $sheet->fromArray($overallScorePayload['rows'], null, 'A1', true);
+
+                    foreach ($overallScorePayload['bold_rows'] as $boldRow) {
+                        $sheet->getStyle("A{$boldRow}:B{$boldRow}")->getFont()->setBold(true);
+                    }
+
+                    $sheet->getColumnDimension('A')->setAutoSize(true);
+                    $sheet->getColumnDimension('B')->setAutoSize(true);
+
+                    $sheetIndex++;
+                    continue;
+                }
+
+                if ($hasDemographicSelection
+                    && !$demographicSheetGenerated
+                    && in_array($tableKey, ['age', 'sex', 'customer-type'], true)
+                ) {
+                    $demographicPayload = $this->buildDemographicProfileExportRows(
+                        officeId: $officeId,
+                        startDate: $startDate,
+                        endDate: $endDate,
+                        selectedDemographicKeys: $selectedDemographicKeys,
+                    );
+
+                    $sheet = $sheetIndex === 0
+                        ? $spreadsheet->getActiveSheet()
+                        : $spreadsheet->createSheet($sheetIndex);
+
+                    $sheet->setTitle('Demographic Profile');
+                    $sheet->fromArray($demographicPayload['rows'], null, 'A1', true);
+
+                    foreach ($demographicPayload['bold_rows'] as $boldRow) {
+                        $sheet->getStyle("A{$boldRow}:D{$boldRow}")->getFont()->setBold(true);
+                    }
+
+                    $sheet->getColumnDimension('A')->setAutoSize(true);
+                    $sheet->getColumnDimension('B')->setAutoSize(true);
+                    $sheet->getColumnDimension('C')->setAutoSize(true);
+                    $sheet->getColumnDimension('D')->setAutoSize(true);
+
+                    $sheetIndex++;
+                    $demographicSheetGenerated = true;
+                    continue;
+                }
+
+                if ($hasSqdSelection
+                    && !$sqdSheetGenerated
+                    && in_array($tableKey, ['external-sqd-results', 'internal-sqd-results'], true)
+                ) {
+                    $sqdPayload = $this->buildSqdResultsExportRows(
+                        officeId: $officeId,
+                        startDate: $startDate,
+                        endDate: $endDate,
+                        selectedSqdKeys: $selectedSqdKeys,
+                    );
+
+                    $sheet = $sheetIndex === 0
+                        ? $spreadsheet->getActiveSheet()
+                        : $spreadsheet->createSheet($sheetIndex);
+
+                    $sheet->setTitle('SQD Results');
+                    $sheet->fromArray($sqdPayload['rows'], null, 'A1', true);
+
+                    foreach ($sqdPayload['bold_rows'] as $boldRow) {
+                        $sheet->getStyle("A{$boldRow}:I{$boldRow}")->getFont()->setBold(true);
+                    }
+
+                    foreach (range('A', 'I') as $column) {
+                        $sheet->getColumnDimension($column)->setAutoSize(true);
+                    }
+
+                    $sheetIndex++;
+                    $sqdSheetGenerated = true;
+                }
+            }
+
+            $fileName = $this->buildCsmExportFilename($period, $date, $month, $year);
+            $tempFile = tempnam(sys_get_temp_dir(), 'csm_report_');
+
+            if ($tempFile === false) {
+                throw new \RuntimeException('Unable to create temporary file for export.');
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save($tempFile);
+
+            return response()->download(
+                $tempFile,
+                $fileName,
+                ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+            )->deleteFileAfterSend(true);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('CSM export analytics error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error exporting CSM analytics tables',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    private function buildOverviewExportRows(
+        int $officeId,
+        string $serviceType,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year,
+        string $startDate,
+        string $endDate
+    ): array {
+        $awareness = $this->computeCcMetric(
+            questionPrefix: 'CC1',
+            includedOptions: [1, 2, 3],
+            serviceType: $serviceType,
+            officeId: $officeId,
+            period: $period,
+            date: $date,
+            month: $month,
+            year: $year,
+        );
+
+        $visibility = $this->computeCcMetric(
+            questionPrefix: 'CC2',
+            includedOptions: [1],
+            serviceType: $serviceType,
+            officeId: $officeId,
+            period: $period,
+            date: $date,
+            month: $month,
+            year: $year,
+        );
+
+        $helpfulness = $this->computeCcMetric(
+            questionPrefix: 'CC3',
+            includedOptions: [1],
+            serviceType: $serviceType,
+            officeId: $officeId,
+            period: $period,
+            date: $date,
+            month: $month,
+            year: $year,
+        );
+
+        $overallScoreData = $this->computeOverallScorePerServiceData(
+            officeId: $officeId,
+            serviceType: $serviceType,
+            startDate: $startDate,
+            endDate: $endDate,
+        );
+
+        $responseRate = $this->computeOverviewResponseRate(
+            officeId: $officeId,
+            period: $period,
+            date: $date,
+            month: $month,
+            year: $year,
+        );
+
+        return [
+            ['Criteria', 'Score'],
+            ['CC Awareness', $this->formatExportPercentage($awareness)],
+            ['CC Visibility', $this->formatExportPercentage($visibility)],
+            ['CC Helpfulness', $this->formatExportPercentage($helpfulness)],
+            ['Response Rate', $this->formatExportPercentage($responseRate)],
+            ['Overall Score', $this->formatExportPercentage((float) ($overallScoreData['service_total_percentage'] ?? 0))],
+        ];
+    }
+
+    private function computeOverviewResponseRate(
+        int $officeId,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year
+    ): float {
+        $externalResponsesQuery = DB::table('queue_transaction_services as qts')
+            ->join('services as s', 's.id', '=', 'qts.service_id')
+            ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
+            ->where('qt.office_id', $officeId)
+            ->where('s.service_type', 'External')
+            ->whereExists(function ($subQuery) {
+                $subQuery->selectRaw('1')
+                    ->from('evaluation_sessions as es')
+                    ->whereColumn('es.queue_transaction_id', 'qt.id');
+            });
+
+        $this->applyQueueDateFilter($externalResponsesQuery, $period, $date, $month, $year);
+        $externalResponses = (int) $externalResponsesQuery->count('qts.id');
+
+        $internalResponsesQuery = DB::table('queue_transaction_services as qts')
+            ->join('services as s', 's.id', '=', 'qts.service_id')
+            ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
+            ->where('it.office_id', $officeId)
+            ->where('s.service_type', 'Internal')
+            ->whereExists(function ($subQuery) {
+                $subQuery->selectRaw('1')
+                    ->from('evaluation_sessions as es')
+                    ->whereColumn('es.internal_transaction_id', 'it.id');
+            });
+
+        $this->applyInternalDateFilter($internalResponsesQuery, $period, $date, $month, $year);
+        $internalResponses = (int) $internalResponsesQuery->count('qts.id');
+
+        $externalTransactionsQuery = DB::table('queue_transaction_services as qts')
+            ->join('services as s', 's.id', '=', 'qts.service_id')
+            ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
+            ->where('qt.office_id', $officeId)
+            ->where('qt.status', 'COMPLETED')
+            ->where('s.service_type', 'External');
+
+        $this->applyQueueDateFilter($externalTransactionsQuery, $period, $date, $month, $year);
+        $externalTransactions = (int) $externalTransactionsQuery->count('qts.id');
+
+        $internalTransactionsQuery = DB::table('queue_transaction_services as qts')
+            ->join('services as s', 's.id', '=', 'qts.service_id')
+            ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
+            ->where('it.office_id', $officeId)
+            ->where('s.service_type', 'Internal');
+
+        $this->applyInternalDateFilter($internalTransactionsQuery, $period, $date, $month, $year);
+        $internalTransactions = (int) $internalTransactionsQuery->count('qts.id');
+
+        $responses = $externalResponses + $internalResponses;
+        $transactions = $externalTransactions + $internalTransactions;
+
+        if ($transactions === 0) {
+            return 0.0;
+        }
+
+        return round(($responses / $transactions) * 100, 2);
+    }
+
+    private function formatExportPercentage(float $value): string
+    {
+        return number_format($value, 2, '.', '') . '%';
+    }
+
+    private function buildCsmExportFilename(string $period, Carbon $date, int $month, int $year): string
+    {
+        $dateLabel = match ($period) {
+            'monthly' => Carbon::create($year, $month, 1)->format('F Y'),
+            'yearly' => (string) $year,
+            default => $date->format('F j, Y'),
+        };
+
+        return "Client Satisfaction Measurement (CSM) Report - {$dateLabel}.xlsx";
+    }
+
+    /**
+     * @return array{rows: array<int, array<int, string|int>>, bold_rows: array<int, int>}
+     */
+    private function buildCitizenCharterCountExportRows(
+        int $officeId,
+        string $serviceType,
+        string $startDate,
+        string $endDate
+    ): array {
+        $meta = $this->getCitizenCharterMeta();
+        $counts = $this->getCitizenCharterCountsRaw($officeId, $serviceType, $startDate, $endDate);
+        $payload = $this->buildCitizenCharterPayload($counts, $meta);
+
+        $awarenessRows = $payload['awareness'] ?? [];
+        $visibilityRows = $payload['visibility'] ?? [];
+        $helpfulnessRows = $payload['helpfulness'] ?? [];
+
+        $awarenessQuestion = (string) ($payload['questions']['awareness']['text'] ?? self::CC_CHART_CONFIG['CC1']['default_question']);
+        $visibilityQuestion = (string) ($payload['questions']['visibility']['text'] ?? self::CC_CHART_CONFIG['CC2']['default_question']);
+        $helpfulnessQuestion = (string) ($payload['questions']['helpfulness']['text'] ?? self::CC_CHART_CONFIG['CC3']['default_question']);
+
+        $getOption = static function (array $rows, int $option): array {
+            foreach ($rows as $row) {
+                if ((int) ($row['option'] ?? 0) === $option) {
+                    return [
+                        'count' => (int) ($row['count'] ?? 0),
+                        'percentage' => (float) ($row['percentage'] ?? 0),
+                    ];
+                }
+            }
+
+            return ['count' => 0, 'percentage' => 0.0];
+        };
+
+        $cc1Option1 = $getOption($awarenessRows, 1);
+        $cc1Option2 = $getOption($awarenessRows, 2);
+        $cc1Option3 = $getOption($awarenessRows, 3);
+        $cc1Option4 = $getOption($awarenessRows, 4);
+
+        $cc2Option1 = $getOption($visibilityRows, 1);
+        $cc2Option2 = $getOption($visibilityRows, 2);
+        $cc2Option3 = $getOption($visibilityRows, 3);
+        $cc2Option4 = $getOption($visibilityRows, 4);
+
+        $cc3Option1 = $getOption($helpfulnessRows, 1);
+        $cc3Option2 = $getOption($helpfulnessRows, 2);
+        $cc3Option3 = $getOption($helpfulnessRows, 3);
+
+        $rows = [
+            ["Citizen's Charter Answers", 'Responses', 'Percentage'],
+            [$awarenessQuestion, '', ''],
+            ["1. I know what a CC is and I saw this office's CC", $cc1Option1['count'], $this->formatExportPercentage($cc1Option1['percentage'])],
+            ["2. I know what a CC is but I did not see this office's CC", $cc1Option2['count'], $this->formatExportPercentage($cc1Option2['percentage'])],
+            ["3. I learned of the CC only when I saw this office's CC", $cc1Option3['count'], $this->formatExportPercentage($cc1Option3['percentage'])],
+            ["I do not know what a CC is and I did not see this office's CC", $cc1Option4['count'], $this->formatExportPercentage($cc1Option4['percentage'])],
+            ['', '', ''],
+            [$visibilityQuestion, '', ''],
+            ['1. Easy to See', $cc2Option1['count'], $this->formatExportPercentage($cc2Option1['percentage'])],
+            ['2. Somewhat easy to see', $cc2Option2['count'], $this->formatExportPercentage($cc2Option2['percentage'])],
+            ['3. Difficult to see', $cc2Option3['count'], $this->formatExportPercentage($cc2Option3['percentage'])],
+            ['4. Not visible at all', $cc2Option4['count'], $this->formatExportPercentage($cc2Option4['percentage'])],
+            ['', '', ''],
+            [$helpfulnessQuestion, '', ''],
+            ['1. Helped very much', $cc3Option1['count'], $this->formatExportPercentage($cc3Option1['percentage'])],
+            ['2. Somewhat helped', $cc3Option2['count'], $this->formatExportPercentage($cc3Option2['percentage'])],
+            ['3. Did not help', $cc3Option3['count'], $this->formatExportPercentage($cc3Option3['percentage'])],
+        ];
+
+        return [
+            'rows' => $rows,
+            'bold_rows' => [1, 2, 8, 14],
+        ];
+    }
+
+    /**
+     * @return array{rows: array<int, array<int, string|int>>, bold_rows: array<int, int>}
+     */
+    private function buildOverallScorePerServiceExportRows(
+        int $officeId,
+        string $startDate,
+        string $endDate
+    ): array {
+        $externalPayload = $this->computeOverallScorePerServiceData(
+            officeId: $officeId,
+            serviceType: 'external',
+            startDate: $startDate,
+            endDate: $endDate,
+        );
+
+        $internalPayload = $this->computeOverallScorePerServiceData(
+            officeId: $officeId,
+            serviceType: 'internal',
+            startDate: $startDate,
+            endDate: $endDate,
+        );
+
+        $allPayload = $this->computeOverallScorePerServiceData(
+            officeId: $officeId,
+            serviceType: 'all',
+            startDate: $startDate,
+            endDate: $endDate,
+        );
+
+        $rows = [];
+        $boldRows = [];
+        $rowIndex = 1;
+
+        $externalRatingsByService = collect($externalPayload['chart_data'] ?? [])
+            ->mapWithKeys(function (array $row) {
+                return [
+                    (string) ($row['service_name'] ?? $row['name'] ?? '') => (float) ($row['percentage'] ?? 0),
+                ];
+            });
+
+        $internalRatingsByService = collect($internalPayload['chart_data'] ?? [])
+            ->mapWithKeys(function (array $row) {
+                return [
+                    (string) ($row['service_name'] ?? $row['name'] ?? '') => (float) ($row['percentage'] ?? 0),
+                ];
+            });
+
+        $externalServices = DB::table('services')
+            ->where('office_id', $officeId)
+            ->where('service_type', 'External')
+            ->whereNull('deleted_at')
+            ->orderBy('service_name')
+            ->pluck('service_name')
+            ->map(fn ($name) => (string) $name)
+            ->values()
+            ->all();
+
+        $internalServices = DB::table('services')
+            ->where('office_id', $officeId)
+            ->where('service_type', 'Internal')
+            ->whereNull('deleted_at')
+            ->orderBy('service_name')
+            ->pluck('service_name')
+            ->map(fn ($name) => (string) $name)
+            ->values()
+            ->all();
+
+        $rows[] = ['External Services', 'Overall Rating (Percentage)'];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        foreach ($externalServices as $serviceName) {
+            $rows[] = [
+                $serviceName,
+                $this->formatExportPercentage((float) ($externalRatingsByService[$serviceName] ?? 0)),
+            ];
+            $rowIndex++;
+        }
+
+        $rows[] = ['External Service Total', $this->formatExportPercentage((float) ($externalPayload['service_total_percentage'] ?? 0))];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        $rows[] = ['Internal Services', ''];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        foreach ($internalServices as $serviceName) {
+            $rows[] = [
+                $serviceName,
+                $this->formatExportPercentage((float) ($internalRatingsByService[$serviceName] ?? 0)),
+            ];
+            $rowIndex++;
+        }
+
+        $rows[] = ['Internal Service Total', $this->formatExportPercentage((float) ($internalPayload['service_total_percentage'] ?? 0))];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        $rows[] = ['OVERALL TOTAL', $this->formatExportPercentage((float) ($allPayload['service_total_percentage'] ?? 0))];
+        $boldRows[] = $rowIndex;
+
+        return [
+            'rows' => $rows,
+            'bold_rows' => $boldRows,
+        ];
+    }
+
+    /**
+     * @param array<int, string> $selectedSqdKeys
+     * @return array{rows: array<int, array<int, string|int>>, bold_rows: array<int, int>}
+     */
+    private function buildSqdResultsExportRows(
+        int $officeId,
+        string $startDate,
+        string $endDate,
+        array $selectedSqdKeys
+    ): array {
+        $includeExternal = in_array('external-sqd-results', $selectedSqdKeys, true);
+        $includeInternal = in_array('internal-sqd-results', $selectedSqdKeys, true);
+
+        if (!$includeExternal && !$includeInternal) {
+            return [
+                'rows' => [
+                    ['SQD Results'],
+                    ['No SQD options selected.'],
+                ],
+                'bold_rows' => [1],
+            ];
+        }
+
+        $criteriaRows = [
+            ['code' => 'SQD0', 'label' => 'SQD0'],
+            ['code' => 'SQD1', 'label' => 'SQD1 (Responsiveness)'],
+            ['code' => 'SQD2', 'label' => 'SQD2 (Reliability)'],
+            ['code' => 'SQD3', 'label' => 'SQD3 (Access and Facilities)'],
+            ['code' => 'SQD4', 'label' => 'SQD4 (Communication)'],
+            ['code' => 'SQD5', 'label' => 'SQD5 (Costs)'],
+            ['code' => 'SQD6', 'label' => 'SQD6 (Integrity)'],
+            ['code' => 'SQD7', 'label' => 'SQD7 (Assurance)'],
+            ['code' => 'SQD8', 'label' => 'SQD8 (Outcome)'],
+        ];
+
+        $rows = [];
+        $boldRows = [];
+        $rowIndex = 1;
+
+        $appendSourceSection = function (string $sourceTitle, string $sourceKey) use (
+            $officeId,
+            $startDate,
+            $endDate,
+            $criteriaRows,
+            &$rows,
+            &$boldRows,
+            &$rowIndex
+        ): void {
+            $rows[] = [$sourceTitle, '', '', '', '', '', '', '', ''];
+            $boldRows[] = $rowIndex;
+            $rowIndex++;
+
+            $rows[] = [
+                'Criteria',
+                'Strongly Agree',
+                'Agree',
+                'Neither Agree nor Disagree',
+                'Disagree',
+                'Strongly Disagree',
+                'N/A',
+                'Total Responses',
+                'Overall (Percentage)',
+            ];
+            $boldRows[] = $rowIndex;
+            $rowIndex++;
+
+            $totalResponses = $this->getSqdTotalRespondents(
+                officeId: $officeId,
+                serviceType: $sourceKey,
+                startDate: $startDate,
+                endDate: $endDate,
+            );
+
+            $aggregateStronglyAgree = 0;
+            $aggregateAgree = 0;
+            $aggregateNeither = 0;
+            $aggregateDisagree = 0;
+            $aggregateStronglyDisagree = 0;
+            $aggregateNa = 0;
+            $aggregateTotalResponses = 0;
+
+            foreach ($criteriaRows as $criteria) {
+                $counts = $this->getSqdCriteriaCountsForSource(
+                    source: $sourceKey,
+                    officeId: $officeId,
+                    startDate: $startDate,
+                    endDate: $endDate,
+                    sqdCode: (string) $criteria['code'],
+                );
+
+                $stronglyAgree = (int) ($counts[5] ?? 0);
+                $agree = (int) ($counts[4] ?? 0);
+                $neither = (int) ($counts[3] ?? 0);
+                $disagree = (int) ($counts[2] ?? 0);
+                $stronglyDisagree = (int) ($counts[1] ?? 0);
+                $na = (int) ($counts[0] ?? 0);
+
+                $denominator = $totalResponses - $na;
+                $overallPercentage = $denominator <= 0
+                    ? 0.0
+                    : round((($stronglyAgree + $agree) / $denominator) * 100, 2);
+
+                $rows[] = [
+                    (string) $criteria['label'],
+                    $stronglyAgree,
+                    $agree,
+                    $neither,
+                    $disagree,
+                    $stronglyDisagree,
+                    $na,
+                    $totalResponses,
+                    $this->formatExportPercentage($overallPercentage),
+                ];
+                $rowIndex++;
+
+                $aggregateStronglyAgree += $stronglyAgree;
+                $aggregateAgree += $agree;
+                $aggregateNeither += $neither;
+                $aggregateDisagree += $disagree;
+                $aggregateStronglyDisagree += $stronglyDisagree;
+                $aggregateNa += $na;
+                $aggregateTotalResponses += $totalResponses;
+            }
+
+            $aggregateDenominator = $aggregateTotalResponses - $aggregateNa;
+            $aggregateOverallPercentage = $aggregateDenominator <= 0
+                ? 0.0
+                : round((($aggregateStronglyAgree + $aggregateAgree) / $aggregateDenominator) * 100, 2);
+
+            $rows[] = [
+                'Overall',
+                $aggregateStronglyAgree,
+                $aggregateAgree,
+                $aggregateNeither,
+                $aggregateDisagree,
+                $aggregateStronglyDisagree,
+                $aggregateNa,
+                $aggregateTotalResponses,
+                $this->formatExportPercentage($aggregateOverallPercentage),
+            ];
+            $boldRows[] = $rowIndex;
+            $rowIndex++;
+        };
+
+        if ($includeExternal) {
+            $appendSourceSection('External Services SQD Results', 'external');
+        }
+
+        if ($includeExternal && $includeInternal) {
+            $rows[] = ['', '', '', '', '', '', '', '', ''];
+            $rowIndex++;
+        }
+
+        if ($includeInternal) {
+            $appendSourceSection('Internal Services SQD Results', 'internal');
+        }
+
+        return [
+            'rows' => $rows,
+            'bold_rows' => $boldRows,
+        ];
+    }
+
+    /**
+     * @param array<int, string> $selectedDemographicKeys
+     * @return array{rows: array<int, array<int, string>>, bold_rows: array<int, int>}
+     */
+    private function buildDemographicProfileExportRows(
+        int $officeId,
+        string $startDate,
+        string $endDate,
+        array $selectedDemographicKeys
+    ): array {
+        $normalizedKeyMap = [
+            'age' => 'age',
+            'sex' => 'sex',
+            'customer-type' => 'client_type',
+        ];
+
+        $selectedCategories = collect($selectedDemographicKeys)
+            ->map(function (string $key) use ($normalizedKeyMap) {
+                return $normalizedKeyMap[$key] ?? null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($selectedCategories)) {
+            $selectedCategories = ['age'];
+        }
+
+        $sectionConfig = [
+            'age' => [
+                'header' => 'Age',
+                'rows' => [
+                    '19 or lower' => '1. 19 or lower',
+                    '20-34' => '2. 20-34',
+                    '35-49' => '3. 35-49',
+                    '50-64' => '4. 50-64',
+                    '65-Higher' => '5. 65 or higher',
+                    'Did not specify' => '6. Did not Specify',
+                ],
+            ],
+            'sex' => [
+                'header' => 'Sex',
+                'rows' => [
+                    'Male' => '1. Male',
+                    'Female' => '2. Female',
+                    'Did not specify' => '3. Did not Specify',
+                ],
+            ],
+            'client_type' => [
+                'header' => 'Customer Type',
+                'rows' => [
+                    'Citizen' => '1. Citizen',
+                    'Business' => '2. Business',
+                    'Government' => '3. Government',
+                    'Did not specify' => '4. Did not specify',
+                ],
+            ],
+        ];
+
+        $rows = [];
+        $boldRows = [];
+        $rowIndex = 1;
+
+        foreach ($selectedCategories as $categoryIndex => $category) {
+            $config = $sectionConfig[$category] ?? null;
+
+            if (!$config) {
+                continue;
+            }
+
+            $externalCounts = $this->getDemographicCountsForSource(
+                source: 'external',
+                category: $category,
+                officeId: $officeId,
+                startDate: $startDate,
+                endDate: $endDate,
+            );
+
+            $internalCounts = $this->getDemographicCountsForSource(
+                source: 'internal',
+                category: $category,
+                officeId: $officeId,
+                startDate: $startDate,
+                endDate: $endDate,
+            );
+
+            $externalTotal = array_sum($externalCounts);
+            $internalTotal = array_sum($internalCounts);
+            $overallTotal = $externalTotal + $internalTotal;
+
+            $rows[] = [
+                (string) $config['header'],
+                'External (Percentage)',
+                'Internal (Percentage)',
+                'Overall (Percentage)',
+            ];
+            $boldRows[] = $rowIndex;
+            $rowIndex++;
+
+            foreach ($config['rows'] as $segmentKey => $label) {
+                $externalValue = (int) ($externalCounts[$segmentKey] ?? 0);
+                $internalValue = (int) ($internalCounts[$segmentKey] ?? 0);
+                $overallValue = $externalValue + $internalValue;
+
+                $externalPercentage = $externalTotal === 0
+                    ? 0.0
+                    : round(($externalValue / $externalTotal) * 100, 2);
+                $internalPercentage = $internalTotal === 0
+                    ? 0.0
+                    : round(($internalValue / $internalTotal) * 100, 2);
+                $overallPercentage = $overallTotal === 0
+                    ? 0.0
+                    : round(($overallValue / $overallTotal) * 100, 2);
+
+                $rows[] = [
+                    $label,
+                    $this->formatExportPercentage($externalPercentage),
+                    $this->formatExportPercentage($internalPercentage),
+                    $this->formatExportPercentage($overallPercentage),
+                ];
+                $rowIndex++;
+            }
+
+            if ($categoryIndex < count($selectedCategories) - 1) {
+                $rows[] = ['', '', '', ''];
+                $rowIndex++;
+            }
+        }
+
+        return [
+            'rows' => $rows,
+            'bold_rows' => $boldRows,
+        ];
+    }
+
+    /**
+     * @return array{rows: array<int, array<int, string|int>>, bold_rows: array<int, int>}
+     */
+    private function buildSurveyedServicesExportRows(
+        int $officeId,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year
+    ): array {
+        $externalRows = $this->getSurveyedServiceRowsForSource(
+            source: 'external',
+            officeId: $officeId,
+            period: $period,
+            date: $date,
+            month: $month,
+            year: $year,
+        );
+
+        $internalRows = $this->getSurveyedServiceRowsForSource(
+            source: 'internal',
+            officeId: $officeId,
+            period: $period,
+            date: $date,
+            month: $month,
+            year: $year,
+        );
+
+        $externalResponseTotal = array_sum(array_column($externalRows, 'response_count'));
+        $externalTransactionTotal = array_sum(array_column($externalRows, 'total_transactions'));
+        $internalResponseTotal = array_sum(array_column($internalRows, 'response_count'));
+        $internalTransactionTotal = array_sum(array_column($internalRows, 'total_transactions'));
+
+        $overallResponseTotal = $externalResponseTotal + $internalResponseTotal;
+        $overallTransactionTotal = $externalTransactionTotal + $internalTransactionTotal;
+
+        $rows = [];
+        $boldRows = [];
+        $rowIndex = 1;
+
+        $rows[] = ['External Services', 'Responses', 'Total Transactions'];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        foreach ($externalRows as $serviceRow) {
+            $rows[] = [
+                $serviceRow['service_name'],
+                $serviceRow['response_count'],
+                $serviceRow['total_transactions'],
+            ];
+            $rowIndex++;
+        }
+
+        $rows[] = ['External Service Total', $externalResponseTotal, $externalTransactionTotal];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        $rows[] = ['Internal Services', '', ''];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        foreach ($internalRows as $serviceRow) {
+            $rows[] = [
+                $serviceRow['service_name'],
+                $serviceRow['response_count'],
+                $serviceRow['total_transactions'],
+            ];
+            $rowIndex++;
+        }
+
+        $rows[] = ['Internal Service Total', $internalResponseTotal, $internalTransactionTotal];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        $rows[] = ['OVERALL TOTAL', $overallResponseTotal, $overallTransactionTotal];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        $rows[] = ['', '', ''];
+        $rowIndex++;
+        $rows[] = ['', '', ''];
+        $rowIndex++;
+
+        $zeroClientServices = $this->getZeroClientServices(
+            officeId: $officeId,
+            period: $period,
+            date: $date,
+            month: $month,
+            year: $year,
+        );
+
+        $rows[] = ['The following services had no clients/transactions', '', ''];
+        $boldRows[] = $rowIndex;
+        $rowIndex++;
+
+        if (empty($zeroClientServices)) {
+            $rows[] = ['1. None', '', ''];
+            return [
+                'rows' => $rows,
+                'bold_rows' => $boldRows,
+            ];
+        }
+
+        foreach ($zeroClientServices as $index => $serviceName) {
+            $number = $index + 1;
+            $rows[] = ["{$number}. {$serviceName}", '', ''];
+        }
+
+        return [
+            'rows' => $rows,
+            'bold_rows' => $boldRows,
+        ];
+    }
+
+    /**
+     * @return array<int, array{service_id: int, service_name: string, response_count: int, total_transactions: int}>
+     */
+    private function getSurveyedServiceRowsForSource(
+        string $source,
+        int $officeId,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year
+    ): array {
+        $isExternal = $source === 'external';
+        $serviceType = $isExternal ? 'External' : 'Internal';
+
+        $query = DB::table('services as s')
+            ->leftJoin('queue_transaction_services as qts', 'qts.service_id', '=', 's.id')
+            ->where('s.office_id', $officeId)
+            ->where('s.service_type', $serviceType)
+            ->whereNull('s.deleted_at')
+            ->groupBy('s.id', 's.service_name')
+            ->orderBy('s.service_name')
+            ->selectRaw('s.id AS service_id')
+            ->selectRaw('s.service_name AS service_name');
+
+        if ($isExternal) {
+            $query
+                ->leftJoin('queue_transactions as qt', function ($join) use ($officeId, $period, $date, $month, $year) {
+                    $join->on('qt.id', '=', 'qts.queue_transaction_id')
+                        ->where('qt.office_id', '=', $officeId)
+                        ->where('qt.status', '=', 'COMPLETED');
+
+                    $this->applyDateConstraintToJoin(
+                        join: $join,
+                        column: 'qt.queue_date',
+                        period: $period,
+                        date: $date,
+                        month: $month,
+                        year: $year,
+                    );
+                })
+                ->leftJoin('evaluation_responses as er', 'er.queue_transaction_id', '=', 'qt.id')
+                ->selectRaw('COUNT(DISTINCT qt.id) AS total_transactions')
+                ->selectRaw('COUNT(DISTINCT er.queue_transaction_id) AS response_count');
+        } else {
+            $query
+                ->leftJoin('internal_transactions as it', function ($join) use ($officeId, $period, $date, $month, $year) {
+                    $join->on('it.id', '=', 'qts.internal_transaction_id')
+                        ->where('it.office_id', '=', $officeId);
+
+                    $this->applyDateConstraintToJoin(
+                        join: $join,
+                        column: 'it.transaction_date',
+                        period: $period,
+                        date: $date,
+                        month: $month,
+                        year: $year,
+                    );
+                })
+                ->leftJoin('evaluation_responses as er', 'er.internal_transaction_id', '=', 'it.id')
+                ->selectRaw('COUNT(DISTINCT it.id) AS total_transactions')
+                ->selectRaw('COUNT(DISTINCT er.internal_transaction_id) AS response_count');
+        }
+
+        return $query
+            ->havingRaw('COUNT(DISTINCT ' . ($isExternal ? 'qt.id' : 'it.id') . ') > 0')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'service_id' => (int) $row->service_id,
+                    'service_name' => (string) $row->service_name,
+                    'response_count' => (int) ($row->response_count ?? 0),
+                    'total_transactions' => (int) ($row->total_transactions ?? 0),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getZeroClientServices(
+        int $officeId,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year
+    ): array {
+        $externalRows = $this->getSurveyedServiceRowsForSource(
+            source: 'external',
+            officeId: $officeId,
+            period: $period,
+            date: $date,
+            month: $month,
+            year: $year,
+        );
+
+        $internalRows = $this->getSurveyedServiceRowsForSource(
+            source: 'internal',
+            officeId: $officeId,
+            period: $period,
+            date: $date,
+            month: $month,
+            year: $year,
+        );
+
+        $servicesWithTransactions = collect($externalRows)
+            ->pluck('service_id')
+            ->merge(collect($internalRows)->pluck('service_id'))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        return DB::table('services as s')
+            ->where('s.office_id', $officeId)
+            ->whereNull('s.deleted_at')
+            ->when($servicesWithTransactions->isNotEmpty(), function ($query) use ($servicesWithTransactions) {
+                $query->whereNotIn('s.id', $servicesWithTransactions->all());
+            })
+            ->orderBy('s.service_type')
+            ->orderBy('s.service_name')
+            ->pluck('s.service_name')
+            ->map(fn ($name) => (string) $name)
+            ->values()
+            ->all();
+    }
+
+    private function applyDateConstraintToJoin(
+        $join,
+        string $column,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year
+    ): void {
+        if ($period === 'monthly') {
+            $join->whereYear($column, '=', $year)
+                ->whereMonth($column, '=', $month);
+            return;
+        }
+
+        if ($period === 'yearly') {
+            $join->whereYear($column, '=', $year);
+            return;
+        }
+
+        $join->whereDate($column, '=', $date->toDateString());
+    }
+
     private function computeCcMetric(
         string $questionPrefix,
         array $includedOptions,
@@ -791,42 +1950,41 @@ class CsmAnalyticsController extends Controller
         $answerOptionExpression = $this->getAnswerOptionExpression();
         $includedOptionList = implode(',', array_map('intval', $includedOptions));
 
-        $query = EvaluationResponse::query()
-            ->where(function (Builder $innerQuery) {
+        $query = DB::table('evaluation_responses as er')
+            ->join('evaluation_questions as eq', 'eq.id', '=', 'er.question_id')
+            ->where(function ($innerQuery) {
                 $innerQuery
-                    ->whereNotNull('answer_option')
-                    ->orWhereNotNull('answer_value');
+                    ->whereNotNull('er.answer_option')
+                    ->orWhereNotNull('er.answer_value');
             })
-            ->whereHas('question', function (Builder $questionQuery) use ($questionPrefix) {
-                $questionQuery->where(function (Builder $innerQuery) use ($questionPrefix) {
-                    $innerQuery
-                        ->where('question_code', $questionPrefix)
-                        ->orWhere('question_text', 'like', $questionPrefix . '%');
-                });
+            ->where(function ($innerQuery) use ($questionPrefix) {
+                $innerQuery
+                    ->where('eq.question_code', $questionPrefix)
+                    ->orWhere('eq.question_text', 'like', $questionPrefix . '%');
             });
 
         if ($source === 'external') {
             $query
-                ->whereNotNull('queue_transaction_id')
-                ->whereHas('queueTransaction', function (Builder $transactionQuery) use ($officeId, $period, $date, $month, $year) {
-                    $transactionQuery
-                        ->where('office_id', $officeId)
-                        ->whereHas('services', function (Builder $serviceQuery) {
-                            $serviceQuery->where('service_type', 'External');
-                        });
+                ->join('queue_transactions as qt', 'qt.id', '=', 'er.queue_transaction_id')
+                ->join('queue_transaction_services as qts', 'qts.queue_transaction_id', '=', 'qt.id')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
+                ->whereNotNull('er.queue_transaction_id')
+                ->where('qt.office_id', $officeId)
+                ->where('s.service_type', 'External');
 
-                    $this->applyQueueDateFilter($transactionQuery, $period, $date, $month, $year);
-                });
+            $this->applyQueueDateFilter($query, $period, $date, $month, $year);
         }
 
         if ($source === 'internal') {
             $query
-                ->whereNotNull('internal_transaction_id')
-                ->whereHas('internalTransaction', function (Builder $transactionQuery) use ($officeId, $period, $date, $month, $year) {
-                    $transactionQuery->where('office_id', $officeId);
+                ->join('internal_transactions as it', 'it.id', '=', 'er.internal_transaction_id')
+                ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
+                ->whereNotNull('er.internal_transaction_id')
+                ->where('it.office_id', $officeId)
+                ->where('s.service_type', 'Internal');
 
-                    $this->applyInternalDateFilter($transactionQuery, $period, $date, $month, $year);
-                });
+            $this->applyInternalDateFilter($query, $period, $date, $month, $year);
         }
 
         $counts = $query
@@ -838,6 +1996,50 @@ class CsmAnalyticsController extends Controller
             'total' => (int) ($counts?->total ?? 0),
             'included' => (int) ($counts?->included ?? 0),
         ];
+    }
+
+    private function getServiceWeightedTransactionCountForSource(
+        string $source,
+        int $officeId,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year
+    ): int {
+        $query = DB::table('queue_transaction_services as qts')
+            ->join('services as s', 's.id', '=', 'qts.service_id');
+
+        if ($source === 'external') {
+            $query
+                ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
+                ->whereNotNull('qts.queue_transaction_id')
+                ->where('qt.office_id', $officeId)
+                ->where('s.service_type', 'External')
+                ->whereExists(function ($subQuery) {
+                    $subQuery->selectRaw('1')
+                        ->from('evaluation_sessions as es')
+                        ->whereColumn('es.queue_transaction_id', 'qt.id');
+                });
+
+            $this->applyQueueDateFilter($query, $period, $date, $month, $year);
+
+            return (int) $query->count('qts.id');
+        }
+
+        $query
+            ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
+            ->whereNotNull('qts.internal_transaction_id')
+            ->where('it.office_id', $officeId)
+            ->where('s.service_type', 'Internal')
+            ->whereExists(function ($subQuery) {
+                $subQuery->selectRaw('1')
+                    ->from('evaluation_sessions as es')
+                    ->whereColumn('es.internal_transaction_id', 'it.id');
+            });
+
+        $this->applyInternalDateFilter($query, $period, $date, $month, $year);
+
+        return (int) $query->count('qts.id');
     }
 
     private function getAnswerOptionExpression(): string
@@ -878,12 +2080,12 @@ class CsmAnalyticsController extends Controller
     }
 
     private function applyQueueDateFilter(
-        Builder $query,
+        Builder|\Illuminate\Database\Query\Builder $query,
         string $period,
         Carbon $date,
         int $month,
         int $year
-    ): Builder {
+    ): Builder|\Illuminate\Database\Query\Builder {
         return match ($period) {
             'monthly' => $query
                 ->whereYear('queue_date', $year)
@@ -896,12 +2098,12 @@ class CsmAnalyticsController extends Controller
     }
 
     private function applyInternalDateFilter(
-        Builder $query,
+        Builder|\Illuminate\Database\Query\Builder $query,
         string $period,
         Carbon $date,
         int $month,
         int $year
-    ): Builder {
+    ): Builder|\Illuminate\Database\Query\Builder {
         return match ($period) {
             'monthly' => $query
                 ->whereYear('transaction_date', $year)
@@ -1243,33 +2445,25 @@ class CsmAnalyticsController extends Controller
         if ($source === 'external') {
             $query
                 ->join('queue_transactions as qt', 'qt.id', '=', 'er.queue_transaction_id')
+                ->join('queue_transaction_services as qts', 'qts.queue_transaction_id', '=', 'qt.id')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('er.queue_transaction_id')
                 ->where('qt.office_id', $officeId)
                 ->where('qt.queue_date', '>=', $startDate)
                 ->where('qt.queue_date', '<', $endDate)
-                ->whereExists(function ($subQuery) {
-                    $subQuery->selectRaw('1')
-                        ->from('queue_transaction_services as qts')
-                        ->join('services as s', 's.id', '=', 'qts.service_id')
-                        ->whereColumn('qts.queue_transaction_id', 'qt.id')
-                        ->where('s.service_type', 'External');
-                });
+                ->where('s.service_type', 'External');
         }
 
         if ($source === 'internal') {
             $query
                 ->join('internal_transactions as it', 'it.id', '=', 'er.internal_transaction_id')
+                ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('er.internal_transaction_id')
                 ->where('it.office_id', $officeId)
                 ->where('it.transaction_date', '>=', $startDate)
                 ->where('it.transaction_date', '<', $endDate)
-                ->whereExists(function ($subQuery) {
-                    $subQuery->selectRaw('1')
-                        ->from('queue_transaction_services as qts')
-                        ->join('services as s', 's.id', '=', 'qts.service_id')
-                        ->whereColumn('qts.internal_transaction_id', 'it.id')
-                        ->where('s.service_type', 'Internal');
-                });
+                ->where('s.service_type', 'Internal');
         }
 
         return $query
@@ -1382,35 +2576,27 @@ class CsmAnalyticsController extends Controller
         if ($source === 'external') {
             $query
                 ->join('queue_transactions as qt', 'qt.id', '=', 'es.queue_transaction_id')
+                ->join('queue_transaction_services as qts', 'qts.queue_transaction_id', '=', 'qt.id')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('es.queue_transaction_id')
                 ->where('qt.office_id', $officeId)
                 ->where('qt.status', 'COMPLETED')
                 ->where('qt.queue_date', '>=', $startDate)
                 ->where('qt.queue_date', '<', $endDate)
-                ->whereExists(function ($subQuery) {
-                    $subQuery->selectRaw('1')
-                        ->from('queue_transaction_services as qts')
-                        ->join('services as s', 's.id', '=', 'qts.service_id')
-                        ->whereColumn('qts.queue_transaction_id', 'qt.id')
-                        ->where('s.service_type', 'External');
-                });
+                ->where('s.service_type', 'External');
         }
 
         if ($source === 'internal') {
             $query
                 ->join('internal_transactions as it', 'it.id', '=', 'es.internal_transaction_id')
+                ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('es.internal_transaction_id')
                 ->where('it.office_id', $officeId)
                 ->where('it.status', 'COMPLETED')
                 ->where('it.transaction_date', '>=', $startDate)
                 ->where('it.transaction_date', '<', $endDate)
-                ->whereExists(function ($subQuery) {
-                    $subQuery->selectRaw('1')
-                        ->from('queue_transaction_services as qts')
-                        ->join('services as s', 's.id', '=', 'qts.service_id')
-                        ->whereColumn('qts.internal_transaction_id', 'it.id')
-                        ->where('s.service_type', 'Internal');
-                });
+                ->where('s.service_type', 'Internal');
         }
 
         $rows = $query
@@ -1737,35 +2923,27 @@ class CsmAnalyticsController extends Controller
         if ($source === 'external') {
             $query
                 ->join('queue_transactions as qt', 'qt.id', '=', 'er.queue_transaction_id')
+                ->join('queue_transaction_services as qts', 'qts.queue_transaction_id', '=', 'qt.id')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('er.queue_transaction_id')
                 ->where('qt.office_id', $officeId)
                 ->where('qt.status', 'COMPLETED')
                 ->where('qt.queue_date', '>=', $startDate)
                 ->where('qt.queue_date', '<', $endDate)
-                ->whereExists(function ($subQuery) {
-                    $subQuery->selectRaw('1')
-                        ->from('queue_transaction_services as qts')
-                        ->join('services as s', 's.id', '=', 'qts.service_id')
-                        ->whereColumn('qts.queue_transaction_id', 'qt.id')
-                        ->where('s.service_type', 'External');
-                });
+                ->where('s.service_type', 'External');
         }
 
         if ($source === 'internal') {
             $query
                 ->join('internal_transactions as it', 'it.id', '=', 'er.internal_transaction_id')
+                ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('er.internal_transaction_id')
                 ->where('it.office_id', $officeId)
                 ->where('it.status', 'COMPLETED')
                 ->where('it.transaction_date', '>=', $startDate)
                 ->where('it.transaction_date', '<', $endDate)
-                ->whereExists(function ($subQuery) {
-                    $subQuery->selectRaw('1')
-                        ->from('queue_transaction_services as qts')
-                        ->join('services as s', 's.id', '=', 'qts.service_id')
-                        ->whereColumn('qts.internal_transaction_id', 'it.id')
-                        ->where('s.service_type', 'Internal');
-                });
+                ->where('s.service_type', 'Internal');
         }
 
         $row = $query->first();
@@ -1790,35 +2968,37 @@ class CsmAnalyticsController extends Controller
         $internalCount = 0;
 
         if ($serviceType !== 'internal') {
-            $externalCount = DB::table('queue_transactions as qt')
+            $externalCount = DB::table('queue_transaction_services as qts')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
+                ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
                 ->where('qt.office_id', $officeId)
                 ->where('qt.status', 'COMPLETED')
                 ->where('qt.queue_date', '>=', $startDate)
                 ->where('qt.queue_date', '<', $endDate)
+                ->where('s.service_type', 'External')
                 ->whereExists(function ($subQuery) {
                     $subQuery->selectRaw('1')
-                        ->from('queue_transaction_services as qts')
-                        ->join('services as s', 's.id', '=', 'qts.service_id')
-                        ->whereColumn('qts.queue_transaction_id', 'qt.id')
-                        ->where('s.service_type', 'External');
+                        ->from('evaluation_sessions as es')
+                        ->whereColumn('es.queue_transaction_id', 'qt.id');
                 })
-                ->count();
+                ->count('qts.id');
         }
 
         if ($serviceType !== 'external') {
-            $internalCount = DB::table('internal_transactions as it')
+            $internalCount = DB::table('queue_transaction_services as qts')
+                ->join('services as s', 's.id', '=', 'qts.service_id')
+                ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
                 ->where('it.office_id', $officeId)
                 ->where('it.status', 'COMPLETED')
                 ->where('it.transaction_date', '>=', $startDate)
                 ->where('it.transaction_date', '<', $endDate)
+                ->where('s.service_type', 'Internal')
                 ->whereExists(function ($subQuery) {
                     $subQuery->selectRaw('1')
-                        ->from('queue_transaction_services as qts')
-                        ->join('services as s', 's.id', '=', 'qts.service_id')
-                        ->whereColumn('qts.internal_transaction_id', 'it.id')
-                        ->where('s.service_type', 'Internal');
+                        ->from('evaluation_sessions as es')
+                        ->whereColumn('es.internal_transaction_id', 'it.id');
                 })
-                ->count();
+                ->count('qts.id');
         }
 
         return $externalCount + $internalCount;

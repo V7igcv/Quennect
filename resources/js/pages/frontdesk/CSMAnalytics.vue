@@ -172,9 +172,10 @@
           <!-- Right: Button -->
           <Button 
             class="h-10 px-4 bg-[#0F5C5C] hover:bg-[#167D7F] text-white flex items-center gap-2"
+            @click="openGenerateTableModal"
           >
             <FileText class="h-4 w-4" />
-            Generate Report
+            Generate Table
           </Button>
         </div>
 
@@ -440,6 +441,95 @@
         />
       </div>
     </div>
+
+    <!-- Generate Table Modal -->
+    <div v-if="showGenerateTableModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-lg p-6 max-w-3xl w-full mx-4 max-h-[85vh] overflow-y-auto">
+        <div class="flex justify-end mb-2">
+          <button
+            type="button"
+            @click="closeGenerateTableModal"
+            class="text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Close generate table modal"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <div class="mb-4">
+          <h3 class="text-lg font-semibold mb-2">Generate Table</h3>
+          <p class="text-gray-600 text-sm leading-relaxed">
+            Select the data dimensions you wish to download as tables. The system will compile a structured data table based on your selection and will be exported as an excel file.
+          </p>
+        </div>
+
+        <div class="mb-4 rounded-md border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-sm text-[#1E3A8A]">
+          Selected tables: <span class="font-semibold">{{ selectedTableKeys.length }}</span>
+        </div>
+
+        <div class="space-y-4 mb-6">
+          <div
+            v-for="group in generateTableGroups"
+            :key="group.key"
+            class="rounded-xl border border-gray-200 bg-white p-4"
+          >
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <h4 class="text-sm font-semibold text-[#1F2937]">{{ group.title }}</h4>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="text-xs font-medium text-[#0F5C5C] hover:text-[#167D7F]"
+                  @click="selectAllInGroup(group.options)"
+                >
+                  Select All
+                </button>
+                <span class="text-gray-300">|</span>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-[#6B7280] hover:text-[#374151]"
+                  @click="clearAllInGroup(group.options)"
+                >
+                  Clear All
+                </button>
+                <span class="text-xs text-[#6B7280] ml-2">{{ selectedCountByGroup(group.options) }} selected</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label
+                v-for="option in group.options"
+                :key="option.key"
+                class="flex items-center gap-3 rounded-md border border-gray-200 bg-[#F9FAFB] px-3 py-2 cursor-pointer hover:bg-gray-100 transition"
+              >
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-gray-300 text-[#0F5C5C] focus:ring-[#0F5C5C]"
+                  :checked="isTableSelected(option.key)"
+                  @change="toggleTableSelection(option.key)"
+                >
+                <span class="text-sm text-[#374151]">{{ option.label }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-2 justify-end">
+          <button
+            @click="closeGenerateTableModal"
+            class="px-4 py-2 border rounded-md hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            @click="handleGenerateTable"
+            class="px-4 py-2 bg-[#0F5C5C] text-white rounded-md hover:bg-[#167D7F] disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="selectedTableKeys.length === 0 || isGeneratingTable"
+          >
+            {{ isGeneratingTable ? 'Generating...' : 'Generate Table' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -467,6 +557,7 @@ import {
   Hand,
   BarChart3,
   Loader2,
+  X,
 } from 'lucide-vue-next'
 import {
   Select,
@@ -489,6 +580,54 @@ const selectedDateRange = ref('daily')
 const isDateFilterOpen = ref(false)
 const isLoadingAnalytics = ref(false)
 const isApplyingDateFilter = ref(false)
+const showGenerateTableModal = ref(false)
+const isGeneratingTable = ref(false)
+
+const generateTableGroups = [
+  {
+    key: 'general-reporting',
+    title: 'General Reporting',
+    options: [
+      { key: 'overview', label: 'Overview' },
+      { key: 'surveyed-services', label: 'Surveyed Services' },
+      { key: 'citizens-charter-count', label: "Citizen's Charter Count" },
+      { key: 'overall-score-per-service', label: 'Overall Score Per Service' },
+    ],
+  },
+  {
+    key: 'demographics',
+    title: 'Demographics',
+    options: [
+      { key: 'age', label: 'Age' },
+      { key: 'sex', label: 'Sex' },
+      { key: 'customer-type', label: 'Customer Type' },
+    ],
+  },
+  {
+    key: 'sqd-results',
+    title: 'SQD Results',
+    options: [
+      { key: 'external-sqd-results', label: 'External SQD Results' },
+      { key: 'internal-sqd-results', label: 'Internal SQD Results' },
+    ],
+  },
+]
+
+const selectedTableKeys = ref([
+  'overview',
+])
+
+const currentlySupportedExportTables = [
+  'overview',
+  'surveyed-services',
+  'citizens-charter-count',
+  'overall-score-per-service',
+  'age',
+  'sex',
+  'customer-type',
+  'external-sqd-results',
+  'internal-sqd-results',
+]
 
 const bodyOriginalOverflow = ref('')
 const htmlOriginalOverflow = ref('')
@@ -761,6 +900,140 @@ const fetchCsmAnalytics = async () => {
     ccData.value = getDefaultCcData()
   } finally {
     isLoadingAnalytics.value = false
+  }
+}
+
+const openGenerateTableModal = () => {
+  showGenerateTableModal.value = true
+}
+
+const closeGenerateTableModal = () => {
+  showGenerateTableModal.value = false
+}
+
+const isTableSelected = (tableKey) => {
+  return selectedTableKeys.value.includes(tableKey)
+}
+
+const toggleTableSelection = (tableKey) => {
+  if (isTableSelected(tableKey)) {
+    selectedTableKeys.value = selectedTableKeys.value.filter((item) => item !== tableKey)
+    return
+  }
+
+  selectedTableKeys.value = [...selectedTableKeys.value, tableKey]
+}
+
+const selectedCountByGroup = (options) => {
+  return options.filter((option) => isTableSelected(option.key)).length
+}
+
+const selectAllInGroup = (options) => {
+  const optionKeys = options.map((option) => option.key)
+  const mergedKeys = [...selectedTableKeys.value]
+
+  optionKeys.forEach((key) => {
+    if (!mergedKeys.includes(key)) {
+      mergedKeys.push(key)
+    }
+  })
+
+  selectedTableKeys.value = mergedKeys
+}
+
+const clearAllInGroup = (options) => {
+  const optionKeys = options.map((option) => option.key)
+  selectedTableKeys.value = selectedTableKeys.value.filter((key) => !optionKeys.includes(key))
+}
+
+const buildFallbackExportFileName = () => {
+  let dateLabel = selectedYear.value
+
+  if (selectedDateRange.value === 'daily') {
+    dateLabel = selectedDate.value.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  } else if (selectedDateRange.value === 'monthly') {
+    dateLabel = `${monthNames[selectedMonthIndex.value]} ${selectedMonthYear.value}`
+  }
+
+  return `Client Satisfaction Measurement (CSM) Report - ${dateLabel}.xlsx`
+}
+
+const parseContentDispositionFileName = (contentDisposition) => {
+  if (!contentDisposition) {
+    return null
+  }
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match && utf8Match[1]) {
+    return decodeURIComponent(utf8Match[1])
+  }
+
+  const simpleMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+  if (simpleMatch && simpleMatch[1]) {
+    return simpleMatch[1]
+  }
+
+  return null
+}
+
+const triggerBlobDownload = (blobData, fileName) => {
+  const blob = new Blob([blobData], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const downloadUrl = window.URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+
+  anchor.href = downloadUrl
+  anchor.download = fileName
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+
+  window.URL.revokeObjectURL(downloadUrl)
+}
+
+const handleGenerateTable = async () => {
+  if (selectedTableKeys.value.length === 0 || isGeneratingTable.value) {
+    return
+  }
+
+  const unsupportedSelections = selectedTableKeys.value.filter(
+    (tableKey) => !currentlySupportedExportTables.includes(tableKey)
+  )
+
+  if (unsupportedSelections.length > 0) {
+    window.alert("For now, only Overview, Surveyed Services, Citizen's Charter Count, Overall Score Per Service, Demographic Profile, and SQD Results can be exported.")
+    return
+  }
+
+  isGeneratingTable.value = true
+
+  try {
+    const response = await api.post(
+      '/frontdesk/analytics/csm/export',
+      {
+        tables: selectedTableKeys.value,
+        ...buildCsmParams(),
+      },
+      {
+        responseType: 'blob',
+      }
+    )
+
+    const contentDisposition = response?.headers?.['content-disposition']
+    const fileName = parseContentDispositionFileName(contentDisposition) || buildFallbackExportFileName()
+
+    triggerBlobDownload(response.data, fileName)
+    closeGenerateTableModal()
+  } catch (error) {
+    console.error('Error exporting CSM analytics table:', error)
+    window.alert('Unable to generate table export right now. Please try again.')
+  } finally {
+    isGeneratingTable.value = false
   }
 }
 
