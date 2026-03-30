@@ -149,6 +149,21 @@
       </div>
     </div>
 
+    <Card class="mb-4 border border-gray-200 bg-gray-50 shadow-sm">
+      <CardContent class="p-4">
+        <div class="flex items-start gap-3">
+          <div class="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white">
+            <Info class="h-4 w-4 text-gray-500" />
+          </div>
+          <div>
+            <p class="text-sm leading-relaxed text-gray-600">
+              All charts and metrics update based on the selected Service Type and Date filter. Percentages are rounded to 2 decimal places. For SQD and overall scoring, N/A responses are excluded from valid-response computations.
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
     <div
       v-if="isLoadingAnalytics"
       class="mb-4 flex items-center gap-2 rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm font-medium text-[#0F5C5C]"
@@ -164,10 +179,19 @@
       <div>
         <div class="flex items-center justify-between mb-4">
           <!-- Left: Title -->
-          <h2 class="text-xl font-semibold">
-            Overview 
-            <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
-          </h2>
+          <div class="flex items-center gap-1">
+            <h2 class="text-xl font-semibold">
+              Overview
+              <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
+            </h2>
+            <CsmMetricExplanation
+              :title="csmMetricExplanations.overview.title"
+              :meaning="csmMetricExplanations.overview.meaning"
+              :computation="csmMetricExplanations.overview.computation"
+              :formula="csmMetricExplanations.overview.formula"
+              :interpretation="csmMetricExplanations.overview.interpretation"
+            />
+          </div>
 
           <!-- Right: Button -->
           <Button 
@@ -239,11 +263,18 @@
       <div class="space-y-6">
         <!-- Citizen's Charter Count Section -->
         <div>
-          <div class="mb-4">
+          <div class="mb-4 flex items-center gap-1">
             <h2 class="text-xl font-semibold">
               Citizen's Charter Count 
               <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
             </h2>
+            <CsmMetricExplanation
+              :title="csmMetricExplanations.citizenCharter.title"
+              :meaning="csmMetricExplanations.citizenCharter.meaning"
+              :computation="csmMetricExplanations.citizenCharter.computation"
+              :formula="csmMetricExplanations.citizenCharter.formula"
+              :interpretation="csmMetricExplanations.citizenCharter.interpretation"
+            />
           </div>
 
           <!-- Main Card containing all CC charts -->
@@ -392,17 +423,31 @@
       <!-- SQD and Demographic Section -->
       <div>
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-          <div class="mb-4">
+          <div class="mb-4 flex items-center gap-1">
             <h2 class="text-xl font-semibold">
               SQD Results
               <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
             </h2>
+            <CsmMetricExplanation
+              :title="csmMetricExplanations.sqd.title"
+              :meaning="csmMetricExplanations.sqd.meaning"
+              :computation="csmMetricExplanations.sqd.computation"
+              :formula="csmMetricExplanations.sqd.formula"
+              :interpretation="csmMetricExplanations.sqd.interpretation"
+            />
           </div>
-          <div class="mb-4">
+          <div class="mb-4 flex items-center gap-1">
             <h2 class="text-xl font-semibold">
               Demographic Profile
               <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
             </h2>
+            <CsmMetricExplanation
+              :title="csmMetricExplanations.demographic.title"
+              :meaning="csmMetricExplanations.demographic.meaning"
+              :computation="csmMetricExplanations.demographic.computation"
+              :formula="csmMetricExplanations.demographic.formula"
+              :interpretation="csmMetricExplanations.demographic.interpretation"
+            />
           </div>
         </div>
 
@@ -427,11 +472,18 @@
 
       <!-- Overall Score Per Service Section -->
       <div>
-        <div class="mb-4">
+        <div class="mb-4 flex items-center gap-1">
           <h2 class="text-xl font-semibold">
             Overall Score Per Service 
             <span class="italic text-[#6B7280]">({{ getServiceTypeLabel }})</span>
           </h2>
+          <CsmMetricExplanation
+            :title="csmMetricExplanations.overallScorePerService.title"
+            :meaning="csmMetricExplanations.overallScorePerService.meaning"
+            :computation="csmMetricExplanations.overallScorePerService.computation"
+            :formula="csmMetricExplanations.overallScorePerService.formula"
+            :interpretation="csmMetricExplanations.overallScorePerService.interpretation"
+          />
         </div>
         
         <OverallScorePerServiceCard 
@@ -445,19 +497,18 @@
     <!-- Generate Table Modal -->
     <div v-if="showGenerateTableModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg shadow-lg p-6 max-w-3xl w-full mx-4 max-h-[85vh] overflow-y-auto">
-        <div class="flex justify-end mb-2">
-          <button
-            type="button"
-            @click="closeGenerateTableModal"
-            class="text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="Close generate table modal"
-          >
-            <X class="w-5 h-5" />
-          </button>
-        </div>
-
         <div class="mb-4">
-          <h3 class="text-lg font-semibold mb-2">Generate Table</h3>
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <h3 class="text-lg font-semibold">Generate Table</h3>
+            <button
+              type="button"
+              @click="closeGenerateTableModal"
+              class="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Close generate table modal"
+            >
+              <X class="w-5 h-5" />
+            </button>
+          </div>
           <p class="text-gray-600 text-sm leading-relaxed">
             Select the data dimensions you wish to download as tables. The system will compile a structured data table based on your selection and will be exported as an excel file.
           </p>
@@ -557,6 +608,7 @@ import {
   Hand,
   BarChart3,
   Loader2,
+  Info,
   X,
 } from 'lucide-vue-next'
 import {
@@ -574,6 +626,7 @@ import {
 import SQDResultsCard from '@/components/CSM/SQDResultsCard.vue'
 import DemographicProfileCard from '@/components/CSM/DemographicProfileCard.vue'
 import OverallScorePerServiceCard from '@/components/CSM/OverallScorePerServiceCard.vue'
+import CsmMetricExplanation from '@/components/CSM/CsmMetricExplanation.vue'
 
 const selectedServiceType = ref('external')
 const selectedDateRange = ref('daily')
@@ -771,6 +824,60 @@ const stats = ref({
   ccHelpfulness: 0,
   overallScore: 0,
 })
+
+const csmMetricExplanations = {
+  overview: {
+    title: 'Overview Metrics',
+    meaning: 'This section gives a quick snapshot of transaction volume and key Citizen Charter indicators for the selected service type and date range.',
+    computation: 'Total Transactions counts completed transactions with evaluation sessions. CC Awareness, Visibility, and Helpfulness are computed as favorable responses divided by total responses for their corresponding CC question. Overall Score follows the service scoring logic used in the Overall Score Per Service section.',
+    formula: 'CC Awareness = ((CC1 Option 1 + Option 2 + Option 3) / Total CC1 Responses) * 100\nCC Visibility = (CC2 Option 1 / Total CC2 Responses) * 100\nCC Helpfulness = (CC3 Option 1 / Total CC3 Responses) * 100',
+    interpretation: [
+      'Higher percentages indicate better Charter performance for that indicator.',
+      'Values are based on the active Service Type and Date filter.',
+      'Percentages are rounded to 2 decimal places.',
+    ],
+  },
+  citizenCharter: {
+    title: "Citizen's Charter Count",
+    meaning: 'This section shows how responses are distributed across options for CC1, CC2, and CC3 questions.',
+    computation: 'For each question, every option has a response count and its share of total responses for that same question.',
+    formula: 'Option Percentage = (Option Response Count / Total Responses for that CC Question) * 100',
+    interpretation: [
+      'Use this to identify which option is most common per question.',
+      'Percentages are not compared across different questions; compare within the same question only.',
+    ],
+  },
+  sqd: {
+    title: 'SQD Results',
+    meaning: 'This chart shows response distribution for the selected SQD statement, from Strongly Disagree to Strongly Agree and Not Applicable.',
+    computation: 'The chart displays counts per response criterion. Overall Percentage uses only valid responses, excluding N/A, and measures the share of Agree plus Strongly Agree.',
+    formula: 'Overall Percentage = ((Agree + Strongly Agree) / (Total Responses - N/A)) * 100',
+    interpretation: [
+      'Higher overall percentage means stronger positive satisfaction for the selected SQD.',
+      'N/A responses are excluded from valid-response scoring.',
+    ],
+  },
+  demographic: {
+    title: 'Demographic Profile',
+    meaning: 'This chart shows respondent distribution by Age, Sex, or Client Type to describe who submitted feedback.',
+    computation: 'Each segment percentage is based on segment count divided by total responses under the selected demographic category.',
+    formula: 'Segment Percentage = (Segment Count / Total Responses in Selected Category) * 100',
+    interpretation: [
+      'Use this to understand representation of respondent groups.',
+      'Did not specify is counted as a separate segment when no value is provided.',
+    ],
+  },
+  overallScorePerService: {
+    title: 'Overall Score Per Service',
+    meaning: 'This chart compares service-level satisfaction performance so you can quickly spot stronger and weaker services.',
+    computation: 'Per-service score is computed from SQD0 to SQD8 using the share of Agree and Strongly Agree among valid responses excluding N/A. Service Total is the average of all displayed service percentages.',
+    formula: 'Per-Service Score = ((Agree + Strongly Agree) / (Total SQD Answers - N/A)) * 100\nService Total = Sum of Service Percentages / Number of Services',
+    interpretation: [
+      'Higher bars indicate stronger perceived service quality.',
+      'Performance bands are: Outstanding, Very Satisfactory, Satisfactory, Fair, and Poor.',
+    ],
+  },
+}
 
 const getDefaultCcData = () => ({
   awareness: [

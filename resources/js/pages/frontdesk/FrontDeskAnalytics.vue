@@ -197,7 +197,16 @@
     <!-- Charts Row -->
     <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div>
-        <h2 class="mb-3 text-lg font-semibold">Average Client Satisfaction Distribution</h2>
+        <div class="mb-3 flex items-center gap-1">
+          <h2 class="text-lg font-semibold">Average Client Satisfaction Distribution</h2>
+          <CsmMetricExplanation
+            :title="queueMetricExplanations.clientSatisfaction.title"
+            :meaning="queueMetricExplanations.clientSatisfaction.meaning"
+            :computation="queueMetricExplanations.clientSatisfaction.computation"
+            :formula="queueMetricExplanations.clientSatisfaction.formula"
+            :interpretation="queueMetricExplanations.clientSatisfaction.interpretation"
+          />
+        </div>
         <Card class="w-full">
           <CardContent class="pt-6">
             <div class="h-[300px] w-full">
@@ -245,7 +254,16 @@
       </div>
 
       <div>
-        <h2 class="mb-3 text-lg font-semibold">Lane Type Distribution</h2>
+        <div class="mb-3 flex items-center gap-1">
+          <h2 class="text-lg font-semibold">Lane Type Distribution</h2>
+          <CsmMetricExplanation
+            :title="queueMetricExplanations.laneType.title"
+            :meaning="queueMetricExplanations.laneType.meaning"
+            :computation="queueMetricExplanations.laneType.computation"
+            :formula="queueMetricExplanations.laneType.formula"
+            :interpretation="queueMetricExplanations.laneType.interpretation"
+          />
+        </div>
         <Card class="w-full">
           <CardContent>
             <div class="h-[300px] w-full mt-2 flex items-center justify-center">
@@ -423,6 +441,7 @@ import {
   PaginationFirst,
   PaginationLast,
 } from '@/components/ui/pagination'
+import CsmMetricExplanation from '@/components/CSM/CsmMetricExplanation.vue'
 
 const selectedDateRange = ref('daily')
 const isDateFilterOpen = ref(false)
@@ -437,6 +456,29 @@ const stats = ref({
   averageWaitingTime: 0,
   averageServiceTime: 0,
 })
+
+const queueMetricExplanations = {
+  clientSatisfaction: {
+    title: 'Average Client Satisfaction Distribution',
+    meaning: 'This chart shows the distribution of each completed transaction based on its rounded average satisfaction rating for the selected date range.',
+    computation: 'Each bar counts transactions where average_satisfaction_rating rounds to 1, 2, 3, 4, or 5. Not Applicable counts transactions with no average_satisfaction_rating. Total Responses counts distinct queue transactions that submitted evaluation responses.',
+    formula: 'Category Count = Number of completed transactions where ROUND(average_satisfaction_rating) = category\nNot Applicable = Number of completed transactions where average_satisfaction_rating is null\nTotal Responses = Count of distinct queue transactions with evaluation responses',
+    interpretation: [
+      'Taller bars mean more completed transactions fell under that rounded rating.',
+      'Use Total Responses to gauge how representative the distribution is.',
+    ],
+  },
+  laneType: {
+    title: 'Lane Type Distribution',
+    meaning: 'This chart shows how total clients are distributed across lane types such as Regular, Senior Citizen, Pregnant, PWD, and IP members.',
+    computation: 'Each lane type has a count and percentage based on total clients for the selected date range.',
+    formula: 'Lane Type Percentage = (Lane Type Client Count / Total Clients) * 100',
+    interpretation: [
+      'Bigger donut slices indicate higher client share for that lane type.',
+      'Use this to monitor if lane demand is balanced or skewed toward specific client groups.',
+    ],
+  },
+}
 
 const queueSummaryRowsPerPage = 10
 const currentQueueSummaryPage = ref(1)
@@ -807,8 +849,10 @@ const fetchLaneTypeDistribution = async () => {
   laneTotalClientsValue.value = payload.total_clients ?? 0
 }
 
-const fetchQueueSummary = async () => {
-  isLoadingQueueSummary.value = true
+const fetchQueueSummary = async ({ showLoading = true } = {}) => {
+  if (showLoading) {
+    isLoadingQueueSummary.value = true
+  }
   try {
     const response = await api.get('/frontdesk/analytics/queue-summary', {
       params: {
@@ -855,7 +899,9 @@ const fetchQueueSummary = async () => {
       endRow: 0,
     }
   } finally {
-    isLoadingQueueSummary.value = false
+    if (showLoading) {
+      isLoadingQueueSummary.value = false
+    }
   }
 }
 
@@ -877,7 +923,7 @@ const fetchAnalyticsData = async () => {
 
 watch(currentQueueSummaryPage, () => {
   if (isApplyingDateFilter.value) return
-  fetchQueueSummary()
+  fetchQueueSummary({ showLoading: false })
 })
 
 const applyDateFilterAndReload = async () => {

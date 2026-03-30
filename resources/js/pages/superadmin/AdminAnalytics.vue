@@ -218,7 +218,16 @@
     <!-- Charts Row -->
     <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div>
-        <h2 class="mb-3 text-lg font-semibold">Client Satisfaction Distribution</h2>
+        <div class="mb-3 flex items-center gap-1">
+          <h2 class="text-lg font-semibold">Client Satisfaction Distribution</h2>
+          <CsmMetricExplanation
+            :title="queueMetricExplanations.clientSatisfaction.title"
+            :meaning="queueMetricExplanations.clientSatisfaction.meaning"
+            :computation="queueMetricExplanations.clientSatisfaction.computation"
+            :formula="queueMetricExplanations.clientSatisfaction.formula"
+            :interpretation="queueMetricExplanations.clientSatisfaction.interpretation"
+          />
+        </div>
         <Card class="w-full">
           <CardContent class="pt-6">
             <div class="h-[300px] w-full">
@@ -266,7 +275,16 @@
       </div>
 
       <div>
-        <h2 class="mb-3 text-lg font-semibold">Lane Type Distribution</h2>
+        <div class="mb-3 flex items-center gap-1">
+          <h2 class="text-lg font-semibold">Lane Type Distribution</h2>
+          <CsmMetricExplanation
+            :title="queueMetricExplanations.laneType.title"
+            :meaning="queueMetricExplanations.laneType.meaning"
+            :computation="queueMetricExplanations.laneType.computation"
+            :formula="queueMetricExplanations.laneType.formula"
+            :interpretation="queueMetricExplanations.laneType.interpretation"
+          />
+        </div>
         <Card class="w-full">
           <CardContent>
             <div class="h-[300px] w-full mt-2 flex items-center justify-center">
@@ -452,6 +470,7 @@ import {
   PaginationFirst,
   PaginationLast,
 } from '@/components/ui/pagination'
+import CsmMetricExplanation from '@/components/CSM/CsmMetricExplanation.vue'
 
 const selectedOffice = ref('')
 const officeOptions = ref([])
@@ -468,6 +487,29 @@ const stats = ref({
   averageWaitingTime: 0,
   averageServiceTime: 0,
 })
+
+const queueMetricExplanations = {
+  clientSatisfaction: {
+    title: 'Average Client Satisfaction Distribution',
+    meaning: 'This chart shows the distribution of each completed transaction based on its rounded average satisfaction rating for the selected office and date range.',
+    computation: 'Each bar counts transactions where average_satisfaction_rating rounds to 1, 2, 3, 4, or 5. Not Applicable counts transactions with no average_satisfaction_rating. Total Responses counts distinct queue transactions that submitted evaluation responses.',
+    formula: 'Category Count = Number of completed transactions where ROUND(average_satisfaction_rating) = category\nNot Applicable = Number of completed transactions where average_satisfaction_rating is null\nTotal Responses = Count of distinct queue transactions with evaluation responses',
+    interpretation: [
+      'Taller bars mean more completed transactions fell under that rounded rating.',
+      'Check the selected office and date range when comparing results.',
+    ],
+  },
+  laneType: {
+    title: 'Lane Type Distribution',
+    meaning: 'This chart shows how clients are distributed across lane types for the selected office and date range.',
+    computation: 'Each lane type includes a client count and percentage share of the total clients.',
+    formula: 'Lane Type Percentage = (Lane Type Client Count / Total Clients) * 100',
+    interpretation: [
+      'Larger slices indicate higher lane utilization.',
+      'Use this to identify lane demand and staffing needs per office.',
+    ],
+  },
+}
 
 const queueSummaryRowsPerPage = 10
 const currentQueueSummaryPage = ref(1)
