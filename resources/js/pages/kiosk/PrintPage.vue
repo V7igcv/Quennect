@@ -1,11 +1,10 @@
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col">
-    
     <!-- Header -->
     <KioskHeader bgColor="#0F5C5C" textColor="#FFFFFF" />
 
     <!-- Content -->
-    <div class="flex-grow max-w-3xl mx-auto px-6 sm:px-8 py-4 sm:py-8 w-full">
+    <div class="flex-grow max-w-4xl mx-auto px-6 sm:px-8 py-4 sm:py-6 w-full">
       
       <!-- Loading State -->
       <div v-if="loading" class="text-center py-12">
@@ -24,90 +23,92 @@
         </button>
       </div>
 
-      <!-- Success State - with queue number -->
-      <div v-else>
-        <!-- Queue Number Display -->
-        <div class="text-center mb-8">
-          <p class="text-gray-700 text-lg mb-2">Ito ang iyong numero sa pila.</p>
-          <p class="text-gray-600 text-sm mb-4">
-            Nais mo bang i-print ang iyong numero? Kung oo, pindutin ang <span class="font-semibold">Print</span> button. 
-            Kung hindi, pindutin ang <span class="font-semibold">Tapos</span> upang magpatuloy.
-          </p>
-          
-          <!-- Queue Number - Large Display -->
-          <div class="text-6xl sm:text-7xl font-bold text-[#0F5C5C] mb-4">
-            {{ queueNumber }}
+      <!-- Success State -->
+      <div v-else class="flex flex-col min-h-[80vh]">
+        
+        <!-- Main Content - Queue Number and Details -->
+        <div class="flex-grow">
+          <!-- Queue Number Display -->
+          <div class="text-center mb-8">
+            <div class="text-7xl sm:text-8xl font-bold text-[#0F5C5C] mb-6 py-4">
+              {{ queueNumber }}
+            </div>
+            
+            <!-- Instruction Message - Simple and Clean -->
+            <p class="text-gray-700 text-lg">
+              Pakikuhanan ng litrato o isulat sa papel ang inyong queue number.
+            </p>
+          </div>
+
+          <!-- Client Details Summary -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden max-w-2xl mx-auto">
+            <div class="px-6 py-4 border-b border-gray-100">
+              <h3 class="font-medium text-gray-700">Mga Detalye ng Transaksyon</h3>
+            </div>
+            <div class="px-6 py-4">
+              <table class="w-full text-sm">
+                <tr class="border-b border-gray-50">
+                  <td class="text-gray-600 py-2 w-1/3">Opisina:</td>
+                  <td class="text-gray-800 py-2">{{ selectedOffice?.name }} ({{ selectedOffice?.acronym }})</td>
+                </tr>
+                
+                <tr class="border-b border-gray-50">
+                  <td class="text-gray-600 py-2 align-top">Serbisyo:</td>
+                  <td class="text-gray-800 py-2">
+                    <span v-for="(service, index) in selectedServices" :key="service.id">
+                      {{ service.name }}<span v-if="index < selectedServices.length - 1">, </span>
+                    </span>
+                  </td>
+                </tr>
+                
+                <tr class="border-b border-gray-50">
+                  <td class="text-gray-600 py-2">Pangalan:</td>
+                  <td class="text-gray-800 py-2">{{ clientDetails?.full_name }}</td>
+                </tr>
+                
+                <tr class="border-b border-gray-50">
+                  <td class="text-gray-600 py-2">Contact Number:</td>
+                  <td class="text-gray-800 py-2">{{ clientDetails?.contact_number }}</td>
+                </tr>
+                
+                <tr class="border-b border-gray-50">
+                  <td class="text-gray-600 py-2">Barangay:</td>
+                  <td class="text-gray-800 py-2">{{ getBarangayName(clientDetails?.barangay_id) }}</td>
+                </tr>
+                
+                <tr class="border-b border-gray-50">
+                  <td class="text-gray-600 py-2">Uri ng Lane:</td>
+                  <td class="text-gray-800 py-2 capitalize">{{ clientDetails?.lane_type }}</td>
+                </tr>
+                
+                <tr v-if="clientDetails?.lane_type === 'priority' && clientDetails?.priority_sectors?.length > 0">
+                  <td class="text-gray-600 py-2">Priority Sector:</td>
+                  <td class="text-gray-800 py-2">
+                    <span v-for="(sector, index) in getPrioritySectorNames(clientDetails.priority_sectors)" :key="index">
+                      {{ sector }}<span v-if="index < clientDetails.priority_sectors.length - 1">, </span>
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tapos Button -->
+          <div class="flex justify-center mt-8">
+            <button 
+              @click="finish"
+              class="px-8 py-3 rounded-lg bg-[#0F5C5C] text-white font-medium text-base hover:bg-[#0a4a4a] transition min-w-[180px]"
+            >
+              Tapos
+            </button>
           </div>
         </div>
 
-        <!-- System Name (separator) -->
-        <div class="text-center mb-6">
-          <p class="text-lg font-semibold text-gray-700">Quennect</p>
-          <p class="text-sm text-gray-500">General Queuing System</p>
-        </div>
-
-        <!-- Client Details Summary - Table Format -->
-        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
-          <table class="w-full">
-            <tr class="border-b border-gray-200">
-              <td class="font-semibold text-gray-700 py-3 w-1/3">Opisina:</td>
-              <td class="text-gray-900 py-3">{{ selectedOffice?.name }} ({{ selectedOffice?.acronym }})</td>
-            </tr>
-            
-            <tr class="border-b border-gray-200">
-              <td class="font-semibold text-gray-700 py-3 align-top">Serbisyo:</td>
-              <td class="text-gray-900 py-3">
-                <div v-for="(service, index) in selectedServices" :key="service.id">
-                  {{ service.name }}<span v-if="index < selectedServices.length - 1">,</span>
-                </div>
-              </td>
-            </tr>
-            
-            <tr class="border-b border-gray-200">
-              <td class="font-semibold text-gray-700 py-3">Pangalan:</td>
-              <td class="text-gray-900 py-3">{{ clientDetails?.full_name }}</td>
-            </tr>
-            
-            <tr class="border-b border-gray-200">
-              <td class="font-semibold text-gray-700 py-3">Contact Number:</td>
-              <td class="text-gray-900 py-3">{{ clientDetails?.contact_number }}</td>
-            </tr>
-            
-            <tr class="border-b border-gray-200">
-              <td class="font-semibold text-gray-700 py-3">Barangay:</td>
-              <td class="text-gray-900 py-3">{{ getBarangayName(clientDetails?.barangay_id) }}</td>
-            </tr>
-            
-            <tr class="border-b border-gray-200">
-              <td class="font-semibold text-gray-700 py-3">Uri ng Lane:</td>
-              <td class="text-gray-900 py-3 capitalize">{{ clientDetails?.lane_type }}</td>
-            </tr>
-            
-            <tr v-if="clientDetails?.lane_type === 'priority' && clientDetails?.priority_sectors?.length > 0" class="border-b border-gray-200">
-              <td class="font-semibold text-gray-700 py-3">Priority Sector:</td>
-              <td class="text-gray-900 py-3">
-                <span v-for="(sector, index) in getPrioritySectorNames(clientDetails.priority_sectors)" :key="index">
-                  {{ sector }}<span v-if="index < clientDetails.priority_sectors.length - 1">, </span>
-                </span>
-              </td>
-            </tr>
-          </table>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-          <button 
-            @click="finish"
-            class="px-8 py-4 rounded-lg border-2 border-[#0F5C5C] text-[#0F5C5C] font-semibold text-lg hover:bg-gray-50 transition min-w-[200px]"
-          >
-            Tapusin
-          </button>
-          <button 
-            @click="print"
-            class="px-8 py-4 rounded-lg bg-[#0F5C5C] text-white font-semibold text-lg hover:bg-[#0a4a4a] transition min-w-[200px]"
-          >
-            I-print
-          </button>
+        <!-- Countdown Timer at the Bottom - Minimalist -->
+        <div class="text-center pt-8 pb-4 border-t border-gray-200 mt-8">
+          <p class="text-gray-500 text-sm">
+            Magbabalik sa home page sa {{ countdown }} segundo
+          </p>
         </div>
       </div>
     </div>
@@ -115,7 +116,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import KioskHeader from '../../components/kiosk/KioskHeader.vue'
 import kioskApi from '../../services/kioskApi'
@@ -129,6 +130,8 @@ const prioritySectors = ref([])
 const queueNumber = ref('')
 const loading = ref(true)
 const error = ref(null)
+const countdown = ref(30) // Changed from 15 to 30 seconds
+let countdownInterval = null
 
 // Get data from localStorage
 onMounted(() => {
@@ -175,13 +178,26 @@ const fetchPrioritySectors = async () => {
   }
 }
 
+// Start countdown timer
+const startCountdown = () => {
+  if (countdownInterval) clearInterval(countdownInterval)
+  
+  countdownInterval = setInterval(() => {
+    if (countdown.value > 1) {
+      countdown.value--
+    } else {
+      clearInterval(countdownInterval)
+      finish()
+    }
+  }, 1000)
+}
+
 // Generate queue number by calling the API
 const generateQueueNumber = async () => {
   loading.value = true
   error.value = null
   
   try {
-    // Prepare the request payload
     const payload = {
       office_id: selectedOffice.value.id,
       client_name: clientDetails.value.full_name,
@@ -191,21 +207,19 @@ const generateQueueNumber = async () => {
       service_ids: selectedServices.value.map(s => s.id)
     }
     
-    // Add priority sectors if lane_type is priority
     if (clientDetails.value.lane_type === 'priority' && clientDetails.value.priority_sectors?.length > 0) {
       payload.priority_sector_ids = clientDetails.value.priority_sectors
     }
     
     console.log('Sending queue generation request:', payload)
     
-    // Call the API
     const response = await kioskApi.post('/queue', payload)
     
     console.log('Queue generation response:', response.data)
     
-    // Set the queue number from API response
     if (response.data && response.data.data) {
       queueNumber.value = response.data.data.queue_number
+      startCountdown()
     } else {
       throw new Error('Invalid response format')
     }
@@ -239,9 +253,13 @@ const getPrioritySectorNames = (sectorIds) => {
   })
 }
 
-// Finish button - go back to welcome
+// Finish button - clear data and go back to welcome
 const finish = () => {
-  // Clear all stored data
+  if (countdownInterval) {
+    clearInterval(countdownInterval)
+    countdownInterval = null
+  }
+  
   localStorage.removeItem('selectedOffice')
   localStorage.removeItem('selectedServices')
   localStorage.removeItem('clientDetails')
@@ -249,10 +267,26 @@ const finish = () => {
   router.push('/kiosk/welcome')
 }
 
-// Print button - show confirmation page
-const print = () => {
-  // TODO: Trigger thermal printer
-  // Navigate to confirmation page with timer
-  router.push('/kiosk/closing')
-}
+// Clean up interval on component unmount
+onUnmounted(() => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval)
+  }
+})
 </script>
+
+<style scoped>
+button {
+  transition: all 0.2s ease;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 640px) {
+  .text-7xl {
+    font-size: 3.5rem;
+  }
+}
+</style>

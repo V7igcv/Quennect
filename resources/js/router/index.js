@@ -77,6 +77,11 @@ const routes = [
         path: 'internal-transactions',
         name: 'frontdesk.internal-transactions',
         component: () => import('../pages/frontdesk/InternalTransactions.vue')
+      },
+      {
+        path: 'create',
+        name: 'frontdesk.create',
+        component: () => import('../pages/frontdesk/Create.vue')
       }
     ]
   },
