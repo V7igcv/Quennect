@@ -59,6 +59,25 @@
                 {{ getPrioritySectorNames(details.client.priority_sectors).join(', ') }}
               </span>
             </div>
+
+            <!-- ✅ DATA PRIVACY CONSENT SECTION -->
+            <div class="border-t border-gray-200 my-4"></div>
+            
+            <div class="bg-gray-50 rounded-lg p-4">
+              <div class="flex items-start gap-3">
+                <input 
+                  type="checkbox" 
+                  id="privacy-consent"
+                  v-model="consentChecked"
+                  class="mt-1 w-4 h-4 text-[#135D5D] rounded border-gray-300 focus:ring-[#135D5D]"
+                />
+                <label for="privacy-consent" class="text-xs text-gray-600 leading-relaxed">
+                  Sumasang-ayon ako na ang aking personal na impormasyon ay kolektahin, gamitin, at iproseso alinsunod sa 
+                  <span class="text-[#135D5D] font-semibold">Data Privacy Act of 2012 (RA 10173)</span> 
+                  para sa layunin ng queuing system. Nauunawaan ko na ang aking data ay protektado at hindi ibabahagi sa iba nang walang pahintulot.
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -73,7 +92,9 @@
             </button>
             <button 
               @click="$emit('confirm')"
-              class="flex-1 py-3 px-4 rounded-xl bg-[#135D5D] text-white font-bold text-sm hover:bg-[#0e4a4a] transition shadow-lg active:scale-95"
+              :disabled="!consentChecked"
+              class="flex-1 py-3 px-4 rounded-xl font-bold text-sm transition shadow-lg active:scale-95"
+              :class="consentChecked ? 'bg-[#135D5D] text-white hover:bg-[#0e4a4a] cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'"
             >
               Kumpirmahin
             </button>
@@ -85,7 +106,7 @@
 </template>
 
 <script setup>
-import { watch, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 
 const props = defineProps({
   show: Boolean,
@@ -95,6 +116,16 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'confirm'])
+
+// Consent state
+const consentChecked = ref(false)
+
+// Reset consent when modal closes
+watch(() => props.show, (isShown) => {
+  if (!isShown) {
+    consentChecked.value = false
+  }
+})
 
 // Full Scroll Lock with iOS Support
 watch(() => props.show, (isShown) => {

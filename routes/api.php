@@ -17,68 +17,82 @@ use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\OfficeManagementController;
 use App\Http\Controllers\ServiceManagementController;
 use App\Http\Controllers\FrontdeskAnalyticsController;
+
+// Internal Transactions Controllers
+use App\Http\Controllers\InternalRequestController;
+use App\Http\Controllers\InternalRequestNotificationController;
+use App\Http\Controllers\InternalEvaluationController;  // ✅ I-ADD ITO
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 */
 
- // Public routes for Kiosk
-    Route::get('/offices', [OfficeController::class, 'index']);
-    Route::get('/offices/{office}', [OfficeController::class, 'show']);
-    Route::get('/offices/{office}/services', [ServiceController::class, 'getByOffice']);
-    Route::get('/services/{service}', [ServiceController::class, 'show']);
-    Route::get('/barangays', [BarangayController::class, 'index']);
-    Route::get('/priority-sectors', [PrioritySectorController::class, 'index']);
+// ==================== PUBLIC ROUTES ====================
 
-    // Queue routes
-    Route::post('/queue', [QueueController::class, 'store']);
-    Route::get('/queue/{queueNumber}', [QueueController::class, 'show']);
-    Route::get('/offices/{office}/queue/today', [QueueController::class, 'getTodayQueue']);
+// Offices
+Route::get('/offices', [OfficeController::class, 'index']);
+Route::get('/offices/{office}', [OfficeController::class, 'show']);
 
-    // Print route
-    Route::patch('/queue/{id}/printed', [PrintController::class, 'markAsPrinted']);
+// External Services (kiosk)
+Route::get('/offices/{office}/services', [ServiceController::class, 'getByOffice']);
+Route::get('/services/{service}', [ServiceController::class, 'show']);
 
-    // Public routes (no authentication required)
-    Route::post('/login', [AuthController::class, 'login'])
-        ->middleware('throttle:20,1'); // 5 attempts per minute
+// ✅ INTERNAL SERVICES (ginawa kong public para gumana sa internal transactions UI)
+Route::get('/internal/offices/{office}/services', [ServiceController::class, 'getInternalServices']);
 
-    // Public routes (no authentication required)
-    Route::post('/login', [AuthController::class, 'login'])
-        ->middleware('throttle:20,1');
+// Supporting data
+Route::get('/barangays', [BarangayController::class, 'index']);
+Route::get('/priority-sectors', [PrioritySectorController::class, 'index']);
 
-    // Public Monitor Routes (no auth required)
-    Route::prefix('monitor')->group(function () {
-        // Get complete monitor dashboard data for an office
-        Route::get('/office/{officeId}', [MonitorController::class, 'getMonitorData']);
-    
-        // Individual endpoints if needed (you can use these or just the combined one above)
-        Route::get('/office/{officeId}/details', [MonitorController::class, 'getOfficeDetails']);
-        Route::get('/office/{officeId}/current-serving', [MonitorController::class, 'getCurrentServing']);
-        Route::get('/office/{officeId}/now-serving', [MonitorController::class, 'getNowServing']);
-        Route::get('/office/{officeId}/waiting-list', [MonitorController::class, 'getWaitingList']);
-    });
+// Queue
+Route::post('/queue', [QueueController::class, 'store']);
+Route::get('/queue/{queueNumber}', [QueueController::class, 'show']);
+Route::get('/offices/{office}/queue/today', [QueueController::class, 'getTodayQueue']);
 
-// Protected routes (require authentication)
+// Print
+Route::patch('/queue/{id}/printed', [PrintController::class, 'markAsPrinted']);
+
+// Login
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:20,1');
+
+// Monitor
+Route::prefix('monitor')->group(function () {
+    Route::get('/office/{officeId}', [MonitorController::class, 'getMonitorData']);
+    Route::get('/office/{officeId}/details', [MonitorController::class, 'getOfficeDetails']);
+    Route::get('/office/{officeId}/current-serving', [MonitorController::class, 'getCurrentServing']);
+    Route::get('/office/{officeId}/now-serving', [MonitorController::class, 'getNowServing']);
+    Route::get('/office/{officeId}/waiting-list', [MonitorController::class, 'getWaitingList']);
+});
+
+
+// ==================== PROTECTED ROUTES ====================
+
 Route::middleware('auth:sanctum')->group(function () {
-    
-    // Auth routes
+
+    // Auth
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
-    // Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::get('/verify', [AuthController::class, 'verify']);
 
+    // ==================== SUPERADMIN ====================
     Route::middleware('role:SUPERADMIN')->prefix('superadmin')->group(function () {
+
+        // User Management
         Route::get('/user-management/users', [UserManagementController::class, 'index']);
         Route::get('/user-management/offices', [UserManagementController::class, 'offices']);
         Route::post('/user-management/users', [UserManagementController::class, 'store']);
         Route::put('/user-management/users/{user}', [UserManagementController::class, 'update']);
 
+        // Office Management
         Route::get('/office-management/offices', [OfficeManagementController::class, 'index']);
         Route::post('/office-management/offices', [OfficeManagementController::class, 'store']);
         Route::put('/office-management/offices/{office}', [OfficeManagementController::class, 'update']);
         Route::delete('/office-management/offices/{office}', [OfficeManagementController::class, 'destroy']);
 
+        // Service Management
         Route::get('/office-management/offices/{office}/services', [ServiceManagementController::class, 'index']);
         Route::post('/office-management/offices/{office}/services', [ServiceManagementController::class, 'store']);
         Route::put('/office-management/offices/{office}/services/{service}', [ServiceManagementController::class, 'update']);
@@ -86,51 +100,74 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/office-management/offices/{office}/services/{service}/toggle-is-free', [ServiceManagementController::class, 'toggleIsFree']);
         Route::patch('/office-management/offices/{office}/services/{service}/toggle-status', [ServiceManagementController::class, 'toggleStatus']);
 
-        // Analytics (requires office_id query param)
+        // Analytics
         Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);
         Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
     });
-    
-    // Front Desk routes
+
+    // ==================== FRONTDESK ====================
     Route::middleware('role:OFFICE FRONTDESK')->prefix('frontdesk')->group(function () {
-    //     // We'll add these later
-    //     Route::get('/queue/today', [QueueController::class, 'today']);
-    //     Route::post('/queue/{queue}/call', [QueueController::class, 'call']);
-    //     Route::post('/queue/{queue}/skip', [QueueController::class, 'skip']);
-    //     Route::post('/queue/{queue}/complete', [QueueController::class, 'complete']);
-    // Dashboard stats
-    Route::get('/dashboard-stats', [FrontdeskController::class, 'getDashboardStats']);
-        
-    // Queue table
-    Route::get('/queue-table', [FrontdeskController::class, 'getQueueTable']);
-        
-    // Queue actions
-    Route::post('/queue/call/{queueId}', [FrontdeskController::class, 'callQueue']);
-    Route::post('/queue/skip-from-table/{queueId}', [FrontdeskController::class, 'skipFromTable']);
-    Route::post('/queue/skip-from-counter/{queueId}', [FrontdeskController::class, 'skipFromCounter']);
-    Route::post('/queue/complete/{queueId}', [FrontdeskController::class, 'completeTransaction']);
 
-    // Analytics
-    Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);
-    Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
-    Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
-    Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
+        // Dashboard
+        Route::get('/dashboard-stats', [FrontdeskController::class, 'getDashboardStats']);
 
-    // Counter Management
-    Route::get('/counters', [CounterController::class, 'index']);
-    Route::get('/counters/available', [CounterController::class, 'getAvailableCounters']);
-    Route::post('/counters', [CounterController::class, 'store']);
-    Route::put('/counters/{id}/status', [CounterController::class, 'updateStatus']);
-    Route::delete('/counters/{id}', [CounterController::class, 'destroy']);
+        // Queue
+        Route::get('/queue-table', [FrontdeskController::class, 'getQueueTable']);
+        Route::post('/queue/call/{queueId}', [FrontdeskController::class, 'callQueue']);
+        Route::post('/queue/skip-from-table/{queueId}', [FrontdeskController::class, 'skipFromTable']);
+        Route::post('/queue/skip-from-counter/{queueId}', [FrontdeskController::class, 'skipFromCounter']);
+        Route::post('/queue/complete/{queueId}', [FrontdeskController::class, 'completeTransaction']);
 
-    // Evaluation Routes
-    Route::get('/evaluation/questions', [EvaluationController::class, 'getQuestions']);
-    Route::get('/evaluation/transaction/{queueId}', [EvaluationController::class, 'getTransactionForEvaluation']);
-    Route::post('/evaluation/submit/{queueId}', [EvaluationController::class, 'submitEvaluation']);
-    Route::get('/evaluation/results/{queueId}', [EvaluationController::class, 'getEvaluationResults']);
-    
+        // Counters
+        Route::get('/counters', [CounterController::class, 'index']);
+        Route::get('/counters/available', [CounterController::class, 'getAvailableCounters']);
+        Route::post('/counters', [CounterController::class, 'store']);
+        Route::put('/counters/{id}/status', [CounterController::class, 'updateStatus']);
+        Route::delete('/counters/{id}', [CounterController::class, 'destroy']);
+
+        // Evaluation
+        Route::get('/evaluation/questions', [EvaluationController::class, 'getQuestions']);
+        Route::get('/evaluation/transaction/{queueId}', [EvaluationController::class, 'getTransactionForEvaluation']);
+        Route::post('/evaluation/submit/{queueId}', [EvaluationController::class, 'submitEvaluation']);
+        Route::get('/evaluation/results/{queueId}', [EvaluationController::class, 'getEvaluationResults']);
+
+        // Analytics
+        Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);
+        Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
+        Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
+        Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
+
+        // ==================== INTERNAL TRANSACTIONS ====================
+        Route::prefix('internal-transactions')->group(function () {
+
+            // Dashboard
+            Route::get('/dashboard', [InternalRequestController::class, 'dashboard']);
+
+            // Requests
+            Route::get('/requests', [InternalRequestController::class, 'index']);
+            Route::post('/requests', [InternalRequestController::class, 'store']);
+            Route::get('/requests/{id}', [InternalRequestController::class, 'show']);
+
+            // Actions
+            Route::post('/requests/{id}/accept', [InternalRequestController::class, 'accept']);
+            Route::post('/requests/{id}/deny', [InternalRequestController::class, 'deny']);
+            Route::post('/requests/{id}/complete', [InternalRequestController::class, 'complete']);
+
+            // Notifications
+            Route::get('/notifications', [InternalRequestNotificationController::class, 'index']);
+            Route::get('/notifications/unread-count', [InternalRequestNotificationController::class, 'unreadCount']);
+            Route::patch('/notifications/{id}/read', [InternalRequestNotificationController::class, 'markAsRead']);
+            Route::patch('/notifications/read-all', [InternalRequestNotificationController::class, 'markAllAsRead']);
+
+            // ✅ INTERNAL EVALUATION (separate controller)
+            Route::prefix('evaluation')->group(function () {
+                Route::get('/questions', [InternalEvaluationController::class, 'getQuestions']);
+                Route::post('/submit/{id}', [InternalEvaluationController::class, 'submitEvaluation']);
+                Route::get('/status/{id}', [InternalEvaluationController::class, 'checkEvaluationStatus']);
+            });
+        });
     });
 
 });
