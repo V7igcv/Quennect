@@ -2,10 +2,10 @@
   <div class="max-w-7xl mx-auto px-2 py-2">
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold text-gray-800">Internal Transactions</h2>
+      <h2 class="text-2xl font-semibold">Internal Transactions</h2>
       <button 
         @click="goToCreateRequest"
-        class="bg-[#0F5C5C] hover:bg-[#0a4a4a] text-white px-4 py-2 rounded-lg transition flex items-center gap-2 text-sm"
+        class="bg-[#0F5C5C] hover:bg-[#0a4a4a] text-white px-4 py-2 rounded-sm transition flex items-center gap-2 text-sm"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -15,23 +15,39 @@
     </div>
 
     <!-- Dashboard Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-500">
-        <p class="text-sm text-gray-500">Pending</p>
-        <p class="text-2xl font-bold text-gray-800">{{ stats.received.pending }}</p>
-      </div>
-      <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-        <p class="text-sm text-gray-500">On Process</p>
-        <p class="text-2xl font-bold text-gray-800">{{ stats.received.on_process }}</p>
-      </div>
-      <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-        <p class="text-sm text-gray-500">Completed</p>
-        <p class="text-2xl font-bold text-gray-800">{{ stats.received.completed }}</p>
-      </div>
-      <div class="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
-        <p class="text-sm text-gray-500">Denied</p>
-        <p class="text-2xl font-bold text-gray-800">{{ stats.received.denied }}</p>
-      </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6">
+      <StatCard class="border-l-4 border-yellow-500"
+        title="Pending"
+        :value="stats.received.pending"
+        :icon="Clock"
+        iconBg="bg-yellow-100"
+        iconColor="text-yellow-600"
+        numberColor="text-yellow-600"
+      />
+      <StatCard class="border-l-4 border-blue-500"
+        title="On Process"
+        :value="stats.received.on_process"
+        :icon="RefreshCw"
+        iconBg="bg-blue-100"
+        iconColor="text-blue-600"
+        numberColor="text-blue-600"
+      />
+      <StatCard class="border-l-4 border-green-500"
+        title="Completed"
+        :value="stats.received.completed"
+        :icon="CheckCircle"
+        iconBg="bg-green-100"
+        iconColor="text-green-600"
+        numberColor="text-green-600"
+      />
+      <StatCard class="border-l-4 border-red-500"
+        title="Denied"
+        :value="stats.received.denied"
+        :icon="XCircle"
+        iconBg="bg-red-100"
+        iconColor="text-red-600"
+        numberColor="text-red-600"
+      />
     </div>
 
     <!-- Tabs -->
@@ -321,6 +337,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import kioskApi from '../../services/kioskApi'
+import StatCard from '@/components/common/StatCard.vue'
+import { Clock, RefreshCw, CheckCircle, XCircle } from 'lucide-vue-next'
 
 const router = useRouter()
 

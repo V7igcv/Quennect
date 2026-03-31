@@ -25,15 +25,22 @@
     <div class="bg-white rounded-lg shadow p-6 mb-6">
       <h3 class="text-lg font-semibold mb-2">Step 1: Select Office</h3>
       <p class="text-sm text-gray-500 mb-4">Choose the office you want to send this request to</p>
-      <select 
-        v-model="selectedOfficeId"
-        class="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-transparent"
-      >
-        <option value="">Select an office</option>
-        <option v-for="office in offices" :key="office.id" :value="office.id">
-          {{ office.name }} ({{ office.acronym }})
-        </option>
-      </select>
+      <div class="relative">
+        <select 
+          v-model="selectedOfficeId"
+          class="w-full appearance-none border rounded-lg pl-3 pr-10 py-3 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-transparent cursor-pointer bg-white"
+        >
+          <option value="">Select an office</option>
+          <option v-for="office in offices" :key="office.id" :value="office.id">
+            {{ office.name }} ({{ office.acronym }})
+          </option>
+        </select>
+        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
     </div>
 
     <!-- Step 2: Select Services -->
@@ -107,9 +114,13 @@
           <input 
             v-model="form.contact_number"
             type="text"
-            class="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-transparent transition"
+            class="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:border-transparent transition"
+            :class="contactNumberError ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-[#0F5C5C]'"
             placeholder="e.g., 09123456789"
+            maxlength="11"
+            @input="form.contact_number = form.contact_number.replace(/\D/g, '')"
           />
+          <p v-if="contactNumberError" class="text-xs text-red-500 mt-1">{{ contactNumberError }}</p>
         </div>
       </div>
     </div>
@@ -235,16 +246,23 @@ const form = ref({
   request_notes: ''
 })
 
+const contactNumberError = computed(() => {
+  if (!form.value.contact_number) return ''
+  if (form.value.contact_number.length !== 11) return 'Contact number must be exactly 11 digits'
+  return ''
+})
+
 const canSubmit = computed(() => {
   return selectedOfficeId.value && 
          selectedServices.value.length > 0 && 
          form.value.full_name.trim() && 
-         form.value.contact_number.trim()
+         form.value.contact_number.trim() &&
+         !contactNumberError.value
 })
 
 const fetchOffices = async () => {
   try {
-    const res = await kioskApi.get('/offices')
+    const res = await kioskApi.get('/offices?has_internal_services=true')
     offices.value = res.data.data
   } catch (err) {
     console.error(err)

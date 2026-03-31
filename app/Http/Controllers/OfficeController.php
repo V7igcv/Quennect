@@ -17,9 +17,16 @@ class OfficeController extends Controller
     public function index(): JsonResponse
     {
         try {
-            $offices = Office::active()
-                ->orderBy('office_name')
-                ->get();
+            $query = Office::active()
+                ->orderBy('office_name');
+
+            if (request()->boolean('has_internal_services')) {
+                $query->whereHas('services', function ($q) {
+                    $q->where('service_type', 'Internal');
+                });
+            }
+
+            $offices = $query->get();
 
             return response()->json([
                 'success' => true,

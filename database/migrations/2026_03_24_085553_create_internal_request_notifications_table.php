@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('internal_request_notifications', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('internal_request_id')->constrained()->onDelete('cascade');
+            $table->foreignId('internal_transaction_id')->constrained('internal_transactions')->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('title');
             $table->text('message');
