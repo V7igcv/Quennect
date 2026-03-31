@@ -36,7 +36,7 @@
             
             <!-- Instruction Message - Simple and Clean -->
             <p class="text-gray-700 text-lg">
-              Pakikuhanan ng litrato o isulat sa papel ang inyong numero.
+              Pakikuhanan ng litrato o isulat sa papel ang inyong queue number.
             </p>
           </div>
 
