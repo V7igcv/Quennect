@@ -21,28 +21,37 @@ class InternalRequestController extends Controller
             $user = $request->user();
             $officeId = $user->office_id;
             
-            // Received requests (incoming to this office)
-            $received = InternalTransaction::where('to_office_id', $officeId);
-            
-            // Sent requests (outgoing from this office)
-            $sent = InternalTransaction::where('from_office_id', $officeId);
+            $startDate = $request->start_date;
+            $endDate = $request->end_date;
+
+            // Base queries
+            $receivedQuery = InternalTransaction::where('to_office_id', $officeId);
+            $sentQuery = InternalTransaction::where('from_office_id', $officeId);
+
+            // Apply date filters if present
+            if ($startDate && $endDate) {
+                // Determine which date to filter by based on your business logic 
+                // Using transaction_date as the primary date filter
+                $receivedQuery->whereBetween('transaction_date', [$startDate, $endDate]);
+                $sentQuery->whereBetween('transaction_date', [$startDate, $endDate]);
+            }
             
             $stats = [
                 'received' => [
-                    'pending' => (clone $received)->where('status', InternalTransaction::STATUS_PENDING)->count(),
-                    'on_process' => (clone $received)->where('status', InternalTransaction::STATUS_ON_PROCESS)->count(),
-                    'completed' => (clone $received)->where('status', InternalTransaction::STATUS_COMPLETED)->count(),
-                    'denied' => (clone $received)->where('status', InternalTransaction::STATUS_DENIED)->count(),
-                    'overdue' => (clone $received)->where('status', InternalTransaction::STATUS_OVERDUE)->count(),
-                    'total' => (clone $received)->count(),
+                    'pending' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_PENDING)->count(),
+                    'on_process' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_ON_PROCESS)->count(),
+                    'completed' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_COMPLETED)->count(),
+                    'denied' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_DENIED)->count(),
+                    'overdue' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_OVERDUE)->count(),
+                    'total' => (clone $receivedQuery)->count(),
                 ],
                 'sent' => [
-                    'pending' => (clone $sent)->where('status', InternalTransaction::STATUS_PENDING)->count(),
-                    'on_process' => (clone $sent)->where('status', InternalTransaction::STATUS_ON_PROCESS)->count(),
-                    'completed' => (clone $sent)->where('status', InternalTransaction::STATUS_COMPLETED)->count(),
-                    'denied' => (clone $sent)->where('status', InternalTransaction::STATUS_DENIED)->count(),
-                    'overdue' => (clone $sent)->where('status', InternalTransaction::STATUS_OVERDUE)->count(),
-                    'total' => (clone $sent)->count(),
+                    'pending' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_PENDING)->count(),
+                    'on_process' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_ON_PROCESS)->count(),
+                    'completed' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_COMPLETED)->count(),
+                    'denied' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_DENIED)->count(),
+                    'overdue' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_OVERDUE)->count(),
+                    'total' => (clone $sentQuery)->count(),
                 ]
             ];
             
@@ -70,6 +79,8 @@ class InternalRequestController extends Controller
             $officeId = $user->office_id;
             $type = $request->type; // 'received' or 'sent'
             $status = $request->status; // filter by status
+            $startDate = $request->start_date;
+            $endDate = $request->end_date;
             
             $query = $type === 'sent' 
                 ? InternalTransaction::where('from_office_id', $officeId)
@@ -77,6 +88,10 @@ class InternalRequestController extends Controller
             
             if ($status && $status !== 'all') {
                 $query->where('status', $status);
+            }
+
+            if ($startDate && $endDate) {
+                $query->whereBetween('transaction_date', [$startDate, $endDate]);
             }
             
             $requests = $query->with(['fromOffice', 'toOffice'])
