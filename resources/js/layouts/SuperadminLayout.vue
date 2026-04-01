@@ -23,7 +23,7 @@
       </button>
 
       <!-- Header -->
-      <Header />
+      <Header :user="currentUser" />
       
       <!-- Mobile sidebar overlay (for small screens) -->
       <Transition name="mobile-overlay-fade">

@@ -17,32 +17,174 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span class="text-md font-normal tabular-nums min-w-25 text-left">{{ currentTime }}</span>
-          <button class="relative p-2 bg-white/15 hover:bg-white/30 rounded-full transition-colors focus:outline-none shadow-sm shrink-0 mr-4 cursor-pointer">
+
+        <!-- Notifications (Frontdesk only) -->
+        <div v-if="isFrontdeskUser" class="relative mr-4">
+          <button
+            type="button"
+            class="relative p-2 bg-white/15 hover:bg-white/30 rounded-full transition-colors focus:outline-none shadow-sm shrink-0 cursor-pointer"
+            @click="toggleDropdown"
+          >
             <Bell class="w-5 h-5 text-white" />
             <!-- Notification Badge -->
-            <span class="absolute top-0 right-0 flex h-2.5 w-2.5">
+            <span
+              v-if="unreadCount > 0"
+              class="absolute top-0 right-0 flex h-2.5 w-2.5"
+            >
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
             </span>
           </button>
+
+          <!-- Notifications dropdown -->
+          <div
+            v-if="showDropdown"
+            class="absolute right-0 mt-2 w-80 bg-white text-gray-900 rounded-lg shadow-lg border border-gray-200 z-50"
+          >
+            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <p class="text-sm font-semibold text-gray-900">Notifications</p>
+                <p v-if="unreadCount > 0" class="text-xs text-gray-500">{{ unreadCount }} unread</p>
+                <p v-else class="text-xs text-gray-500">No unread notifications</p>
+              </div>
+              <button
+                v-if="unreadCount > 0"
+                type="button"
+                class="text-xs text-[#0F5C5C] hover:underline"
+                @click.stop="markAllAsRead"
+              >
+                Mark all as read
+              </button>
+            </div>
+
+            <div class="max-h-80 overflow-y-auto">
+              <div
+                v-if="isLoadingNotifications"
+                class="px-4 py-6 text-sm text-gray-500 text-center"
+              >
+                Loading notifications...
+              </div>
+
+              <template v-else>
+                <button
+                  v-for="notification in notifications"
+                  :key="notification.id"
+                  type="button"
+                  class="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-start gap-3 border-b border-gray-50 last:border-b-0"
+                  @click.stop="openNotification(notification)"
+                >
+                  <span class="mt-1">
+                    <span
+                      v-if="!notification.is_read"
+                      class="inline-flex h-2 w-2 rounded-full bg-[#DC2626]"
+                    ></span>
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-gray-900 truncate">
+                      {{ notification.title }}
+                    </p>
+                    <p class="text-xs text-gray-600 mt-0.5 line-clamp-2">
+                      {{ notification.message }}
+                    </p>
+                    <p class="text-[11px] text-gray-400 mt-1">
+                      {{ notification.created_at_formatted || notification.created_at }}
+                    </p>
+                  </div>
+                </button>
+
+                <div
+                  v-if="!notifications.length"
+                  class="px-4 py-6 text-sm text-gray-500 text-center"
+                >
+                  No notifications yet.
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification detail modal -->
+    <div
+      v-if="showModal && selectedNotification"
+      class="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-4"
+    >
+      <div class="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900 mt-1">
+              {{ selectedNotification.title }}
+            </h3>
+          </div>
+          <button
+            type="button"
+            class="text-gray-400 hover:text-gray-600"
+            @click="closeModal"
+          >
+            <span class="sr-only">Close</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </div>
+        <div class="px-5 py-4">
+          <p class="text-sm text-gray-700 whitespace-pre-line">
+            {{ selectedNotification.message }}
+          </p>
+          <p
+            v-if="selectedNotification.created_at || selectedNotification.created_at_formatted"
+            class="text-xs text-gray-400 mt-3"
+          >
+            Sent {{ selectedNotification.created_at_formatted || selectedNotification.created_at }}
+          </p>
+        </div>
+        <div class="px-5 py-3 bg-gray-50 flex justify-end">
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium text-white bg-[#0F5C5C] rounded-md hover:bg-[#0C4747]"
+            @click="closeModal"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   </header>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Bell } from 'lucide-vue-next';
+import api from '../../services/api'
 
 export default {
   name: 'Header',
   components: {
     Bell
   },
-  setup() {
+  props: {
+    user: {
+      type: Object,
+      default: null
+    }
+  },
+  setup(props) {
     const currentDate = ref('')
     const currentTime = ref('')
     let timerInterval = null
+    let unreadPollingInterval = null
+
+    const notifications = ref([])
+    const unreadCount = ref(0)
+    const isLoadingNotifications = ref(false)
+    const showDropdown = ref(false)
+    const showModal = ref(false)
+    const selectedNotification = ref(null)
+
+    const isFrontdeskUser = computed(() => {
+      return props.user && props.user.role === 'OFFICE FRONTDESK'
+    })
     
     const updateDateTime = () => {
       const now = new Date()
@@ -66,22 +208,121 @@ export default {
         hour12: true
       })
     }
+
+    const fetchUnreadCount = async () => {
+      if (!isFrontdeskUser.value) return
+      try {
+        const response = await api.get('/frontdesk/internal-transactions/notifications/unread-count')
+        unreadCount.value = response.data?.data?.count ?? 0
+      } catch (error) {
+        console.error('Failed to fetch unread notifications count:', error)
+      }
+    }
+
+    const fetchNotifications = async () => {
+      if (!isFrontdeskUser.value) return
+      isLoadingNotifications.value = true
+      try {
+        const response = await api.get('/frontdesk/internal-transactions/notifications', {
+          params: { per_page: 10 }
+        })
+        const payload = response.data?.data
+        const paginator = payload?.notifications
+        const items = Array.isArray(paginator?.data) ? paginator.data : Array.isArray(paginator) ? paginator : []
+        notifications.value = items
+        unreadCount.value = payload?.unread_count ?? unreadCount.value
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error)
+      } finally {
+        isLoadingNotifications.value = false
+      }
+    }
+
+    const toggleDropdown = async () => {
+      if (!showDropdown.value) {
+        await fetchNotifications()
+      }
+      showDropdown.value = !showDropdown.value
+    }
+
+    const markAsRead = async (notification) => {
+      if (!isFrontdeskUser.value || !notification) return
+      try {
+        await api.patch(`/frontdesk/internal-transactions/notifications/${notification.id}/read`)
+        // After marking as read, fully refresh notifications and unread count
+        await fetchNotifications()
+        await fetchUnreadCount()
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error)
+      }
+    }
+
+    const openNotification = async (notification) => {
+      // Optimistically update UI so the red dot and badge
+      // disappear immediately when the user clicks
+      if (!notification.is_read) {
+        notification.is_read = true
+        if (unreadCount.value > 0) {
+          unreadCount.value -= 1
+        }
+      }
+
+      selectedNotification.value = notification
+      showModal.value = true
+      await markAsRead(notification)
+    }
+
+    const closeModal = () => {
+      showModal.value = false
+      selectedNotification.value = null
+    }
+
+    const markAllAsRead = async () => {
+      if (!isFrontdeskUser.value || unreadCount.value === 0) return
+      try {
+        await api.patch('/frontdesk/internal-transactions/notifications/read-all')
+        // Refresh list and unread count to reflect the changes
+        await fetchNotifications()
+        await fetchUnreadCount()
+      } catch (error) {
+        console.error('Failed to mark all notifications as read:', error)
+      }
+    }
     
     onMounted(() => {
       updateDateTime()
       // Update every second
       timerInterval = setInterval(updateDateTime, 1000)
+
+       if (isFrontdeskUser.value) {
+         fetchUnreadCount()
+         unreadPollingInterval = setInterval(fetchUnreadCount, 60000)
+       }
     })
     
     onUnmounted(() => {
       if (timerInterval) {
         clearInterval(timerInterval)
       }
+      if (unreadPollingInterval) {
+        clearInterval(unreadPollingInterval)
+      }
     })
     
     return {
       currentDate,
-      currentTime
+      currentTime,
+      notifications,
+      unreadCount,
+      isLoadingNotifications,
+      showDropdown,
+      showModal,
+      selectedNotification,
+      isFrontdeskUser,
+      toggleDropdown,
+      openNotification,
+      closeModal,
+      markAllAsRead
     }
   }
 }

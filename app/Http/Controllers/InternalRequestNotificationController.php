@@ -18,14 +18,15 @@ class InternalRequestNotificationController extends Controller
             $perPage = $request->per_page ?? 20;
             
             $notifications = InternalRequestNotification::where('user_id', $user->id)
-                ->with(['request' => function($query) {
+                ->with(['transaction' => function($query) {
                     $query->with(['fromOffice', 'toOffice']);
                 }])
                 ->orderBy('created_at', 'desc')
                 ->paginate($perPage);
-            
-            // Format notifications for better display
+
+            // Format notifications for better display and return as a simple array
             $formattedNotifications = $notifications->through(function ($notification) {
+                $request = $notification->transaction;
                 return [
                     'id' => $notification->id,
                     'title' => $notification->title,
@@ -34,15 +35,15 @@ class InternalRequestNotificationController extends Controller
                     'is_read' => $notification->is_read,
                     'created_at' => $notification->created_at->format('Y-m-d H:i:s'),
                     'created_at_formatted' => $notification->created_at->diffForHumans(),
-                    'request' => $notification->request ? [
-                        'id' => $notification->request->id,
-                        'transaction_id' => $notification->request->transaction_id,
-                        'from_office' => $notification->request->fromOffice->office_name . ' (' . $notification->request->fromOffice->office_acronym . ')',
-                        'to_office' => $notification->request->toOffice->office_name . ' (' . $notification->request->toOffice->office_acronym . ')',
-                        'status' => $notification->request->status,
+                    'request' => $request ? [
+                        'id' => $request->id,
+                        'transaction_id' => $request->transaction_id,
+                        'from_office' => $request->fromOffice->office_name . ' (' . $request->fromOffice->office_acronym . ')',
+                        'to_office' => $request->toOffice->office_name . ' (' . $request->toOffice->office_acronym . ')',
+                        'status' => $request->status,
                     ] : null,
                 ];
-            });
+            })->items();
             
             $unreadCount = InternalRequestNotification::where('user_id', $user->id)
                 ->where('is_read', false)
@@ -102,13 +103,15 @@ class InternalRequestNotificationController extends Controller
     /**
      * Mark a single notification as read
      */
-    public function markAsRead($id)
+    public function markAsRead(Request $request, $id)
     {
         try {
+            $user = $request->user();
+
             $notification = InternalRequestNotification::findOrFail($id);
-            
-            // Check if user owns this notification
-            if ($notification->user_id !== auth()->id()) {
+
+            // Check if user owns this notification using the same guard as index/unreadCount
+            if (!$user || $notification->user_id !== $user->id) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized'
