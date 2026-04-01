@@ -94,7 +94,7 @@ class InternalRequestController extends Controller
                 $query->whereBetween('transaction_date', [$startDate, $endDate]);
             }
             
-            $requests = $query->with(['fromOffice', 'toOffice'])
+            $requests = $query->with(['fromOffice', 'toOffice', 'evaluationSession'])
                 ->orderBy('created_at', 'desc')
                 ->paginate($request->per_page ?? 15);
             
@@ -148,6 +148,7 @@ class InternalRequestController extends Controller
                     'can_accept' => $type === 'received' && $request->status === InternalTransaction::STATUS_PENDING,
                     'can_deny' => $type === 'received' && $request->status === InternalTransaction::STATUS_PENDING,
                     'can_complete' => $type === 'received' && $request->status === InternalTransaction::STATUS_ON_PROCESS,
+                    'can_evaluate' => $type === 'received' && $request->status === InternalTransaction::STATUS_COMPLETED && !$request->evaluationSession,
                 ];
             });
             
@@ -194,7 +195,7 @@ class InternalRequestController extends Controller
             ]);
             
             $user = $request->user();
-            
+
             $internalTransaction = DB::transaction(function () use ($validated, $user) {
                 $transaction = InternalTransaction::create([
                     'transaction_id' => InternalTransaction::generateTransactionId(),
@@ -212,6 +213,19 @@ class InternalRequestController extends Controller
                     'requested_at' => now(),
                     'created_by' => $user->id,
                 ]);
+
+                // Link internal transaction to services in the shared pivot table
+                // so that analytics can join via queue_transaction_services
+                // using internal_transaction_id (queue_transaction_id stays null).
+                foreach ($validated['service_ids'] as $serviceId) {
+                    DB::table('queue_transaction_services')->insert([
+                        'queue_transaction_id' => null,
+                        'internal_transaction_id' => $transaction->id,
+                        'service_id' => $serviceId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
                 
                 // Notification for REQUESTING OFFICE (self)
                 $this->createNotification(

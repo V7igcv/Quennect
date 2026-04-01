@@ -212,6 +212,11 @@ class InternalTransaction extends Model
         return $this->hasMany(EvaluationResponse::class, 'internal_transaction_id');
     }
 
+    public function evaluationSession()
+    {
+        return $this->hasOne(EvaluationSession::class, 'internal_transaction_id');
+    }
+
     /**
      * Get the user who created the request
      */

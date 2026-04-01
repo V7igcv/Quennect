@@ -330,8 +330,8 @@
       </div>
     </div>
 
-    <!-- Deny Modal with Blur Background -->
-    <div v-if="showDenyModal" class="fixed inset-0 backdrop-blur-md bg-black/20 flex items-center justify-center z-50 p-4">
+    <!-- Deny Modal with standard overlay -->
+    <div v-if="showDenyModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl w-full max-w-md p-6 shadow-xl transform transition-all">
         <h3 class="text-xl font-semibold text-gray-800 mb-2">Deny Request</h3>
         <p class="text-sm text-gray-500 mb-4">Select the reason(s) for denying this request:</p>
@@ -369,8 +369,8 @@
       </div>
     </div>
 
-    <!-- Complete Modal with Blur Background -->
-    <div v-if="showCompleteModal" class="fixed inset-0 backdrop-blur-md bg-black/20 flex items-center justify-center z-50 p-4">
+    <!-- Complete Modal with standard overlay -->
+    <div v-if="showCompleteModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl w-full max-w-md p-6 shadow-xl transform transition-all">
         <h3 class="text-xl font-semibold text-gray-800 mb-2">Complete Request</h3>
         <p class="text-sm text-gray-500 mb-4">Select completion notes or add your own message:</p>
@@ -404,59 +404,57 @@
       </div>
     </div>
 
-    <!-- Evaluation Modal with Blur Background -->
-    <div v-if="showEvaluationModal" class="fixed inset-0 backdrop-blur-md bg-black/20 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div class="bg-white rounded-xl w-full max-w-2xl p-6 shadow-xl max-h-[90vh] overflow-y-auto transform transition-all">
-        <h3 class="text-xl font-semibold text-gray-800 mb-4">Client Satisfaction Evaluation</h3>
-        
-        <div v-if="evaluationLoading" class="text-center py-8">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0F5C5C] mx-auto"></div>
+    <!-- Internal Evaluation Modal -->
+    <InternalEvaluationModal
+      v-model="showEvaluationModal"
+      :office-name="selectedRequest?.from_office"
+      :customer-name="selectedRequest?.full_name"
+      :contact-number="selectedRequest?.contact_number"
+      :likert-questions="evaluationFormQuestions.likert"
+      :multiple-choice-questions="evaluationFormQuestions.multiple_choice"
+      @submit="submitEvaluation"
+      @alert="handleEvaluationAlertObj"
+    />
+
+    <!-- Success Output Modal -->
+    <div v-if="showSuccessModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg max-w-sm w-full mx-4 p-6 shadow-xl text-center">
+        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
         </div>
-        
-        <form v-else @submit.prevent="submitEvaluation">
-          <div v-for="question in evaluationQuestions" :key="question.id" class="mb-6 pb-4 border-b border-gray-100 last:border-0">
-            <label class="block text-sm font-medium text-gray-700 mb-3">
-              {{ question.text }}
-            </label>
-            
-            <!-- Multiple Choice -->
-            <div v-if="question.type === 'MULTIPLE_CHOICE'" class="space-y-2">
-              <label v-for="option in question.options" :key="option" class="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition">
-                <input 
-                  type="radio" 
-                  :name="`question_${question.id}`" 
-                  :value="option"
-                  v-model="evaluationResponses[question.id]"
-                  class="mt-0.5 w-4 h-4 text-[#0F5C5C] focus:ring-[#0F5C5C]"
-                  required
-                />
-                <span class="text-sm text-gray-700">{{ option }}</span>
-              </label>
-            </div>
-            
-            <!-- Likert Scale -->
-            <div v-if="question.type === 'LIKERT'" class="flex justify-between gap-2">
-              <label v-for="rating in [1,2,3,4,5]" :key="rating" class="flex-1 text-center cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition">
-                <input 
-                  type="radio" 
-                  :name="`question_${question.id}`" 
-                  :value="rating"
-                  v-model="evaluationResponses[question.id]"
-                  class="w-4 h-4 mx-auto text-[#0F5C5C] focus:ring-[#0F5C5C]"
-                  required
-                />
-                <span class="text-xs text-gray-600 block mt-1">{{ rating }}</span>
-              </label>
-            </div>
-          </div>
-          
-          <div class="flex justify-end gap-3 mt-6">
-            <button type="button" @click="showEvaluationModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Cancel</button>
-            <button type="submit" :disabled="evaluationSubmitting" class="px-4 py-2 bg-[#0F5C5C] text-white rounded-lg hover:bg-[#0a4a4a] transition disabled:opacity-50">
-              {{ evaluationSubmitting ? 'Submitting...' : 'Submit Evaluation' }}
-            </button>
-          </div>
-        </form>
+        <h3 class="text-xl font-bold text-gray-900 mb-2">Evaluation Submitted!</h3>
+        <p class="text-gray-600 mb-6 font-mono text-lg bg-gray-50 py-2 rounded">
+          Overall Rating: {{ submittedAverageRating }}
+        </p>
+        <button 
+          @click="showSuccessModal = false"
+          class="w-full bg-[#0F5C5C] hover:bg-[#0a4a4a] text-white py-2 rounded-lg transition"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div v-if="showAlertModal" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+      <div class="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl transform transition-all">
+        <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+          <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-center text-gray-900 mb-2">{{ alertTitle }}</h3>
+        <p class="text-sm text-center text-gray-600 mb-6">{{ alertMessage }}</p>
+        <div class="flex justify-center">
+          <Button 
+            class="bg-[#0F5C5C] hover:bg-[#167D7F] text-white w-full"
+            @click="showAlertModal = false"
+          >
+            OK
+          </Button>
+        </div>
       </div>
     </div>
   </div>
@@ -468,6 +466,7 @@ import { useRouter } from 'vue-router'
 import kioskApi from '../../services/kioskApi'
 import { Button } from '@/components/ui/button'
 import StatCard from '@/components/common/StatCard.vue'
+import InternalEvaluationModal from '@/components/modals/InternalEvaluationModal.vue'
 import {
   Popover,
   PopoverContent,
@@ -501,10 +500,18 @@ const denyReason = ref('')
 const denyOptions = ref([])
 const completionNotes = ref('')
 const completeOptions = ref([])
-const evaluationQuestions = ref([])
-const evaluationLoading = ref(false)
-const evaluationSubmitting = ref(false)
-const evaluationResponses = ref({})
+
+const showSuccessModal = ref(false)
+const submittedAverageRating = ref('')
+
+const showAlertModal = ref(false)
+const alertTitle = ref('')
+const alertMessage = ref('')
+
+const evaluationFormQuestions = ref({
+  multiple_choice: [],
+  likert: []
+})
 
 // Date filtering logic
 const selectedDateRange = ref('daily')
@@ -808,7 +815,7 @@ const confirmDenyWithOptions = async () => {
   }
   
   if (!fullReason) {
-    alert('Please provide a reason for denying this request')
+    handleAlert('Validation Error', 'Please provide a reason for denying this request')
     return
   }
   
@@ -820,7 +827,7 @@ const confirmDenyWithOptions = async () => {
     await Promise.all([fetchDashboard(), fetchRequests()])
   } catch (err) {
     console.error(err)
-    alert('Failed to deny request')
+    handleAlert('Error', 'Failed to deny request')
   }
 }
 
@@ -843,7 +850,7 @@ const confirmCompleteWithOptions = async () => {
   }
   
   if (!fullMessage) {
-    alert('Please add completion notes')
+    handleAlert('Validation Error', 'Please add completion notes')
     return
   }
   
@@ -855,54 +862,67 @@ const confirmCompleteWithOptions = async () => {
     await Promise.all([fetchDashboard(), fetchRequests()])
   } catch (err) {
     console.error(err)
-    alert('Failed to complete request')
+    handleAlert('Error', 'Failed to complete request')
   }
 }
 
 const openEvaluationModal = async (request) => {
   selectedRequest.value = request
-  showEvaluationModal.value = true
-  evaluationLoading.value = true
-  evaluationResponses.value = {}
   
   try {
     const res = await kioskApi.get('/frontdesk/internal-transactions/evaluation/questions')
-    evaluationQuestions.value = res.data.data
-    console.log('Evaluation questions loaded:', evaluationQuestions.value)
+    evaluationFormQuestions.value = res.data.data
+    showEvaluationModal.value = true
   } catch (err) {
     console.error('Failed to load evaluation questions:', err)
-    alert('Failed to load evaluation form. Please try again.')
-  } finally {
-    evaluationLoading.value = false
+    handleAlert('Error', 'Failed to load evaluation form. Please try again.')
   }
 }
 
-const submitEvaluation = async () => {
-  evaluationSubmitting.value = true
-  
-  const responses = Object.entries(evaluationResponses.value).map(([questionId, value]) => {
-    const question = evaluationQuestions.value.find(q => q.id == parseInt(questionId))
-    return {
-      question_id: parseInt(questionId),
-      answer_value: value.toString(),
-      rating_value: question?.type === 'LIKERT' ? parseInt(value) : null
-    }
-  })
-  
+const handleAlert = (title, message) => {
+  alertTitle.value = title
+  alertMessage.value = message
+  showAlertModal.value = true
+}
+
+const handleEvaluationAlertObj = (alertData) => {
+  handleAlert(alertData.title, alertData.message)
+}
+
+const submitEvaluation = async (formData) => {
   try {
-    await kioskApi.post(`/frontdesk/internal-transactions/evaluation/submit/${selectedRequest.value.id}`, {
-      responses
-    })
+    const payload = {
+      session: {
+        client_type: formData.client_type,
+        sex: formData.sex,
+        age: formData.age
+      },
+      responses: {
+        multiple_choice: formData.multipleChoiceAnswers,
+        likert: formData.likertRatings
+      }
+    }
+
+    await kioskApi.post(`/frontdesk/internal-transactions/evaluation/submit/${selectedRequest.value.id}`, payload)
     
-    showEvaluationModal.value = false
-    alert('Evaluation submitted successfully!')
+    // We can show the success modal after
+    // Let's compute average client-side quickly to show or just fetch it again
+    let total = 0
+    let count = 0
+    Object.values(formData.likertRatings).forEach(val => {
+      if (val !== 'NA' && val) {
+        total += Number(val)
+        count++
+      }
+    })
+    submittedAverageRating.value = count > 0 ? (total / count).toFixed(2) : 'N/A'
+    
+    showSuccessModal.value = true
     await fetchRequests()
     
   } catch (err) {
     console.error('Failed to submit evaluation:', err.response?.data || err.message)
-    alert(err.response?.data?.message || 'Failed to submit evaluation. Please try again.')
-  } finally {
-    evaluationSubmitting.value = false
+    handleAlert('Submission Failed', err.response?.data?.message || 'Failed to submit evaluation. Please try again.')
   }
 }
 

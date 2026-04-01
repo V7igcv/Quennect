@@ -92,97 +92,79 @@ class CsmAnalyticsController extends Controller
             $month = (int) ($validated['month'] ?? $today->month);
             $year = (int) ($validated['year'] ?? $today->year);
 
-            $cacheKey = $this->buildOverviewCacheKey(
+            $externalTransactionCount = $this->getServiceWeightedTransactionCountForSource(
+                source: 'external',
                 officeId: $officeId,
-                serviceType: $serviceType,
                 period: $period,
                 date: $date,
                 month: $month,
                 year: $year,
             );
 
-            $payload = Cache::remember($cacheKey, now()->addMinutes(3), function () use (
-                $officeId,
-                $serviceType,
-                $period,
-                $date,
-                $month,
-                $year
-            ) {
-                $externalTransactionCount = $this->getServiceWeightedTransactionCountForSource(
-                    source: 'external',
-                    officeId: $officeId,
-                    period: $period,
-                    date: $date,
-                    month: $month,
-                    year: $year,
-                );
+            $internalTransactionCount = $this->getServiceWeightedTransactionCountForSource(
+                source: 'internal',
+                officeId: $officeId,
+                period: $period,
+                date: $date,
+                month: $month,
+                year: $year,
+            );
 
-                $internalTransactionCount = $this->getServiceWeightedTransactionCountForSource(
-                    source: 'internal',
-                    officeId: $officeId,
-                    period: $period,
-                    date: $date,
-                    month: $month,
-                    year: $year,
-                );
+            [$startDate, $endDate] = $this->resolveDateRange($period, $date, $month, $year);
+            $overallScoreData = $this->computeOverallScorePerServiceData(
+                officeId: $officeId,
+                serviceType: $serviceType,
+                startDate: $startDate,
+                endDate: $endDate,
+            );
 
-                [$startDate, $endDate] = $this->resolveDateRange($period, $date, $month, $year);
-                $overallScoreData = $this->computeOverallScorePerServiceData(
-                    officeId: $officeId,
-                    serviceType: $serviceType,
-                    startDate: $startDate,
-                    endDate: $endDate,
-                );
+            $totalTransactions = match ($serviceType) {
+                'internal' => $internalTransactionCount,
+                'all' => $externalTransactionCount + $internalTransactionCount,
+                default => $externalTransactionCount,
+            };
 
-                $totalTransactions = match ($serviceType) {
-                    'internal' => $internalTransactionCount,
-                    'all' => $externalTransactionCount + $internalTransactionCount,
-                    default => $externalTransactionCount,
-                };
+            $awareness = $this->computeCcMetric(
+                questionPrefix: 'CC1',
+                includedOptions: [1, 2, 3],
+                serviceType: $serviceType,
+                officeId: $officeId,
+                period: $period,
+                date: $date,
+                month: $month,
+                year: $year,
+            );
 
-                $awareness = $this->computeCcMetric(
-                    questionPrefix: 'CC1',
-                    includedOptions: [1, 2, 3],
-                    serviceType: $serviceType,
-                    officeId: $officeId,
-                    period: $period,
-                    date: $date,
-                    month: $month,
-                    year: $year,
-                );
+            $visibility = $this->computeCcMetric(
+                questionPrefix: 'CC2',
+                includedOptions: [1],
+                serviceType: $serviceType,
+                officeId: $officeId,
+                period: $period,
+                date: $date,
+                month: $month,
+                year: $year,
+            );
 
-                $visibility = $this->computeCcMetric(
-                    questionPrefix: 'CC2',
-                    includedOptions: [1],
-                    serviceType: $serviceType,
-                    officeId: $officeId,
-                    period: $period,
-                    date: $date,
-                    month: $month,
-                    year: $year,
-                );
+            $helpfulness = $this->computeCcMetric(
+                questionPrefix: 'CC3',
+                includedOptions: [1],
+                serviceType: $serviceType,
+                officeId: $officeId,
+                period: $period,
+                date: $date,
+                month: $month,
+                year: $year,
+            );
 
-                $helpfulness = $this->computeCcMetric(
-                    questionPrefix: 'CC3',
-                    includedOptions: [1],
-                    serviceType: $serviceType,
-                    officeId: $officeId,
-                    period: $period,
-                    date: $date,
-                    month: $month,
-                    year: $year,
-                );
-
-                return [
-                    'service_type' => $serviceType,
-                    'total_transactions' => $totalTransactions,
-                    'cc_awareness' => $awareness,
-                    'cc_visibility' => $visibility,
-                    'cc_helpfulness' => $helpfulness,
-                    'overall_score' => $overallScoreData['service_total_percentage'],
-                ];
-            });
+            $payload = [
+                'service_type' => $serviceType,
+                'total_transactions' => $totalTransactions,
+                'cc_awareness' => $awareness,
+                'cc_visibility' => $visibility,
+                'cc_helpfulness' => $helpfulness,
+                'overall_score' => $overallScoreData['service_total_percentage'],
+            ];
 
             return response()->json([
                 'success' => true,
@@ -249,26 +231,10 @@ class CsmAnalyticsController extends Controller
 
             [$startDate, $endDate] = $this->resolveDateRange($period, $date, $month, $year);
 
-            $cacheKey = $this->buildCitizenCharterCacheKey(
-                officeId: $officeId,
-                serviceType: $serviceType,
-                period: $period,
-                date: $date,
-                month: $month,
-                year: $year,
-            );
+            $meta = $this->getCitizenCharterMeta();
+            $counts = $this->getCitizenCharterCountsRaw($officeId, $serviceType, $startDate, $endDate);
 
-            $payload = Cache::remember($cacheKey, now()->addMinutes(3), function () use (
-                $officeId,
-                $serviceType,
-                $startDate,
-                $endDate
-            ) {
-                $meta = $this->getCitizenCharterMeta();
-                $counts = $this->getCitizenCharterCountsRaw($officeId, $serviceType, $startDate, $endDate);
-
-                return $this->buildCitizenCharterPayload($counts, $meta);
-            });
+            $payload = $this->buildCitizenCharterPayload($counts, $meta);
 
             return response()->json([
                 'success' => true,
@@ -342,127 +308,108 @@ class CsmAnalyticsController extends Controller
 
             [$startDate, $endDate] = $this->resolveDateRange($period, $date, $month, $year);
 
-            $cacheKey = $this->buildSqdCacheKey(
-                officeId: $officeId,
-                serviceType: $serviceType,
-                period: $period,
-                date: $date,
-                month: $month,
-                year: $year,
-                sqdCode: $dbSqdCode,
-            );
+            $question = EvaluationQuestion::query()
+                ->whereIn('question_type', ['LIKERT'])
+                ->where(function (Builder $query) use ($dbSqdCode) {
+                    $query->where('question_code', $dbSqdCode)
+                        ->orWhere('question_text', 'like', $dbSqdCode . '%');
+                })
+                ->first();
 
-            $payload = Cache::remember($cacheKey, now()->addMinutes(3), function () use (
-                $officeId,
-                $serviceType,
-                $startDate,
-                $endDate,
-                $dbSqdCode,
-                $displaySqdCode
-            ) {
-                $question = EvaluationQuestion::query()
-                    ->whereIn('question_type', ['LIKERT'])
-                    ->where(function (Builder $query) use ($dbSqdCode) {
-                        $query->where('question_code', $dbSqdCode)
-                            ->orWhere('question_text', 'like', $dbSqdCode . '%');
-                    })
-                    ->first();
+            $description = $question?->question_text ?? $displaySqdCode;
 
-                $description = $question?->question_text ?? $displaySqdCode;
+            $criteriaCounts = [
+                1 => 0,
+                2 => 0,
+                3 => 0,
+                4 => 0,
+                5 => 0,
+                0 => 0,
+            ];
 
-                $criteriaCounts = [
-                    1 => 0,
-                    2 => 0,
-                    3 => 0,
-                    4 => 0,
-                    5 => 0,
-                    0 => 0,
-                ];
-
-                if ($serviceType !== 'internal') {
-                    $externalCounts = $this->getSqdCriteriaCountsForSource(
-                        source: 'external',
-                        officeId: $officeId,
-                        startDate: $startDate,
-                        endDate: $endDate,
-                        sqdCode: $dbSqdCode,
-                    );
-
-                    foreach ($externalCounts as $key => $value) {
-                        $criteriaCounts[$key] += $value;
-                    }
-                }
-
-                if ($serviceType !== 'external') {
-                    $internalCounts = $this->getSqdCriteriaCountsForSource(
-                        source: 'internal',
-                        officeId: $officeId,
-                        startDate: $startDate,
-                        endDate: $endDate,
-                        sqdCode: $dbSqdCode,
-                    );
-
-                    foreach ($internalCounts as $key => $value) {
-                        $criteriaCounts[$key] += $value;
-                    }
-                }
-
-                $totalRespondents = $this->getSqdTotalRespondents(
+            if ($serviceType !== 'internal') {
+                $externalCounts = $this->getSqdCriteriaCountsForSource(
+                    source: 'external',
                     officeId: $officeId,
-                    serviceType: $serviceType,
                     startDate: $startDate,
                     endDate: $endDate,
+                    sqdCode: $dbSqdCode,
                 );
 
-                $naCount = $criteriaCounts[0];
-                $numerator = $criteriaCounts[4] + $criteriaCounts[5];
-                $denominator = $totalRespondents - $naCount;
-                $overallPercentage = $denominator <= 0
-                    ? 0.0
-                    : round(($numerator / $denominator) * 100, 2);
+                foreach ($externalCounts as $key => $value) {
+                    $criteriaCounts[$key] += $value;
+                }
+            }
 
-                $distribution = [
-                    [
-                        'criteria' => self::SQD_CRITERIA[1],
-                        'value' => $criteriaCounts[1],
-                        'option' => 1,
-                    ],
-                    [
-                        'criteria' => self::SQD_CRITERIA[2],
-                        'value' => $criteriaCounts[2],
-                        'option' => 2,
-                    ],
-                    [
-                        'criteria' => self::SQD_CRITERIA[3],
-                        'value' => $criteriaCounts[3],
-                        'option' => 3,
-                    ],
-                    [
-                        'criteria' => self::SQD_CRITERIA[4],
-                        'value' => $criteriaCounts[4],
-                        'option' => 4,
-                    ],
-                    [
-                        'criteria' => self::SQD_CRITERIA[5],
-                        'value' => $criteriaCounts[5],
-                        'option' => 5,
-                    ],
-                    [
-                        'criteria' => self::SQD_CRITERIA[0],
-                        'value' => $criteriaCounts[0],
-                        'option' => 0,
-                    ],
-                ];
+            if ($serviceType !== 'external') {
+                $internalCounts = $this->getSqdCriteriaCountsForSource(
+                    source: 'internal',
+                    officeId: $officeId,
+                    startDate: $startDate,
+                    endDate: $endDate,
+                    sqdCode: $dbSqdCode,
+                );
 
-                return [
-                    'sqd_code' => $displaySqdCode,
-                    'question_code' => $dbSqdCode,
-                    'description' => $description,
-                    'distribution' => $distribution,
-                    'total_responses' => $totalRespondents,
-                    'overall_percentage' => $overallPercentage,
-                ];
-            });
+                foreach ($internalCounts as $key => $value) {
+                    $criteriaCounts[$key] += $value;
+                }
+            }
+
+            $totalRespondents = $this->getSqdTotalRespondents(
+                officeId: $officeId,
+                serviceType: $serviceType,
+                startDate: $startDate,
+                endDate: $endDate,
+            );
+
+            $naCount = $criteriaCounts[0];
+            $numerator = $criteriaCounts[4] + $criteriaCounts[5];
+            $denominator = $totalRespondents - $naCount;
+            $overallPercentage = $denominator <= 0
+                ? 0.0
+                : round(($numerator / $denominator) * 100, 2);
+
+            $distribution = [
+                [
+                    'criteria' => self::SQD_CRITERIA[1],
+                    'value' => $criteriaCounts[1],
+                    'option' => 1,
+                ],
+                [
+                    'criteria' => self::SQD_CRITERIA[2],
+                    'value' => $criteriaCounts[2],
+                    'option' => 2,
+                ],
+                [
+                    'criteria' => self::SQD_CRITERIA[3],
+                    'value' => $criteriaCounts[3],
+                    'option' => 3,
+                ],
+                [
+                    'criteria' => self::SQD_CRITERIA[4],
+                    'value' => $criteriaCounts[4],
+                    'option' => 4,
+                ],
+                [
+                    'criteria' => self::SQD_CRITERIA[5],
+                    'value' => $criteriaCounts[5],
+                    'option' => 5,
+                ],
+                [
+                    'criteria' => self::SQD_CRITERIA[0],
+                    'value' => $criteriaCounts[0],
+                    'option' => 0,
+                ],
+            ];
+
+            $payload = [
+                'sqd_code' => $displaySqdCode,
+                'question_code' => $dbSqdCode,
+                'description' => $description,
+                'distribution' => $distribution,
+                'total_responses' => $totalRespondents,
+                'overall_percentage' => $overallPercentage,
+            ];
 
             return response()->json([
                 'success' => true,
@@ -534,74 +481,56 @@ class CsmAnalyticsController extends Controller
             $category = $this->normalizeDemographicCategory((string) ($validated['category'] ?? 'age'));
             [$startDate, $endDate] = $this->resolveDateRange($period, $date, $month, $year);
 
-            $cacheKey = $this->buildDemographicCacheKey(
-                officeId: $officeId,
-                serviceType: $serviceType,
-                period: $period,
-                date: $date,
-                month: $month,
-                year: $year,
-                category: $category,
-            );
+            $segments = $this->getDemographicSegments($category);
+            $counts = array_fill_keys($segments, 0);
 
-            $payload = Cache::remember($cacheKey, now()->addMinutes(3), function () use (
-                $officeId,
-                $serviceType,
-                $startDate,
-                $endDate,
-                $category
-            ) {
-                $segments = $this->getDemographicSegments($category);
-                $counts = array_fill_keys($segments, 0);
+            if ($serviceType !== 'internal') {
+                $externalCounts = $this->getDemographicCountsForSource(
+                    source: 'external',
+                    category: $category,
+                    officeId: $officeId,
+                    startDate: $startDate,
+                    endDate: $endDate,
+                );
 
-                if ($serviceType !== 'internal') {
-                    $externalCounts = $this->getDemographicCountsForSource(
-                        source: 'external',
-                        category: $category,
-                        officeId: $officeId,
-                        startDate: $startDate,
-                        endDate: $endDate,
-                    );
-
-                    foreach ($externalCounts as $segment => $value) {
-                        $counts[$segment] = ($counts[$segment] ?? 0) + $value;
-                    }
+                foreach ($externalCounts as $segment => $value) {
+                    $counts[$segment] = ($counts[$segment] ?? 0) + $value;
                 }
+            }
 
-                if ($serviceType !== 'external') {
-                    $internalCounts = $this->getDemographicCountsForSource(
-                        source: 'internal',
-                        category: $category,
-                        officeId: $officeId,
-                        startDate: $startDate,
-                        endDate: $endDate,
-                    );
+            if ($serviceType !== 'external') {
+                $internalCounts = $this->getDemographicCountsForSource(
+                    source: 'internal',
+                    category: $category,
+                    officeId: $officeId,
+                    startDate: $startDate,
+                    endDate: $endDate,
+                );
 
-                    foreach ($internalCounts as $segment => $value) {
-                        $counts[$segment] = ($counts[$segment] ?? 0) + $value;
-                    }
+                foreach ($internalCounts as $segment => $value) {
+                    $counts[$segment] = ($counts[$segment] ?? 0) + $value;
                 }
+            }
 
-                $totalResponses = array_sum($counts);
-                $distribution = [];
+            $totalResponses = array_sum($counts);
+            $distribution = [];
 
-                foreach ($segments as $segment) {
-                    $value = (int) ($counts[$segment] ?? 0);
-                    $distribution[] = [
-                        'name' => $segment,
-                        'value' => $value,
-                        'percentage' => $totalResponses === 0
-                            ? 0
-                            : round(($value / $totalResponses) * 100, 2),
-                    ];
-                }
-
-                return [
-                    'category' => $this->getDemographicCategoryDisplayName($category),
-                    'distribution' => $distribution,
-                    'total_responses' => $totalResponses,
+            foreach ($segments as $segment) {
+                $value = (int) ($counts[$segment] ?? 0);
+                $distribution[] = [
+                    'name' => $segment,
+                    'value' => $value,
+                    'percentage' => $totalResponses === 0
+                        ? 0
+                        : round(($value / $totalResponses) * 100, 2),
                 ];
-            });
+            }
+
+            $payload = [
+                'category' => $this->getDemographicCategoryDisplayName($category),
+                'distribution' => $distribution,
+                'total_responses' => $totalResponses,
+            ];
 
             return response()->json([
                 'success' => true,
@@ -670,28 +599,12 @@ class CsmAnalyticsController extends Controller
 
             [$startDate, $endDate] = $this->resolveDateRange($period, $date, $month, $year);
 
-            $cacheKey = $this->buildOverallScorePerServiceCacheKey(
+            $payload = $this->computeOverallScorePerServiceData(
                 officeId: $officeId,
                 serviceType: $serviceType,
-                period: $period,
-                date: $date,
-                month: $month,
-                year: $year,
+                startDate: $startDate,
+                endDate: $endDate,
             );
-
-            $payload = Cache::remember($cacheKey, now()->addMinutes(3), function () use (
-                $officeId,
-                $serviceType,
-                $startDate,
-                $endDate
-            ) {
-                return $this->computeOverallScorePerServiceData(
-                    officeId: $officeId,
-                    serviceType: $serviceType,
-                    startDate: $startDate,
-                    endDate: $endDate,
-                );
-            });
 
             return response()->json([
                 'success' => true,
@@ -798,9 +711,10 @@ class CsmAnalyticsController extends Controller
 
             foreach ($selectedTables as $tableKey) {
                 if ($tableKey === 'overview') {
+                    // Overview export should always reflect ALL services, independent of current filter.
                     $overviewRows = $this->buildOverviewExportRows(
                         officeId: $officeId,
-                        serviceType: $serviceType,
+                        serviceType: 'all',
                         period: $period,
                         date: $date,
                         month: $month,
@@ -851,9 +765,10 @@ class CsmAnalyticsController extends Controller
                 }
 
                 if ($tableKey === 'citizens-charter-count') {
+                    // Citizen's Charter Count export should always reflect ALL services.
                     $citizenCharterPayload = $this->buildCitizenCharterCountExportRows(
                         officeId: $officeId,
-                        serviceType: $serviceType,
+                        serviceType: 'all',
                         startDate: $startDate,
                         endDate: $endDate,
                     );
@@ -1088,7 +1003,10 @@ class CsmAnalyticsController extends Controller
         $internalResponsesQuery = DB::table('queue_transaction_services as qts')
             ->join('services as s', 's.id', '=', 'qts.service_id')
             ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
-            ->where('it.office_id', $officeId)
+                        ->where(function ($q) use ($officeId) {
+                                $q->where('it.office_id', $officeId)
+                                    ->orWhere('it.to_office_id', $officeId);
+                        })
             ->where('s.service_type', 'Internal')
             ->whereExists(function ($subQuery) {
                 $subQuery->selectRaw('1')
@@ -1112,7 +1030,10 @@ class CsmAnalyticsController extends Controller
         $internalTransactionsQuery = DB::table('queue_transaction_services as qts')
             ->join('services as s', 's.id', '=', 'qts.service_id')
             ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
-            ->where('it.office_id', $officeId)
+            ->where(function ($q) use ($officeId) {
+                $q->where('it.office_id', $officeId)
+                  ->orWhere('it.to_office_id', $officeId);
+            })
             ->where('s.service_type', 'Internal');
 
         $this->applyInternalDateFilter($internalTransactionsQuery, $period, $date, $month, $year);
@@ -1786,7 +1707,10 @@ class CsmAnalyticsController extends Controller
             $query
                 ->leftJoin('internal_transactions as it', function ($join) use ($officeId, $period, $date, $month, $year) {
                     $join->on('it.id', '=', 'qts.internal_transaction_id')
-                        ->where('it.office_id', '=', $officeId);
+                        ->where(function ($q) use ($officeId) {
+                            $q->where('it.office_id', '=', $officeId)
+                              ->orWhere('it.to_office_id', '=', $officeId);
+                        });
 
                     $this->applyDateConstraintToJoin(
                         join: $join,
@@ -1981,7 +1905,10 @@ class CsmAnalyticsController extends Controller
                 ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
                 ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('er.internal_transaction_id')
-                ->where('it.office_id', $officeId)
+                ->where(function ($q) use ($officeId) {
+                    $q->where('it.office_id', $officeId)
+                      ->orWhere('it.to_office_id', $officeId);
+                })
                 ->where('s.service_type', 'Internal');
 
             $this->applyInternalDateFilter($query, $period, $date, $month, $year);
@@ -2029,7 +1956,10 @@ class CsmAnalyticsController extends Controller
         $query
             ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
             ->whereNotNull('qts.internal_transaction_id')
-            ->where('it.office_id', $officeId)
+            ->where(function ($q) use ($officeId) {
+                $q->where('it.office_id', $officeId)
+                  ->orWhere('it.to_office_id', $officeId);
+            })
             ->where('s.service_type', 'Internal')
             ->whereExists(function ($subQuery) {
                 $subQuery->selectRaw('1')
@@ -2460,7 +2390,10 @@ class CsmAnalyticsController extends Controller
                 ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
                 ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('er.internal_transaction_id')
-                ->where('it.office_id', $officeId)
+                ->where(function ($q) use ($officeId) {
+                    $q->where('it.office_id', $officeId)
+                      ->orWhere('it.to_office_id', $officeId);
+                })
                 ->where('it.transaction_date', '>=', $startDate)
                 ->where('it.transaction_date', '<', $endDate)
                 ->where('s.service_type', 'Internal');
@@ -2592,7 +2525,10 @@ class CsmAnalyticsController extends Controller
                 ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
                 ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('es.internal_transaction_id')
-                ->where('it.office_id', $officeId)
+                ->where(function ($q) use ($officeId) {
+                    $q->where('it.office_id', $officeId)
+                      ->orWhere('it.to_office_id', $officeId);
+                })
                 ->where('it.status', 'COMPLETED')
                 ->where('it.transaction_date', '>=', $startDate)
                 ->where('it.transaction_date', '<', $endDate)
@@ -2692,7 +2628,10 @@ class CsmAnalyticsController extends Controller
                 ->join('internal_transactions as it', 'it.id', '=', 'er.internal_transaction_id')
                 ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
                 ->join('services as s', 's.id', '=', 'qts.service_id')
-                ->where('it.office_id', $officeId)
+                ->where(function ($q) use ($officeId) {
+                    $q->where('it.office_id', $officeId)
+                      ->orWhere('it.to_office_id', $officeId);
+                })
                 ->where('it.status', 'COMPLETED')
                 ->where('s.service_type', 'Internal')
                 ->where('it.transaction_date', '>=', $startDate)
@@ -2939,7 +2878,10 @@ class CsmAnalyticsController extends Controller
                 ->join('queue_transaction_services as qts', 'qts.internal_transaction_id', '=', 'it.id')
                 ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('er.internal_transaction_id')
-                ->where('it.office_id', $officeId)
+                ->where(function ($q) use ($officeId) {
+                    $q->where('it.office_id', $officeId)
+                      ->orWhere('it.to_office_id', $officeId);
+                })
                 ->where('it.status', 'COMPLETED')
                 ->where('it.transaction_date', '>=', $startDate)
                 ->where('it.transaction_date', '<', $endDate)
@@ -2988,7 +2930,10 @@ class CsmAnalyticsController extends Controller
             $internalCount = DB::table('queue_transaction_services as qts')
                 ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
-                ->where('it.office_id', $officeId)
+                ->where(function ($q) use ($officeId) {
+                    $q->where('it.office_id', $officeId)
+                      ->orWhere('it.to_office_id', $officeId);
+                })
                 ->where('it.status', 'COMPLETED')
                 ->where('it.transaction_date', '>=', $startDate)
                 ->where('it.transaction_date', '<', $endDate)
