@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\InternalRequestNotificationCreated;
 use App\Models\InternalTransaction;
 use App\Models\Service;
 use App\Models\Office;
@@ -145,6 +146,7 @@ class InternalRequestController extends Controller
                     'expected_completion_date' => $request->expected_completion_date?->format('Y-m-d'),
                     'remaining_days' => $remainingDays,
                     'deadline_status' => $deadlineStatus,
+                    'has_evaluation' => (bool) $request->evaluationSession,
                     'can_accept' => $type === 'received' && $request->status === InternalTransaction::STATUS_PENDING,
                     'can_deny' => $type === 'received' && $request->status === InternalTransaction::STATUS_PENDING,
                     'can_complete' => $type === 'received' && $request->status === InternalTransaction::STATUS_ON_PROCESS,
@@ -489,13 +491,15 @@ class InternalRequestController extends Controller
         $users = \App\Models\User::where('office_id', $officeId)->get();
         
         foreach ($users as $user) {
-            \App\Models\InternalRequestNotification::create([
+            $notification = \App\Models\InternalRequestNotification::create([
                 'internal_transaction_id' => $transaction->id,
                 'user_id' => $user->id,
                 'title' => $title,
                 'message' => $message,
                 'type' => $type,
             ]);
+
+            event(new InternalRequestNotificationCreated($notification));
         }
     }
     

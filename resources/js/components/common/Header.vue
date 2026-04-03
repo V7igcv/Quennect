@@ -185,6 +185,8 @@ export default {
     const isFrontdeskUser = computed(() => {
       return props.user && props.user.role === 'OFFICE FRONTDESK'
     })
+
+    const notificationChannelName = ref(null)
     
     const updateDateTime = () => {
       const now = new Date()
@@ -219,9 +221,11 @@ export default {
       }
     }
 
-    const fetchNotifications = async () => {
+    const fetchNotifications = async ({ showLoading = true } = {}) => {
       if (!isFrontdeskUser.value) return
-      isLoadingNotifications.value = true
+      if (showLoading) {
+        isLoadingNotifications.value = true
+      }
       try {
         const response = await api.get('/frontdesk/internal-transactions/notifications', {
           params: { per_page: 10 }
@@ -234,13 +238,15 @@ export default {
       } catch (error) {
         console.error('Failed to fetch notifications:', error)
       } finally {
-        isLoadingNotifications.value = false
+        if (showLoading) {
+          isLoadingNotifications.value = false
+        }
       }
     }
 
     const toggleDropdown = async () => {
       if (!showDropdown.value) {
-        await fetchNotifications()
+        await fetchNotifications({ showLoading: true })
       }
       showDropdown.value = !showDropdown.value
     }
@@ -249,8 +255,8 @@ export default {
       if (!isFrontdeskUser.value || !notification) return
       try {
         await api.patch(`/frontdesk/internal-transactions/notifications/${notification.id}/read`)
-        // After marking as read, fully refresh notifications and unread count
-        await fetchNotifications()
+        // After marking as read, refresh notifications and unread count without showing loader
+        await fetchNotifications({ showLoading: false })
         await fetchUnreadCount()
       } catch (error) {
         console.error('Failed to mark notification as read:', error)
@@ -281,11 +287,63 @@ export default {
       if (!isFrontdeskUser.value || unreadCount.value === 0) return
       try {
         await api.patch('/frontdesk/internal-transactions/notifications/read-all')
-        // Refresh list and unread count to reflect the changes
-        await fetchNotifications()
+        // Refresh list and unread count to reflect the changes without showing loader
+        await fetchNotifications({ showLoading: false })
         await fetchUnreadCount()
       } catch (error) {
         console.error('Failed to mark all notifications as read:', error)
+      }
+    }
+
+    const subscribeToNotificationChannel = () => {
+      if (!window.Echo || !props.user || !isFrontdeskUser.value) {
+        return
+      }
+
+      const rawUser = props.user || {}
+      const officeId =
+        rawUser.office_id ??
+        rawUser.officeId ??
+        rawUser.office?.id ??
+        null
+
+      if (!officeId) {
+        console.warn('Header: Unable to resolve office_id for notifications subscription.')
+        return
+      }
+
+      const channelName = `internal.notifications.office.${officeId}`
+      notificationChannelName.value = channelName
+
+      window.Echo
+        .channel(channelName)
+        .listen('.internal.notifications.created', (event) => {
+          const payload = event || {}
+          const newNotification = payload.notification
+          const newUnreadCount = payload.unread_count
+
+          if (newNotification) {
+            notifications.value.unshift(newNotification)
+            if (notifications.value.length > 10) {
+              notifications.value.pop()
+            }
+          }
+
+          if (typeof newUnreadCount === 'number') {
+            unreadCount.value = newUnreadCount
+          } else {
+            unreadCount.value += 1
+          }
+        })
+        .error((socketError) => {
+          console.error('Notification websocket error:', socketError)
+        })
+    }
+
+    const unsubscribeFromNotificationChannel = () => {
+      if (notificationChannelName.value && window.Echo) {
+        window.Echo.leave(notificationChannelName.value)
+        notificationChannelName.value = null
       }
     }
     
@@ -297,6 +355,7 @@ export default {
        if (isFrontdeskUser.value) {
          fetchUnreadCount()
          unreadPollingInterval = setInterval(fetchUnreadCount, 60000)
+         subscribeToNotificationChannel()
        }
     })
     
@@ -307,6 +366,7 @@ export default {
       if (unreadPollingInterval) {
         clearInterval(unreadPollingInterval)
       }
+      unsubscribeFromNotificationChannel()
     })
     
     return {
@@ -319,6 +379,7 @@ export default {
       showModal,
       selectedNotification,
       isFrontdeskUser,
+      subscribeToNotificationChannel,
       toggleDropdown,
       openNotification,
       closeModal,

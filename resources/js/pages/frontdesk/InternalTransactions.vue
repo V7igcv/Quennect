@@ -234,8 +234,8 @@
                 <span class="text-xs text-gray-400">{{ req.contact_number }}</span>
               </td>
               <td class="px-4 py-3">
-                <span class="px-2 py-1 text-xs rounded-full" :class="getStatusClass(req.status)">
-                  {{ getStatusLabel(req.status) }}
+                <span class="px-2 py-1 text-xs rounded-full" :class="getStatusClass(req)">
+                  {{ getStatusLabel(req) }}
                 </span>
               </td>
               <td class="px-4 py-3 text-sm">
@@ -263,7 +263,7 @@
                 <div class="flex justify-end gap-2">
                   <button 
                     v-if="activeTab === 'received' && req.can_accept" 
-                    @click="acceptRequest(req)" 
+                    @click="openAcceptModal(req)" 
                     class="text-green-600 hover:text-green-800" 
                     title="Accept"
                   >
@@ -326,6 +326,24 @@
           >
             Next
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Accept Confirmation Modal -->
+    <div v-if="showAcceptModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl w-full max-w-md p-6 shadow-xl transform transition-all">
+        <h3 class="text-xl font-semibold text-gray-800 mb-2">Accept Request</h3>
+        <p class="text-sm text-gray-500 mb-4">
+          Are you sure you want to accept this request
+          <span v-if="selectedRequest" class="font-semibold">#{{ selectedRequest.transaction_id || selectedRequest.id }}</span>
+          from
+          <span v-if="selectedRequest" class="font-semibold">{{ selectedRequest.from_office }}</span>
+          ?
+        </p>
+        <div class="flex gap-3">
+          <button @click="showAcceptModal = false" class="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Cancel</button>
+          <button @click="acceptRequest" class="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Confirm Accept</button>
         </div>
       </div>
     </div>
@@ -492,6 +510,7 @@ const stats = ref({
 const requests = ref([])
 const pagination = ref({ current_page: 1, last_page: 1 })
 const activeTab = ref('received')
+const showAcceptModal = ref(false)
 const showDenyModal = ref(false)
 const showCompleteModal = ref(false)
 const showEvaluationModal = ref(false)
@@ -676,7 +695,13 @@ const getCount = (tab) => {
   return counts[tab] || 0
 }
 
-const getStatusClass = (status) => {
+const getStatusClass = (req) => {
+  const status = req.status
+
+  if (status === 'COMPLETED' && req.has_evaluation) {
+    return 'bg-purple-100 text-purple-800'
+  }
+
   const classes = {
     PENDING: 'bg-yellow-100 text-yellow-800',
     'ON-PROCESS': 'bg-blue-100 text-blue-800',
@@ -687,7 +712,13 @@ const getStatusClass = (status) => {
   return classes[status] || 'bg-gray-100 text-gray-800'
 }
 
-const getStatusLabel = (status) => {
+const getStatusLabel = (req) => {
+  const status = req.status
+
+  if (status === 'COMPLETED' && req.has_evaluation) {
+    return 'Evaluated'
+  }
+
   const labels = {
     PENDING: 'Pending',
     'ON-PROCESS': 'On Process',
@@ -786,13 +817,21 @@ const goToCreateRequest = () => {
   router.push('/frontdesk/create')
 }
 
-const acceptRequest = async (req) => {
+const openAcceptModal = (req) => {
+  selectedRequest.value = req
+  showAcceptModal.value = true
+}
+
+const acceptRequest = async () => {
+  if (!selectedRequest.value) return
+
   try {
-    await kioskApi.post(`/frontdesk/internal-transactions/requests/${req.id}/accept`)
+    await kioskApi.post(`/frontdesk/internal-transactions/requests/${selectedRequest.value.id}/accept`)
+    showAcceptModal.value = false
     await Promise.all([fetchDashboard(), fetchRequests()])
   } catch (err) {
     console.error(err)
-    alert('Failed to accept request')
+    handleAlert('Error', 'Failed to accept request')
   }
 }
 

@@ -85,6 +85,7 @@ class InternalRequestNotification extends Model
             'accepted' => 'Accepted',
             'denied' => 'Denied',
             'completed' => 'Completed',
+            'evaluation_completed' => 'Evaluation Completed',
             default => ucfirst($this->type),
         };
     }

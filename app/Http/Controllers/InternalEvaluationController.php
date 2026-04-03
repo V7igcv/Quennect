@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\InternalRequestNotificationCreated;
 use App\Models\EvaluationQuestion;
 use App\Models\EvaluationResponse;
 use App\Models\EvaluationSession;
+use App\Models\InternalRequestNotification;
 use App\Models\InternalTransaction;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -210,6 +213,22 @@ class InternalEvaluationController extends Controller
 
             $internalTransaction->average_satisfaction_rating = $averageRating;
             $internalTransaction->save();
+
+            // Notify the requester office that the evaluation was completed
+            $requesterOfficeId = $internalTransaction->from_office_id;
+            $requesterUsers = User::where('office_id', $requesterOfficeId)->get();
+
+            foreach ($requesterUsers as $user) {
+                $notification = InternalRequestNotification::create([
+                    'internal_transaction_id' => $internalTransaction->id,
+                    'user_id' => $user->id,
+                    'title' => 'Evaluation Completed',
+                    'message' => "The service evaluation for your request (#{$internalTransaction->transaction_id}) has been submitted successfully.",
+                    'type' => 'evaluation_completed',
+                ]);
+
+                event(new InternalRequestNotificationCreated($notification));
+            }
 
             DB::commit();
             
