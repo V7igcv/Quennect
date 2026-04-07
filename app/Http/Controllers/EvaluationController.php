@@ -287,12 +287,28 @@ class EvaluationController extends Controller
 
             $this->broadcastMonitorUpdate((int) $transaction->office_id);
 
+            // Prepare data for SMS message
+            $transaction->loadMissing(['services', 'office']);
+            $clientName = $transaction->client_name ?? 'Kliyente';
+            $services = $transaction->services
+                ->map(fn ($service) => $service->display_name)
+                ->implode(', ');
+
+            if ($services === '') {
+                $services = 'inyong transaksyon';
+            }
+
+            $officeName = $transaction->office?->office_name ?? null;
+
             $smsSent = false;
 
             try {
                 $smsSent = app(SmsNotificationService::class)->sendEvaluationSubmittedMessage(
                     $transaction->contact_number,
-                    $transaction->full_queue_number
+                    $clientName,
+                    $services,
+                    $averageRating,
+                    $officeName
                 );
             } catch (\Throwable $smsException) {
                 Log::warning('Evaluation completed but SMS sending failed.', [

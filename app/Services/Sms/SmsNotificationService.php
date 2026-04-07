@@ -13,7 +13,9 @@ class SmsNotificationService
 
     public function sendEvaluationSubmittedMessage(
         string $contactNumber,
-        string $queueNumber,
+        string $clientName,
+        string $services,
+        ?float $averageRating,
         ?string $officeName = null
     ): bool {
         $normalizedNumber = $this->normalizePhoneNumber($contactNumber);
@@ -21,26 +23,42 @@ class SmsNotificationService
         if (!$normalizedNumber) {
             Log::warning('SMS not sent: invalid contact number.', [
                 'contact_number' => $contactNumber,
-                'queue_number' => $queueNumber,
+                'client_name' => $clientName,
             ]);
 
             return false;
         }
 
-        $message = $this->buildEvaluationSubmittedMessage($queueNumber, $officeName);
+        $message = $this->buildEvaluationSubmittedMessage(
+            $clientName,
+            $services,
+            $averageRating,
+            $officeName
+        );
 
         return $this->smsSender->send($normalizedNumber, $message);
     }
 
-    public function buildEvaluationSubmittedMessage(string $queueNumber, ?string $officeName = null): string
+    public function buildEvaluationSubmittedMessage(
+        string $clientName,
+        string $services,
+        ?float $averageRating,
+        ?string $officeName = null
+    ): string
     {
-        $office = $officeName ?: config('app.name');
+        $office = $officeName ?: 'Ligao City Hall';
 
-        return sprintf(
-            'Salamat po! Naisumite na ang inyong evaluation para sa queue %s sa %s. Ingat po at maraming salamat.',
-            $queueNumber,
-            $office
-        );
+        // Determine sentiment based on average satisfaction rating
+        // Treat Neutral (3) and above as positive; below 3 or null as improvement feedback
+        $isPositive = $averageRating !== null && $averageRating >= 3.0;
+
+        if ($isPositive) {
+            // Strongly Agree / Agree / Neutral
+            return "Salamat po, {$clientName}! Lubos po naming pinahahalagahan ang inyong positibong karanasan sa inyong transaksyon sa {$services}. Ang inyong feedback ay nagbibigay sa amin ng inspirasyon upang lalo pang pagbutihin ang serbisyo sa {$office}. Hanggang sa muli!";
+        }
+
+        // Strongly Disagree / Disagree / Not Applicable (or no computed rating)
+        return "Salamat po, {$clientName}, sa inyong pagbabahagi ng inyong karanasan sa inyong transaksyon sa {$services}. Sisiguruhin po naming gagalingan pa namin ang serbisyo sa {$office} sa susunod na pagkakataon. Hanggang sa muli!";
     }
 
     private function normalizePhoneNumber(string $contactNumber): ?string
