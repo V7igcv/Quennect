@@ -246,6 +246,109 @@ class FrontdeskAnalyticsController extends Controller
     }
 
     /**
+     * Get barangay distribution for donut chart and total clients.
+     *
+     * Supported filters:
+     * - period=daily&date=YYYY-MM-DD (default)
+     * - period=monthly&month=1-12&year=YYYY
+     * - period=yearly&year=YYYY
+     */
+    public function getBarangayDistribution(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+            ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
+
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+
+            $baseTransactionsQuery = QueueTransaction::query()
+                ->with(['barangay:id,barangay_name'])
+                ->where('office_id', $officeId)
+                ->whereHas('services', function (Builder $query) {
+                    $query->where('service_type', 'External');
+                });
+
+            $filteredTransactionsQuery = $this->applyDateFilter(
+                $baseTransactionsQuery,
+                $period,
+                $date,
+                $month,
+                $year
+            );
+
+            $transactions = $filteredTransactionsQuery->get();
+            $totalClients = $transactions->count();
+
+            $groupedByBarangay = $transactions->groupBy(function (QueueTransaction $transaction) {
+                return $transaction->barangay_id ?? 0;
+            });
+
+            $distribution = $groupedByBarangay->map(function ($group, $barangayId) {
+                /** @var QueueTransaction $first */
+                $first = $group->first();
+                $name = $first->barangay?->barangay_name ?? 'Unspecified';
+
+                return [
+                    'name' => $name,
+                    'value' => $group->count(),
+                ];
+            })->values()->sortByDesc('value')->values()->all();
+
+            $distributionWithPercentage = array_map(function (array $segment) use ($totalClients) {
+                return [
+                    ...$segment,
+                    'percentage' => $totalClients === 0
+                        ? 0
+                        : round(($segment['value'] / $totalClients) * 100, 2),
+                ];
+            }, $distribution);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total_clients' => $totalClients,
+                    'distribution' => $distributionWithPercentage,
+                ],
+                'filter' => $this->buildFilterPayload($period, $date, $month, $year),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Frontdesk analytics barangay distribution error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching barangay distribution',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Get lane type distribution for donut chart and total clients.
      *
      * Supported filters:

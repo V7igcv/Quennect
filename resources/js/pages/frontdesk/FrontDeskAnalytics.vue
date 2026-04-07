@@ -40,12 +40,14 @@
                 :disabled="!cell"
                 class="h-9 rounded-md text-sm transition-colors"
                 :class="[
-                  !cell ? 'cursor-default' : 'hover:bg-gray-100',
-                  cell && isSelectedDay(cell) ? 'bg-[#111827] text-white hover:bg-[#111827]' : 'text-gray-800'
+                  !cell && 'cursor-default bg-transparent',
+                  cell && isSelectedDay(cell)
+                    ? 'bg-[#0F5C5C] text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50',
                 ]"
                 @click="cell && selectDailyDate(cell)"
               >
-                {{ cell ?? '' }}
+                <span v-if="cell">{{ cell }}</span>
               </button>
             </div>
           </div>
@@ -68,7 +70,7 @@
                 :key="monthName"
                 type="button"
                 class="h-9 rounded-md border text-xs font-medium transition-colors"
-                :class="monthIndex === selectedMonthIndex ? 'border-[#111827] bg-[#111827] text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
+                :class="monthIndex === selectedMonthIndex ? 'border-[#0F5C5C] bg-[#0F5C5C] text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
                 @click="selectedMonthIndex = monthIndex"
               >
                 {{ monthName.slice(0, 3).toUpperCase() }}
@@ -194,116 +196,123 @@
       />
     </div>
 
-    <!-- Charts Row -->
-    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div>
-        <div class="mb-3 flex items-center gap-1">
-          <h2 class="text-lg font-semibold">Average Client Satisfaction Distribution</h2>
-          <CsmMetricExplanation
-            :title="queueMetricExplanations.clientSatisfaction.title"
-            :meaning="queueMetricExplanations.clientSatisfaction.meaning"
-            :computation="queueMetricExplanations.clientSatisfaction.computation"
-            :formula="queueMetricExplanations.clientSatisfaction.formula"
-            :interpretation="queueMetricExplanations.clientSatisfaction.interpretation"
-          />
-        </div>
-        <Card class="w-full">
-          <CardContent class="pt-6">
-            <div class="h-[300px] w-full">
-              <div class="h-full rounded-lg border border-gray-100 bg-gray-50 p-4">
-                <div class="flex h-full items-end gap-3 border-b border-gray-200 pb-3">
-                  <div
-                    v-for="(entry, index) in clientSatisfactionData"
-                    :key="`client-satisfaction-bar-${index}`"
-                    class="flex min-w-0 flex-1 flex-col items-center"
-                  >
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <div class="flex h-48 w-full max-w-12 items-end cursor-help">
-                            <div
-                              class="w-full rounded-t-md transition-all duration-300"
-                              :style="{
-                                height: `${getClientSatisfactionBarHeight(entry.value)}%`,
-                                backgroundColor: getClientSatisfactionBarColor(entry.label)
-                              }"
-                            ></div>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
-                          <p class="font-semibold text-gray-900">{{ entry.label }}</p>
-                          <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ entry.value }}</span></p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <span class="mt-2 h-10 px-1 text-[11px] font-medium leading-tight text-center text-gray-600 flex items-start justify-center">
-                      {{ entry.label }}
-                    </span>
-                    <span class="mt-1 text-xs font-semibold text-gray-900">{{ entry.value }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-6 flex items-center gap-2 border-t border-gray-100 pt-4">
-              <span class="text-sm font-medium text-gray-500">Total Responses:</span>
-              <span class="text-lg font-semibold text-gray-900">{{ clientSatisfactionTotalResponses }}</span>
-            </div>
-          </CardContent>
-        </Card>
+    <!-- Barangay Distribution Row -->
+    <div class="mt-6">
+      <div class="mb-3 flex items-center gap-1">
+        <h2 class="text-lg font-semibold">Barangay Distribution</h2>
+        <CsmMetricExplanation
+          :title="queueMetricExplanations.clientSatisfaction.title"
+          :meaning="queueMetricExplanations.clientSatisfaction.meaning"
+          :computation="queueMetricExplanations.clientSatisfaction.computation"
+          :formula="queueMetricExplanations.clientSatisfaction.formula"
+          :interpretation="queueMetricExplanations.clientSatisfaction.interpretation"
+        />
       </div>
-
-      <div>
-        <div class="mb-3 flex items-center gap-1">
-          <h2 class="text-lg font-semibold">Lane Type Distribution</h2>
-          <CsmMetricExplanation
-            :title="queueMetricExplanations.laneType.title"
-            :meaning="queueMetricExplanations.laneType.meaning"
-            :computation="queueMetricExplanations.laneType.computation"
-            :formula="queueMetricExplanations.laneType.formula"
-            :interpretation="queueMetricExplanations.laneType.interpretation"
-          />
-        </div>
-        <Card class="w-full">
-          <CardContent>
-            <div class="h-[300px] w-full mt-2 flex items-center justify-center">
-              <div
-                class="relative h-52 w-52"
-                @mousemove="handleLaneDonutMouseMove"
-                @mouseleave="clearLaneHoverSegment"
-              >
-                <div class="h-full w-full rounded-full" :style="{ background: lanePieGradient }"></div>
-                <div class="absolute inset-6 rounded-full bg-white flex flex-col items-center justify-center">
-                  <span class="text-2xl font-bold text-gray-900">{{ laneTotalClients }}</span>
-                  <span class="text-xs text-gray-500">Total Clients</span>
-                </div>
-
+      <Card class="w-full">
+        <CardContent class="pt-6">
+          <div class="h-[320px] w-full">
+            <div class="h-full rounded-lg border border-gray-100 bg-gray-50 p-4 flex flex-col">
+              <div class="flex-1 flex items-end gap-3 border-b border-gray-200 pb-3 overflow-x-auto">
                 <div
-                  v-if="hoveredLaneSegment"
-                  class="pointer-events-none absolute z-20 min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg"
-                  :style="{ left: `${laneTooltipPosition.x}px`, top: `${laneTooltipPosition.y}px`, transform: 'translate(8px, -110%)' }"
+                  v-for="(segment, index) in barangayChartData"
+                  :key="`barangay-bar-${index}`"
+                  class="flex min-w-0 flex-1 flex-col items-center"
                 >
-                  <p class="font-semibold text-gray-900">{{ hoveredLaneSegment.name }}</p>
-                  <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ hoveredLaneSegment.value }}</span></p>
-                  <p class="text-gray-600">Percentage: <span class="font-semibold">{{ hoveredLaneSegment.percentage }}%</span></p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <div class="flex h-48 w-full max-w-12 items-end pt-2 cursor-help">
+                          <div
+                            class="w-full rounded-t-md transition-all duration-300"
+                            :style="{
+                              height: `${getBarangayBarHeight(segment.value)}%`,
+                              backgroundColor: getBarangayBarColor(index),
+                            }"
+                          ></div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent class="min-w-40 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
+                        <p class="font-semibold text-gray-900 truncate" :title="segment.name">{{ segment.name }}</p>
+                        <p class="mt-1 text-gray-600">
+                          Clients: <span class="font-semibold">{{ segment.value }}</span>
+                        </p>
+                        <p class="text-gray-600">
+                          Percentage: <span class="font-semibold">{{ segment.percentage }}%</span>
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <span
+                    class="mt-2 h-10 px-1 text-[11px] font-medium leading-tight text-center text-gray-600 flex items-start justify-center truncate w-full"
+                    :title="segment.name"
+                  >
+                    {{ segment.name }}
+                  </span>
+                  <span class="mt-1 text-xs font-semibold text-gray-900">{{ segment.value }}</span>
                 </div>
               </div>
-            </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 pt-4 border-t border-gray-100">
-              <div
-                v-for="(segment, index) in laneTypeChartData"
-                :key="`lane-segment-${index}`"
-                class="flex items-center gap-2 text-sm"
-              >
-                <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getLaneSegmentColor(index) }"></div>
-                <span class="text-gray-600">{{ segment.name }}</span>
-                <span class="text-gray-900 font-medium ml-auto">{{ segment.percentage }}%</span>
+              <div class="mt-4 flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-500">Total Clients:</span>
+                <span class="text-lg font-semibold text-gray-900">{{ barangayTotalClients }}</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+
+    <!-- Lane Type Distribution Row -->
+    <div class="mt-6">
+      <div class="mb-3 flex items-center gap-1">
+        <h2 class="text-lg font-semibold">Lane Type Distribution</h2>
+        <CsmMetricExplanation
+          :title="queueMetricExplanations.laneType.title"
+          :meaning="queueMetricExplanations.laneType.meaning"
+          :computation="queueMetricExplanations.laneType.computation"
+          :formula="queueMetricExplanations.laneType.formula"
+          :interpretation="queueMetricExplanations.laneType.interpretation"
+        />
       </div>
+      <Card class="w-full">
+        <CardContent>
+          <div class="h-[300px] w-full mt-2 flex items-center justify-center">
+            <div
+              class="relative h-52 w-52"
+              @mousemove="handleLaneDonutMouseMove"
+              @mouseleave="clearLaneHoverSegment"
+            >
+              <div class="h-full w-full rounded-full" :style="{ background: lanePieGradient }"></div>
+              <div class="absolute inset-6 rounded-full bg-white flex flex-col items-center justify-center">
+                <span class="text-2xl font-bold text-gray-900">{{ laneTotalClients }}</span>
+                <span class="text-xs text-gray-500">Total Clients</span>
+              </div>
+
+              <div
+                v-if="hoveredLaneSegment"
+                class="pointer-events-none absolute z-20 min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg"
+                :style="{ left: `${laneTooltipPosition.x}px`, top: `${laneTooltipPosition.y}px`, transform: 'translate(8px, -110%)' }"
+              >
+                <p class="font-semibold text-gray-900">{{ hoveredLaneSegment.name }}</p>
+                <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ hoveredLaneSegment.value }}</span></p>
+                <p class="text-gray-600">Percentage: <span class="font-semibold">{{ hoveredLaneSegment.percentage }}%</span></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 pt-4 border-t border-gray-100">
+            <div
+              v-for="(segment, index) in laneTypeChartData"
+              :key="`lane-segment-${index}`"
+              class="flex items-center gap-2 text-sm"
+            >
+              <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getLaneSegmentColor(index) }"></div>
+              <span class="text-gray-600">{{ segment.name }}</span>
+              <span class="text-gray-900 font-medium ml-auto">{{ segment.percentage }}%</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
 
     <!-- Queue Summary Table -->
@@ -459,13 +468,13 @@ const stats = ref({
 
 const queueMetricExplanations = {
   clientSatisfaction: {
-    title: 'Average Client Satisfaction Distribution',
-    meaning: 'This chart shows the distribution of each completed transaction based on its rounded average satisfaction rating for the selected date range.',
-    computation: 'Each bar counts transactions where average_satisfaction_rating rounds to 1, 2, 3, 4, or 5. Not Applicable counts transactions with no average_satisfaction_rating. Total Responses counts distinct queue transactions that submitted evaluation responses.',
-    formula: 'Category Count = Number of completed transactions where ROUND(average_satisfaction_rating) = category\nNot Applicable = Number of completed transactions where average_satisfaction_rating is null\nTotal Responses = Count of distinct queue transactions with evaluation responses',
+    title: 'Barangay Distribution',
+    meaning: 'This bar chart shows how clients are distributed across barangays for the selected date range.',
+    computation: 'Each bar represents the number of queue transactions per barangay (based on barangay_id) for the selected date range, limited to external services.',
+    formula: 'Barangay Percentage = (Barangay Client Count / Total Clients) * 100',
     interpretation: [
-      'Taller bars mean more completed transactions fell under that rounded rating.',
-      'Use Total Responses to gauge how representative the distribution is.',
+      'Taller bars indicate barangays with more clients served.',
+      'Use this to identify where most clients are coming from.',
     ],
   },
   laneType: {
@@ -578,6 +587,24 @@ const lanePieGradient = computed(() => {
   })
   return `conic-gradient(${slices.join(', ')})`
 })
+
+const barangayData = ref([])
+const barangayTotalClientsValue = ref(0)
+const barangayTotalClients = computed(() => barangayTotalClientsValue.value)
+const barangayChartData = computed(() => barangayData.value)
+
+const maxBarangayValue = computed(() => {
+  const values = barangayChartData.value.map((item) => item.value || 0)
+  return values.length ? Math.max(...values) : 1
+})
+
+const getBarangayBarColor = (index) => laneColorPalette[index % laneColorPalette.length]
+
+const getBarangayBarHeight = (value) => {
+  if (!maxBarangayValue.value) return 6
+  const normalized = (value / maxBarangayValue.value) * 80
+  return Math.max(normalized, 6)
+}
 
 const getClientSatisfactionBarColor = (label) => {
   const colors = {
@@ -849,6 +876,16 @@ const fetchLaneTypeDistribution = async () => {
   laneTotalClientsValue.value = payload.total_clients ?? 0
 }
 
+const fetchBarangayDistribution = async () => {
+  const response = await api.get('/frontdesk/analytics/barangay-distribution', {
+    params: getDateFilterParams(),
+  })
+
+  const payload = response?.data?.data || {}
+  barangayData.value = payload.distribution?.length ? payload.distribution : []
+  barangayTotalClientsValue.value = payload.total_clients ?? 0
+}
+
 const fetchQueueSummary = async ({ showLoading = true } = {}) => {
   if (showLoading) {
     isLoadingQueueSummary.value = true
@@ -910,7 +947,7 @@ const fetchAnalyticsData = async () => {
   try {
     await Promise.all([
       fetchCardStats(),
-      fetchClientSatisfaction(),
+      fetchBarangayDistribution(),
       fetchLaneTypeDistribution(),
       fetchQueueSummary(),
     ])

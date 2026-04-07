@@ -277,6 +277,77 @@ class FrontdeskController extends Controller
     }
 
     /**
+     * Auto-skip all stale waiting queues from previous days for the current office.
+     *
+     * Intended to be triggered around midnight by the frontdesk dashboard.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function autoSkipStaleQueues()
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'User not authenticated'
+            ], 401);
+        }
+
+        if (!$user->office_id) {
+            return response()->json([
+                'message' => 'User is not assigned to any office.'
+            ], 403);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $today = now()->toDateString();
+
+            $staleQueues = QueueTransaction::where('office_id', $user->office_id)
+                ->whereIn('status', ['WAITING', 'SERVING'])
+                ->whereDate('queue_date', '<', $today)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($staleQueues as $queue) {
+                $queue->status = 'SKIPPED';
+                $queue->skipped_at = now();
+
+                // If this queue was already called (SERVING), clear the counter assignment
+                if ($queue->counter_id) {
+                    $queue->counter_id = null;
+                }
+
+                $queue->save();
+            }
+
+            DB::commit();
+
+            if ($staleQueues->isNotEmpty()) {
+                $this->broadcastMonitorUpdate((int) $user->office_id);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Stale queues skipped successfully.',
+                'skipped_count' => $staleQueues->count(),
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Auto-skip stale queues error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error auto-skipping stale queues',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Skip a queue number from counter card
      * 
      * @param int $queueId

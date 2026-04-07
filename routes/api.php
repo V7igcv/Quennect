@@ -104,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Analytics
         Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);
         Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
+        Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
     });
@@ -135,6 +136,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/queue/skip-from-table/{queueId}', [FrontdeskController::class, 'skipFromTable']);
         Route::post('/queue/skip-from-counter/{queueId}', [FrontdeskController::class, 'skipFromCounter']);
         Route::post('/queue/complete/{queueId}', [FrontdeskController::class, 'completeTransaction']);
+        Route::post('/queue/auto-skip-stale', [FrontdeskController::class, 'autoSkipStaleQueues']);
 
         // Counters
         Route::get('/counters', [CounterController::class, 'index']);
@@ -152,6 +154,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Analytics
         Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);
         Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
+        Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
 

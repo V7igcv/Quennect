@@ -618,6 +618,14 @@ const clearMidnightRefreshSchedule = () => {
   }
 }
 
+const autoSkipStaleQueues = async () => {
+  try {
+    await api.post('/frontdesk/queue/auto-skip-stale')
+  } catch (error) {
+    console.error('Error auto-skipping stale queues:', error)
+  }
+}
+
 const scheduleMidnightRefresh = () => {
   clearMidnightRefreshSchedule()
 
@@ -628,7 +636,13 @@ const scheduleMidnightRefresh = () => {
   const delayMs = Math.max(nextMidnight.getTime() - now.getTime(), 0)
 
   midnightRefreshTimeout.value = setTimeout(async () => {
+    // First, auto-skip any stale queues from previous days
+    await autoSkipStaleQueues()
+
+    // Then refresh dashboard data for the new day
     await refreshDashboardRealtime()
+
+    // Reschedule for the next midnight
     scheduleMidnightRefresh()
   }, delayMs)
 }
