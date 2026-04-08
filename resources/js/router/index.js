@@ -82,6 +82,11 @@ const routes = [
         path: 'create',
         name: 'frontdesk.create',
         component: () => import('../pages/frontdesk/Create.vue')
+      },
+      {
+        path: 'chat',
+        name: 'frontdesk.chat',
+        component: () => import('../pages/frontdesk/ChatModule.vue')
       }
     ]
   },
