@@ -181,7 +181,8 @@
                 :disabled="isExportingGraphs"
                 @click="confirmExportGraphs"
               >
-                Generate PDF
+                <span v-if="!isExportingGraphs">Generate PDF</span>
+                <span v-else>Generating PDF...</span>
               </Button>
             </div>
           </div>
@@ -777,7 +778,24 @@ const monthNames = [
 const weekDayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
 const exportOfficeDisplayName = computed(() => {
-  // Placeholder label; will be replaced with the actual office name once wired to backend/user context
+  const storedUser = localStorage.getItem('user')
+  if (!storedUser) return 'this office'
+
+  try {
+    const parsed = JSON.parse(storedUser)
+    const office = parsed?.office
+
+    if (office?.name && office?.acronym) {
+      return `${office.name} (${office.acronym})`
+    }
+
+    if (office?.name) {
+      return office.name
+    }
+  } catch (error) {
+    console.error('Failed to parse stored user for exportOfficeDisplayName', error)
+  }
+
   return 'this office'
 })
 
@@ -863,9 +881,38 @@ const closeExportModal = () => {
   showExportModal.value = false
 }
 
-const confirmExportGraphs = () => {
-  // Backend export logic will be implemented in a later step
-  showExportModal.value = false
+const confirmExportGraphs = async () => {
+  if (isExportingGraphs.value) return
+
+  isExportingGraphs.value = true
+
+  try {
+    const response = await api.get('/frontdesk/analytics/export-graphs', {
+      params: getDateFilterParams(),
+      responseType: 'blob',
+    })
+
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+
+    const safeOfficeName = exportOfficeDisplayName.value.replace(/[\\/]/g, '-')
+    const fileName = `${safeOfficeName} Queue Analytics Graph - ${dateFilterLabel.value}.pdf`
+
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    showExportModal.value = false
+  } catch (error) {
+    console.error('Error exporting queue analytics graphs:', error)
+    window.alert('Failed to generate PDF report. Please try again.')
+  } finally {
+    isExportingGraphs.value = false
+  }
 }
 
 const formatDate = (date) => {

@@ -107,6 +107,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
+        Route::get('/analytics/export-graphs', [FrontdeskAnalyticsController::class, 'exportGraphs']);
     });
 
     // ==================== FRONTDESK ====================
@@ -157,6 +158,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
+        Route::get('/analytics/export-graphs', [FrontdeskAnalyticsController::class, 'exportGraphs']);
 
         // ==================== INTERNAL TRANSACTIONS ====================
         Route::prefix('internal-transactions')->group(function () {

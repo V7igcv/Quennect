@@ -201,7 +201,8 @@
                 :disabled="isExportingGraphs || !selectedOffice"
                 @click="confirmExportGraphs"
               >
-                Generate PDF
+                <span v-if="!isExportingGraphs">Generate PDF</span>
+                <span v-else>Generating PDF...</span>
               </Button>
             </div>
           </div>
@@ -598,10 +599,6 @@ const selectedOfficeDisplayName = computed(() => {
   const selected = officeOptions.value.find((office) => office.value === selectedOffice.value)
   if (!selected) return 'selected office'
 
-  if (selected.acronym) {
-    return `${selected.label} (${selected.acronym})`
-  }
-
   return selected.label
 })
 
@@ -877,9 +874,38 @@ const closeExportModal = () => {
   showExportModal.value = false
 }
 
-const confirmExportGraphs = () => {
-  // Backend export logic will be implemented in a later step
-  showExportModal.value = false
+const confirmExportGraphs = async () => {
+  if (isExportingGraphs.value || !selectedOffice.value) return
+
+  isExportingGraphs.value = true
+
+  try {
+    const response = await api.get('/superadmin/analytics/export-graphs', {
+      params: getDateFilterParams(),
+      responseType: 'blob',
+    })
+
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+
+    const safeOfficeName = selectedOfficeDisplayName.value.replace(/[\\/]/g, '-')
+    const fileName = `${safeOfficeName} Queue Analytics Graph - ${dateFilterLabel.value}.pdf`
+
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    showExportModal.value = false
+  } catch (error) {
+    console.error('Error exporting superadmin queue analytics graphs:', error)
+    window.alert('Failed to generate PDF report. Please try again.')
+  } finally {
+    isExportingGraphs.value = false
+  }
 }
 
 const formatDate = (date) => {
@@ -923,11 +949,17 @@ const fetchOfficeOptions = async () => {
     return match?.[1] || ''
   }
 
-  officeOptions.value = data.map((office) => ({
-    value: String(office.id),
-    label: office.display_name,
-    acronym: office.acronym || extractAcronymFromDisplayName(office.display_name),
-  }))
+  officeOptions.value = data.map((office) => {
+    const acronym = office.acronym || extractAcronymFromDisplayName(office.display_name)
+    const baseName = office.name || String(office.display_name || '').replace(/\s*\([^)]*\)\s*$/, '')
+    const label = acronym ? `${baseName} (${acronym})` : baseName
+
+    return {
+      value: String(office.id),
+      label,
+      acronym,
+    }
+  })
 
   if (!selectedOffice.value && officeOptions.value.length > 0) {
     selectedOffice.value = officeOptions.value[0].value

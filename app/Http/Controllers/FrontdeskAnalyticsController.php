@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Enums\TransactionStatus;
 use App\Models\EvaluationResponse;
+use App\Models\Office;
 use App\Models\QueueTransaction;
+use App\Services\Analytics\ChartImageService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +17,13 @@ use Illuminate\Support\Facades\Log;
 
 class FrontdeskAnalyticsController extends Controller
 {
+    private ChartImageService $chartImageService;
+
+    public function __construct(ChartImageService $chartImageService)
+    {
+        $this->chartImageService = $chartImageService;
+    }
+
     /**
      * Get analytics card metrics for Front Desk.
      *
@@ -290,7 +300,9 @@ class FrontdeskAnalyticsController extends Controller
                 ->where('office_id', $officeId)
                 ->whereHas('services', function (Builder $query) {
                     $query->where('service_type', 'External');
-                });
+                })
+                ->where('status', TransactionStatus::COMPLETED->value)
+                ->whereHas('evaluationResponses');
 
             $filteredTransactionsQuery = $this->applyDateFilter(
                 $baseTransactionsQuery,
@@ -617,6 +629,118 @@ class FrontdeskAnalyticsController extends Controller
         }
     }
 
+    /**
+     * Export queue analytics graphs (stat cards + distributions) as a PDF file.
+     *
+     * This endpoint is shared by both SUPERADMIN (via office_id) and FRONTDESK
+     * users (via their assigned office_id).
+     */
+    public function exportGraphs(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+            ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
+
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+
+            $periodLabel = $this->buildPeriodLabel($period, $date, $month, $year);
+
+            $office = Office::find($officeId);
+            $officeName = $office?->office_name ?? 'Unknown Office';
+            $officeAcronym = $office?->office_acronym;
+            $officeDisplayName = $officeAcronym
+                ? sprintf('%s (%s)', $officeName, $officeAcronym)
+                : $officeName;
+
+            // Reuse existing analytics endpoints internally to avoid duplicating logic.
+            $cardStatsResponse = $this->getCardStats($request);
+            $cardStatsPayload = $cardStatsResponse->getData(true);
+            $cardStats = $cardStatsPayload['data'] ?? [];
+
+            $barangayResponse = $this->getBarangayDistribution($request);
+            $barangayPayload = $barangayResponse->getData(true);
+            $barangayStats = $barangayPayload['data'] ?? [];
+
+            $laneTypeResponse = $this->getLaneTypeDistribution($request);
+            $laneTypePayload = $laneTypeResponse->getData(true);
+            $laneTypeStats = $laneTypePayload['data'] ?? [];
+
+            $barangayChartPath = null;
+            $laneTypeChartPath = null;
+
+            if (!empty($barangayStats['distribution'] ?? [])) {
+                $barangayChartPath = $this->chartImageService->generateBarangayBarChart(
+                    $barangayStats['distribution'],
+                    $officeDisplayName,
+                    $periodLabel
+                );
+            }
+
+            if (!empty($laneTypeStats['distribution'] ?? [])) {
+                $laneTypeChartPath = $this->chartImageService->generateLaneTypeDonutChart(
+                    $laneTypeStats['distribution'],
+                    $officeDisplayName,
+                    $periodLabel
+                );
+            }
+
+            $pdf = Pdf::loadView('analytics.queue-graphs-report', [
+                'officeName' => $officeName,
+                'officeAcronym' => $officeAcronym,
+                'officeDisplayName' => $officeDisplayName,
+                'periodLabel' => $periodLabel,
+                'period' => $period,
+                'date' => $date,
+                'month' => $month,
+                'year' => $year,
+                'cardStats' => $cardStats,
+                'barangayStats' => $barangayStats,
+                'laneTypeStats' => $laneTypeStats,
+                'barangayChartPath' => $barangayChartPath,
+                'laneTypeChartPath' => $laneTypeChartPath,
+            ])->setPaper('a4', 'portrait');
+
+            $safeOfficeName = str_replace(['/', '\\'], '-', $officeDisplayName);
+            $fileName = sprintf('%s Queue Analytics Graph - %s.pdf', $safeOfficeName, $periodLabel);
+
+            return $pdf->download($fileName);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Frontdesk analytics export graphs error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error exporting analytics graphs',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     private function mapAverageSatisfactionLabel($averageRating): string
     {
         if ($averageRating === null) {
@@ -672,6 +796,23 @@ class FrontdeskAnalyticsController extends Controller
                 ->whereYear('queue_date', $year),
             default => $query
                 ->whereDate('queue_date', $date->toDateString()),
+        };
+    }
+
+    /**
+     * Build a human-readable label for the current period filter.
+     *
+     * Examples:
+     * - daily  => "April 8, 2026"
+     * - monthly => "April 2026"
+     * - yearly  => "2026"
+     */
+    private function buildPeriodLabel(string $period, Carbon $date, int $month, int $year): string
+    {
+        return match ($period) {
+            'monthly' => Carbon::create($year, $month, 1)->translatedFormat('F Y'),
+            'yearly' => (string) $year,
+            default => $date->translatedFormat('F j, Y'),
         };
     }
 
