@@ -151,8 +151,63 @@
             </div>
           </PopoverContent>
         </Popover>
+
+        <Button
+          class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white whitespace-nowrap"
+          type="button"
+          :disabled="!selectedOffice"
+          @click="openExportModal"
+        >
+          Export Graph
+        </Button>
       </div>
     </div>
+
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showExportModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60" @click="closeExportModal"></div>
+          <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 z-10 mx-4">
+            <button
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+              type="button"
+              @click="closeExportModal"
+            >
+              <span class="sr-only">Close</span>
+              ×
+            </button>
+
+            <h2 class="text-xl font-semibold text-gray-900 mb-3">Export Analytics Graphs</h2>
+            <p class="text-sm text-gray-600 mb-6">
+              This will generate a PDF report containing the current queue analytics stat cards and graphs
+              for
+              <span class="font-semibold">{{ selectedOfficeDisplayName }}</span>
+              for
+              <span class="font-semibold">{{ dateFilterLabel }}</span>.
+            </p>
+
+            <div class="flex justify-end gap-3">
+              <button
+                class="px-4 py-2 rounded-sm border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium cursor-pointer"
+                type="button"
+                :disabled="isExportingGraphs"
+                @click="closeExportModal"
+              >
+                Cancel
+              </button>
+              <Button
+                class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white text-sm font-medium"
+                type="button"
+                :disabled="isExportingGraphs || !selectedOffice"
+                @click="confirmExportGraphs"
+              >
+                Generate PDF
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <div
       v-if="isLoadingAnalytics"
@@ -484,6 +539,8 @@ const isDateFilterOpen = ref(false)
 const isLoadingAnalytics = ref(false)
 const isLoadingQueueSummary = ref(false)
 const isApplyingDateFilter = ref(false)
+const showExportModal = ref(false)
+const isExportingGraphs = ref(false)
 
 const stats = ref({
   totalClients: 0,
@@ -536,6 +593,16 @@ const queueSummaryEndRow = computed(() => queueSummaryPagination.value.endRow)
 const selectedOfficeAcronym = computed(() => {
   const selected = officeOptions.value.find((office) => office.value === selectedOffice.value)
   return selected?.acronym || ''
+})
+const selectedOfficeDisplayName = computed(() => {
+  const selected = officeOptions.value.find((office) => office.value === selectedOffice.value)
+  if (!selected) return 'selected office'
+
+  if (selected.acronym) {
+    return `${selected.label} (${selected.acronym})`
+  }
+
+  return selected.label
 })
 
 const firstQueueSummaryPage = () => {
@@ -798,6 +865,21 @@ const isSelectedDay = (day) => {
   return selectedDate.value.getFullYear() === dailyViewYear.value
     && selectedDate.value.getMonth() === dailyViewMonth.value
     && selectedDate.value.getDate() === day
+}
+
+const openExportModal = () => {
+  if (!selectedOffice.value) return
+  showExportModal.value = true
+}
+
+const closeExportModal = () => {
+  if (isExportingGraphs.value) return
+  showExportModal.value = false
+}
+
+const confirmExportGraphs = () => {
+  // Backend export logic will be implemented in a later step
+  showExportModal.value = false
 }
 
 const formatDate = (date) => {

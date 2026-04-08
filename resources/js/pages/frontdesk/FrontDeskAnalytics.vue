@@ -4,18 +4,19 @@
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
       <h1 class="text-2xl font-semibold">Queue Analytics</h1>
 
-      <!-- Date Filter Dropdown -->
-      <Popover v-model:open="isDateFilterOpen">
-        <PopoverTrigger as-child>
-          <Button variant="outline" class="w-full sm:w-[220px] justify-start bg-white">
-            <span class="flex items-center gap-2">
-              <Calendar class="h-4 w-4 text-gray-500 shrink-0" />
-              <span class="truncate">{{ dateFilterLabel }}</span>
-            </span>
-          </Button>
-        </PopoverTrigger>
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+        <!-- Date Filter Dropdown -->
+        <Popover v-model:open="isDateFilterOpen">
+          <PopoverTrigger as-child>
+            <Button variant="outline" class="w-full sm:w-[220px] justify-start bg-white">
+              <span class="flex items-center gap-2">
+                <Calendar class="h-4 w-4 text-gray-500 shrink-0" />
+                <span class="truncate">{{ dateFilterLabel }}</span>
+              </span>
+            </Button>
+          </PopoverTrigger>
 
-        <PopoverContent align="end" class="w-[320px] p-3">
+          <PopoverContent align="end" class="w-[320px] p-3">
           <!-- Daily -->
           <div v-if="selectedDateRange === 'daily'" class="space-y-3">
             <div class="flex items-center justify-between">
@@ -130,8 +131,63 @@
             </Button>
           </div>
         </PopoverContent>
-      </Popover>
+        </Popover>
+
+        <Button
+          class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white whitespace-nowrap"
+          type="button"
+          @click="openExportModal"
+        >
+          Export Graph
+        </Button>
+      </div>
     </div>
+
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showExportModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60" @click="closeExportModal"></div>
+          <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 z-10 mx-4">
+            <button
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+              type="button"
+              @click="closeExportModal"
+            >
+              <span class="sr-only">Close</span>
+              ×
+            </button>
+
+            <h2 class="text-xl font-semibold text-gray-900 mb-3">Export Analytics Graphs</h2>
+            <p class="text-sm text-gray-600 mb-6">
+              This will generate a PDF report containing the current queue analytics stat cards and graphs
+              for
+              <span class="font-semibold">{{ exportOfficeDisplayName }}</span>
+              for
+              <span class="font-semibold">{{ dateFilterLabel }}</span>.
+            </p>
+
+            <div class="flex justify-end gap-3">
+              <button
+                class="px-4 py-2 rounded-sm border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium cursor-pointer"
+                type="button"
+                :disabled="isExportingGraphs"
+                @click="closeExportModal"
+              >
+                Cancel
+              </button>
+              <Button
+                class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white text-sm font-medium"
+                type="button"
+                :disabled="isExportingGraphs"
+                @click="confirmExportGraphs"
+              >
+                Generate PDF
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <div
       v-if="isLoadingAnalytics"
@@ -457,6 +513,8 @@ const isDateFilterOpen = ref(false)
 const isLoadingAnalytics = ref(false)
 const isLoadingQueueSummary = ref(false)
 const isApplyingDateFilter = ref(false)
+const showExportModal = ref(false)
+const isExportingGraphs = ref(false)
 
 const stats = ref({
   totalClients: 0,
@@ -718,6 +776,11 @@ const monthNames = [
 ]
 const weekDayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
+const exportOfficeDisplayName = computed(() => {
+  // Placeholder label; will be replaced with the actual office name once wired to backend/user context
+  return 'this office'
+})
+
 const dateFilterLabel = computed(() => {
   if (selectedDateRange.value === 'daily') {
     return selectedDate.value.toLocaleDateString('en-US', {
@@ -789,6 +852,20 @@ const isSelectedDay = (day) => {
   return selectedDate.value.getFullYear() === dailyViewYear.value
     && selectedDate.value.getMonth() === dailyViewMonth.value
     && selectedDate.value.getDate() === day
+}
+
+const openExportModal = () => {
+  showExportModal.value = true
+}
+
+const closeExportModal = () => {
+  if (isExportingGraphs.value) return
+  showExportModal.value = false
+}
+
+const confirmExportGraphs = () => {
+  // Backend export logic will be implemented in a later step
+  showExportModal.value = false
 }
 
 const formatDate = (date) => {
