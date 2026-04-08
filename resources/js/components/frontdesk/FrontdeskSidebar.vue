@@ -272,7 +272,7 @@ export default {
     }
   },
   emits: ['toggle-collapse', 'logout'],
-  setup(props) {
+  setup(props, { emit }) {
     const router = useRouter()
     const route = useRoute()
     
@@ -291,8 +291,8 @@ export default {
     
     // Handle logout
     const handleLogout = () => {
-      const event = new CustomEvent('sidebar-logout')
-      window.dispatchEvent(event)
+      emit('logout')
+      // The actual logout logic will be handled by the layout
     }
     
     // Fetch unread count from API
