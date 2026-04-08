@@ -193,14 +193,23 @@
             />
           </div>
 
-          <!-- Right: Button -->
-          <Button 
-            class="h-10 px-4 bg-[#0F5C5C] hover:bg-[#167D7F] text-white flex items-center gap-2"
-            @click="openGenerateTableModal"
-          >
-            <FileText class="h-4 w-4" />
-            Generate Table
-          </Button>
+          <!-- Right: Buttons -->
+          <div class="flex items-center gap-2">
+            <Button 
+              class="h-10 px-4 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white flex items-center gap-2 whitespace-nowrap"
+              @click="openGenerateTableModal"
+            >
+              <FileText class="h-4 w-4" />
+              Generate Table
+            </Button>
+            <Button 
+              class="h-10 px-4 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white flex items-center gap-2 whitespace-nowrap"
+              @click="openGenerateGraphsModal"
+            >
+              <BarChart3 class="h-4 w-4" />
+              Generate Graph
+            </Button>
+          </div>
         </div>
 
         <!-- 5 Stat Cards Row -->
@@ -581,6 +590,55 @@
         </div>
       </div>
     </div>
+
+    <!-- Generate Graphs Modal -->
+    <div v-if="showGenerateGraphsModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-lg p-6 max-w-xl w-full mx-4">
+        <div class="mb-4 flex items-center justify-between gap-2">
+          <h3 class="text-lg font-semibold">Generate Graph PDF</h3>
+          <button
+            type="button"
+            @click="closeGenerateGraphsModal"
+            class="text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Close generate graphs modal"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <p class="text-gray-600 text-sm leading-relaxed mb-3">
+          This will generate a PDF containing the overview cards, Citizen's Charter graphs, SQD graphs (SQD0–SQD8), demographic profile pies, and the Overall Score Per Service graph for the selected
+          <span class="font-semibold">{{ getServiceTypeLabel }}</span>
+          services and
+          <span class="font-semibold">{{ dateFilterLabel }}</span>
+          period.
+        </p>
+
+        <div class="rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm text-[#0F5C5C] mb-4">
+          The PDF will be downloaded as
+          <span class="font-semibold">{{ exportGraphsFileNamePreview }}</span>.
+        </div>
+
+        <div class="flex justify-end gap-2">
+          <button
+            type="button"
+            class="px-4 py-2 border rounded-md hover:bg-gray-100"
+            @click="closeGenerateGraphsModal"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 bg-[#0F5C5C] text-white rounded-md hover:bg-[#167D7F] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            :disabled="isGeneratingGraphs"
+            @click="handleGenerateGraphs"
+          >
+            <Loader2 v-if="isGeneratingGraphs" class="h-4 w-4 animate-spin" />
+            <span>{{ isGeneratingGraphs ? 'Generating PDF...' : 'Generate PDF' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -635,6 +693,8 @@ const isLoadingAnalytics = ref(false)
 const isApplyingDateFilter = ref(false)
 const showGenerateTableModal = ref(false)
 const isGeneratingTable = ref(false)
+const showGenerateGraphsModal = ref(false)
+const isGeneratingGraphs = ref(false)
 
 const generateTableGroups = [
   {
@@ -957,6 +1017,32 @@ const buildCsmParams = () => ({
   service_type: selectedServiceType.value,
 })
 
+const getOfficeDisplayName = () => {
+  try {
+    const rawUser = window.localStorage.getItem('user')
+    if (!rawUser) return 'this office'
+
+    const parsed = JSON.parse(rawUser)
+    const office = parsed?.office
+    if (!office) return 'this office'
+
+    const name = office.office_name || office.name
+    const acronym = office.office_acronym || office.acronym
+
+    if (name && acronym) return `${name} (${acronym})`
+    if (name) return name
+    if (acronym) return acronym
+    return 'this office'
+  } catch (e) {
+    return 'this office'
+  }
+}
+
+const exportGraphsFileNamePreview = computed(() => {
+  const officeName = getOfficeDisplayName()
+  return `${officeName} Client Satisfaction Measurement Graph - ${dateFilterLabel.value}.pdf`
+})
+
 const fetchOverviewStats = async () => {
   const response = await api.get('/frontdesk/analytics/csm/overview', {
     params: buildCsmParams(),
@@ -1016,6 +1102,14 @@ const openGenerateTableModal = () => {
 
 const closeGenerateTableModal = () => {
   showGenerateTableModal.value = false
+}
+
+const openGenerateGraphsModal = () => {
+  showGenerateGraphsModal.value = true
+}
+
+const closeGenerateGraphsModal = () => {
+  showGenerateGraphsModal.value = false
 }
 
 const isTableSelected = (tableKey) => {
@@ -1088,9 +1182,7 @@ const parseContentDispositionFileName = (contentDisposition) => {
 }
 
 const triggerBlobDownload = (blobData, fileName) => {
-  const blob = new Blob([blobData], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  })
+  const blob = new Blob([blobData])
   const downloadUrl = window.URL.createObjectURL(blob)
   const anchor = document.createElement('a')
 
@@ -1141,6 +1233,35 @@ const handleGenerateTable = async () => {
     window.alert('Unable to generate table export right now. Please try again.')
   } finally {
     isGeneratingTable.value = false
+  }
+}
+
+const handleGenerateGraphs = async () => {
+  if (isGeneratingGraphs.value) return
+
+  isGeneratingGraphs.value = true
+
+  try {
+    const response = await api.post(
+      '/frontdesk/analytics/csm/export-graphs',
+      {
+        ...buildCsmParams(),
+      },
+      {
+        responseType: 'blob',
+      },
+    )
+
+    const contentDisposition = response?.headers?.['content-disposition']
+    const fileName = parseContentDispositionFileName(contentDisposition) || exportGraphsFileNamePreview.value
+
+    triggerBlobDownload(response.data, fileName)
+    closeGenerateGraphsModal()
+  } catch (error) {
+    console.error('Error exporting CSM analytics graphs:', error)
+    window.alert('Unable to generate graph PDF right now. Please try again.')
+  } finally {
+    isGeneratingGraphs.value = false
   }
 }
 

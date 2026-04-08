@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\EvaluationQuestion;
 use App\Models\EvaluationResponse;
 use App\Models\InternalTransaction;
+use App\Models\Office;
 use App\Models\QueueTransaction;
+use App\Services\Analytics\ChartImageService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +22,13 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class CsmAnalyticsController extends Controller
 {
+    private ChartImageService $chartImageService;
+
+    public function __construct(ChartImageService $chartImageService)
+    {
+        $this->chartImageService = $chartImageService;
+    }
+
     private const CC_CHART_CONFIG = [
         'CC1' => [
             'key' => 'awareness',
@@ -909,6 +919,365 @@ class CsmAnalyticsController extends Controller
     }
 
     /**
+     * Export CSM analytics graphs as a PDF file.
+     *
+     * Includes:
+     * - Overview stat cards
+     * - Citizen's Charter graphs (CC1, CC2, CC3)
+     * - SQD graphs (SQD0-SQD8)
+     * - Demographic profile pies (Age, Sex, Client Type)
+     * - Overall Score Per Service graph
+     */
+    public function exportGraphs(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'service_type' => 'nullable|in:external,internal,all',
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+            ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
+
+            $serviceType = $validated['service_type'] ?? 'external';
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+
+            [$startDate, $endDate] = $this->resolveDateRange($period, $date, $month, $year);
+            $periodLabel = $this->buildPeriodLabel($period, $date, $month, $year);
+
+            $office = Office::find($officeId);
+            $officeName = $office?->office_name ?? 'Unknown Office';
+            $officeAcronym = $office?->office_acronym;
+            $officeDisplayName = $officeAcronym
+                ? sprintf('%s (%s)', $officeName, $officeAcronym)
+                : $officeName;
+
+            $serviceTypeLabel = $this->mapServiceTypeLabel($serviceType);
+
+            // Overview stats
+            $overviewResponse = $this->getOverviewStats($request);
+            $overviewPayload = $overviewResponse->getData(true);
+            $overviewData = $overviewPayload['data'] ?? [];
+
+            // Citizen's Charter data
+            $citizenCharterResponse = $this->getCitizenCharterCounts($request);
+            $citizenCharterPayload = $citizenCharterResponse->getData(true);
+            $citizenCharterData = $citizenCharterPayload['data'] ?? [];
+
+            $ccQuestions = [
+                'awareness' => (string) ($citizenCharterData['questions']['awareness']['text'] ?? self::CC_CHART_CONFIG['CC1']['default_question']),
+                'visibility' => (string) ($citizenCharterData['questions']['visibility']['text'] ?? self::CC_CHART_CONFIG['CC2']['default_question']),
+                'helpfulness' => (string) ($citizenCharterData['questions']['helpfulness']['text'] ?? self::CC_CHART_CONFIG['CC3']['default_question']),
+            ];
+
+            // Overall score per service data
+            $overallScorePayload = $this->computeOverallScorePerServiceData(
+                officeId: $officeId,
+                serviceType: $serviceType,
+                startDate: $startDate,
+                endDate: $endDate,
+            );
+
+            // Demographic distributions (Age, Sex, Client Type)
+            $demographicCategories = ['age', 'sex', 'client_type'];
+            $demographicDistributions = [];
+
+            foreach ($demographicCategories as $category) {
+                $segments = $this->getDemographicSegments($category);
+                $counts = array_fill_keys($segments, 0);
+
+                if ($serviceType !== 'internal') {
+                    $externalCounts = $this->getDemographicCountsForSource(
+                        source: 'external',
+                        category: $category,
+                        officeId: $officeId,
+                        startDate: $startDate,
+                        endDate: $endDate,
+                    );
+
+                    foreach ($externalCounts as $segment => $value) {
+                        $counts[$segment] = ($counts[$segment] ?? 0) + $value;
+                    }
+                }
+
+                if ($serviceType !== 'external') {
+                    $internalCounts = $this->getDemographicCountsForSource(
+                        source: 'internal',
+                        category: $category,
+                        officeId: $officeId,
+                        startDate: $startDate,
+                        endDate: $endDate,
+                    );
+
+                    foreach ($internalCounts as $segment => $value) {
+                        $counts[$segment] = ($counts[$segment] ?? 0) + $value;
+                    }
+                }
+
+                $totalResponses = array_sum($counts);
+                $distribution = [];
+
+                foreach ($segments as $segment) {
+                    $value = (int) ($counts[$segment] ?? 0);
+                    $distribution[] = [
+                        'name' => $segment,
+                        'value' => $value,
+                        'percentage' => $totalResponses === 0
+                            ? 0
+                            : round(($value / $totalResponses) * 100, 2),
+                    ];
+                }
+
+                $demographicDistributions[$category] = [
+                    'category' => $this->getDemographicCategoryDisplayName($category),
+                    'distribution' => $distribution,
+                    'total_responses' => $totalResponses,
+                ];
+            }
+
+            // SQD distributions for SQD0-SQD8
+            $sqdCodes = ['SQD0', 'SQD1', 'SQD2', 'SQD3', 'SQD4', 'SQD5', 'SQD6', 'SQD7', 'SQD8'];
+            $sqdDistributions = [];
+
+            foreach ($sqdCodes as $sqdCode) {
+                $dbSqdCode = $this->normalizeSqdCode($sqdCode);
+
+                $question = EvaluationQuestion::query()
+                    ->whereIn('question_type', ['LIKERT'])
+                    ->where(function (Builder $query) use ($dbSqdCode) {
+                        $query->where('question_code', $dbSqdCode)
+                            ->orWhere('question_text', 'like', $dbSqdCode . '%');
+                    })
+                    ->first();
+
+                $description = $question?->question_text ?? $dbSqdCode;
+
+                $criteriaCounts = [
+                    1 => 0,
+                    2 => 0,
+                    3 => 0,
+                    4 => 0,
+                    5 => 0,
+                    0 => 0,
+                ];
+
+                if ($serviceType !== 'internal') {
+                    $externalCounts = $this->getSqdCriteriaCountsForSource(
+                        source: 'external',
+                        officeId: $officeId,
+                        startDate: $startDate,
+                        endDate: $endDate,
+                        sqdCode: $dbSqdCode,
+                    );
+
+                    foreach ($externalCounts as $key => $value) {
+                        $criteriaCounts[$key] += $value;
+                    }
+                }
+
+                if ($serviceType !== 'external') {
+                    $internalCounts = $this->getSqdCriteriaCountsForSource(
+                        source: 'internal',
+                        officeId: $officeId,
+                        startDate: $startDate,
+                        endDate: $endDate,
+                        sqdCode: $dbSqdCode,
+                    );
+
+                    foreach ($internalCounts as $key => $value) {
+                        $criteriaCounts[$key] += $value;
+                    }
+                }
+
+                $totalRespondents = $this->getSqdTotalRespondents(
+                    officeId: $officeId,
+                    serviceType: $serviceType,
+                    startDate: $startDate,
+                    endDate: $endDate,
+                );
+
+                $naCount = $criteriaCounts[0];
+                $numerator = $criteriaCounts[4] + $criteriaCounts[5];
+                $denominator = $totalRespondents - $naCount;
+                $overallPercentage = $denominator <= 0
+                    ? 0.0
+                    : round(($numerator / $denominator) * 100, 2);
+
+                $distribution = [
+                    [
+                        'criteria' => self::SQD_CRITERIA[1],
+                        'value' => $criteriaCounts[1],
+                        'option' => 1,
+                    ],
+                    [
+                        'criteria' => self::SQD_CRITERIA[2],
+                        'value' => $criteriaCounts[2],
+                        'option' => 2,
+                    ],
+                    [
+                        'criteria' => self::SQD_CRITERIA[3],
+                        'value' => $criteriaCounts[3],
+                        'option' => 3,
+                    ],
+                    [
+                        'criteria' => self::SQD_CRITERIA[4],
+                        'value' => $criteriaCounts[4],
+                        'option' => 4,
+                    ],
+                    [
+                        'criteria' => self::SQD_CRITERIA[5],
+                        'value' => $criteriaCounts[5],
+                        'option' => 5,
+                    ],
+                    [
+                        'criteria' => self::SQD_CRITERIA[0],
+                        'value' => $criteriaCounts[0],
+                        'option' => 0,
+                    ],
+                ];
+
+                $sqdDistributions[$sqdCode] = [
+                    'sqd_code' => $dbSqdCode,
+                    'description' => $description,
+                    'distribution' => $distribution,
+                    'total_responses' => $totalRespondents,
+                    'overall_percentage' => $overallPercentage,
+                ];
+            }
+
+            // Generate chart images via QuickChart
+            $ccChartPaths = [
+                'awareness' => null,
+                'visibility' => null,
+                'helpfulness' => null,
+            ];
+
+            if (!empty($citizenCharterData['awareness'] ?? [])) {
+                $ccChartPaths['awareness'] = $this->chartImageService->generateCitizenCharterBarChart(
+                    $citizenCharterData['awareness'],
+                    'CC1',
+                    $ccQuestions['awareness'],
+                    $officeDisplayName,
+                    $periodLabel,
+                );
+            }
+
+            if (!empty($citizenCharterData['visibility'] ?? [])) {
+                $ccChartPaths['visibility'] = $this->chartImageService->generateCitizenCharterBarChart(
+                    $citizenCharterData['visibility'],
+                    'CC2',
+                    $ccQuestions['visibility'],
+                    $officeDisplayName,
+                    $periodLabel,
+                );
+            }
+
+            if (!empty($citizenCharterData['helpfulness'] ?? [])) {
+                $ccChartPaths['helpfulness'] = $this->chartImageService->generateCitizenCharterBarChart(
+                    $citizenCharterData['helpfulness'],
+                    'CC3',
+                    $ccQuestions['helpfulness'],
+                    $officeDisplayName,
+                    $periodLabel,
+                );
+            }
+
+            $sqdChartPaths = [];
+
+            foreach ($sqdDistributions as $code => $payload) {
+                $sqdChartPaths[$code] = $this->chartImageService->generateSqdBarChart(
+                    $code,
+                    $payload['description'],
+                    $payload['distribution'],
+                    $officeDisplayName,
+                    $periodLabel,
+                    $serviceTypeLabel,
+                );
+            }
+
+            $demographicChartPaths = [];
+
+            foreach ($demographicDistributions as $key => $payload) {
+                $demographicChartPaths[$key] = $this->chartImageService->generateDemographicPieChart(
+                    $payload['category'],
+                    $payload['distribution'],
+                    $officeDisplayName,
+                    $periodLabel,
+                );
+            }
+
+            $overallScoreChartPath = null;
+
+            if (!empty($overallScorePayload['chart_data'] ?? [])) {
+                $overallScoreChartPath = $this->chartImageService->generateOverallScorePerServiceBarChart(
+                    $overallScorePayload['chart_data'],
+                    $serviceTypeLabel,
+                    $officeDisplayName,
+                    $periodLabel,
+                );
+            }
+
+            $pdf = Pdf::loadView('analytics.csm-graphs-report', [
+                'officeName' => $officeName,
+                'officeAcronym' => $officeAcronym,
+                'officeDisplayName' => $officeDisplayName,
+                'periodLabel' => $periodLabel,
+                'period' => $period,
+                'date' => $date,
+                'month' => $month,
+                'year' => $year,
+                'serviceType' => $serviceType,
+                'serviceTypeLabel' => $serviceTypeLabel,
+                'overviewData' => $overviewData,
+                'citizenCharterData' => $citizenCharterData,
+                'ccQuestions' => $ccQuestions,
+                'sqdDistributions' => $sqdDistributions,
+                'demographicDistributions' => $demographicDistributions,
+                'overallScorePayload' => $overallScorePayload,
+                'ccChartPaths' => $ccChartPaths,
+                'sqdChartPaths' => $sqdChartPaths,
+                'demographicChartPaths' => $demographicChartPaths,
+                'overallScoreChartPath' => $overallScoreChartPath,
+            ])->setPaper('a4', 'portrait');
+
+            $safeOfficeName = str_replace(['/', '\\'], '-', $officeDisplayName);
+            $fileName = sprintf('%s Client Satisfaction Measurement Graph - %s.pdf', $safeOfficeName, $periodLabel);
+
+            return $pdf->download($fileName);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('CSM export graphs error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error exporting CSM analytics graphs',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * @return array<int, array<int, string>>
      */
     private function buildOverviewExportRows(
@@ -1056,13 +1425,27 @@ class CsmAnalyticsController extends Controller
 
     private function buildCsmExportFilename(string $period, Carbon $date, int $month, int $year): string
     {
-        $dateLabel = match ($period) {
+        $dateLabel = $this->buildPeriodLabel($period, $date, $month, $year);
+
+        return "Client Satisfaction Measurement (CSM) Report - {$dateLabel}.xlsx";
+    }
+
+    private function buildPeriodLabel(string $period, Carbon $date, int $month, int $year): string
+    {
+        return match ($period) {
             'monthly' => Carbon::create($year, $month, 1)->format('F Y'),
             'yearly' => (string) $year,
             default => $date->format('F j, Y'),
         };
+    }
 
-        return "Client Satisfaction Measurement (CSM) Report - {$dateLabel}.xlsx";
+    private function mapServiceTypeLabel(string $serviceType): string
+    {
+        return match ($serviceType) {
+            'internal' => 'Internal',
+            'all' => 'All (External and Internal)',
+            default => 'External',
+        };
     }
 
     /**

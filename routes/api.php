@@ -123,6 +123,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/csm/demographic-profile', [CsmAnalyticsController::class, 'getDemographicProfile']);
         Route::get('/analytics/csm/overall-score-per-service', [CsmAnalyticsController::class, 'getOverallScorePerService']);
         Route::post('/analytics/csm/export', [CsmAnalyticsController::class, 'exportTables']);
+        Route::post('/analytics/csm/export-graphs', [CsmAnalyticsController::class, 'exportGraphs']);
 
         // Counter Management
         Route::get('/counters', [CounterController::class, 'index']);

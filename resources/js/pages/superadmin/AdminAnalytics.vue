@@ -153,12 +153,13 @@
         </Popover>
 
         <Button
-          class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white whitespace-nowrap"
+          class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white whitespace-nowrap flex items-center gap-2"
           type="button"
           :disabled="!selectedOffice"
           @click="openExportModal"
         >
-          Export Graph
+          <BarChart3 class="h-4 w-4" />
+          Generate Graph
         </Button>
       </div>
     </div>
@@ -495,6 +496,7 @@ import {
   Hourglass,
   Building2,
   Loader2,
+  BarChart3,
 } from 'lucide-vue-next'
 import {
   Popover,
