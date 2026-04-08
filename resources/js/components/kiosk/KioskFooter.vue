@@ -14,7 +14,9 @@
     <button 
       v-if="nextVisible"
       @click="$emit('next')" 
-      class="flex items-center gap-2 text-[#0F5C5C] font-semibold cursor-pointer"
+      :disabled="nextDisabled"
+      class="flex items-center gap-2 font-semibold cursor-pointer"
+      :class="nextDisabled ? 'text-gray-400 cursor-not-allowed' : 'text-[#0F5C5C]'"
     >
       Magpatuloy
       <Triangle class="w-6 h-6 rotate-90 fill-current" />
@@ -30,6 +32,10 @@ defineProps({
   nextVisible: {
     type: Boolean,
     default: true
+  },
+  nextDisabled: {
+    type: Boolean,
+    default: false
   }
 })
 

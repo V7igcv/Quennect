@@ -10,10 +10,17 @@
       />
     </div>
     
-    <!-- Main content -->
-    <div class="transition-all duration-300" :class="sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
-      <!-- Mobile menu button -->
+    <!-- Main content - Adjust based on route -->
+    <div 
+      class="transition-all duration-300" 
+      :class="[
+        sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64',
+        isChatRoute ? 'p-0' : ''
+      ]"
+    >
+      <!-- Mobile menu button - Hide on chat page -->
       <button
+        v-if="!isChatRoute"
         class="lg:hidden fixed top-3 left-3 z-60 bg-[#0F5C5C] text-white p-2 rounded-md shadow-md"
         @click="toggleMobileSidebar"
       >
@@ -22,10 +29,10 @@
         </svg>
       </button>
 
-      <!-- Header -->
-      <Header :user="currentUser" />
+      <!-- Header - Hide on chat page -->
+      <Header v-if="!isChatRoute" :user="currentUser" />
       
-      <!-- Mobile sidebar overlay (for small screens) -->
+      <!-- Mobile sidebar overlay -->
       <Transition name="mobile-overlay-fade">
         <div 
           v-if="mobileSidebarOpen" 
@@ -34,7 +41,7 @@
         ></div>
       </Transition>
       
-      <!-- Mobile sidebar (for small screens) -->
+      <!-- Mobile sidebar -->
       <Transition name="mobile-sidebar-slide">
         <div 
           v-if="mobileSidebarOpen" 
@@ -49,11 +56,12 @@
         </div>
       </Transition>
       
-      <!-- Page Content -->
-      <main class="p-6">
-        <router-view />
+      <!-- Page Content - Remove padding on chat route -->
+      <main :class="isChatRoute ? 'p-0 h-screen' : 'p-6'">
+        <router-view :current-office-id="officeId" />
       </main>
 
+      <!-- Logout Modal -->
       <div v-if="showLogoutConfirmModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-60 px-4">
         <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
           <h3 class="text-lg font-semibold mb-2">Log out?</h3>
@@ -84,8 +92,8 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue' // Add onMounted
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import Header from '../components/common/Header.vue'
 import FrontdeskSidebar from '../components/frontdesk/FrontdeskSidebar.vue'
 import { authService } from '../services/auth'
@@ -98,37 +106,49 @@ export default {
   },
   setup() {
     const router = useRouter()
+    const route = useRoute()
     const sidebarCollapsed = ref(false)
     const mobileSidebarOpen = ref(false)
     const isRefreshing = ref(false)
     const showLogoutConfirmModal = ref(false)
     const isLoggingOut = ref(false)
 
-    // Initialize with stored user data immediately - this prevents "Loading..." flash
+    // Check if current route is chat
+    const isChatRoute = computed(() => {
+      return route.path === '/frontdesk/chat'
+    })
+
+    // Initialize with stored user data immediately
     const currentUser = ref(authService.getCurrentUser())
 
+    // Extract office ID as a number
+    const officeId = computed(() => {
+      if (!currentUser.value) return null
+      if (currentUser.value.office_id) {
+        return Number(currentUser.value.office_id)
+      }
+      if (currentUser.value.office && currentUser.value.office.id) {
+        return Number(currentUser.value.office.id)
+      }
+      return null
+    })
+
+    console.log('Office ID:', officeId.value)
+    console.log('Is Chat Route:', isChatRoute.value)
+
     const fetchUserData = async () => {
-      // Only fetch if we have a token (user is authenticated)
       if (!authService.isAuthenticated()) {
         return
       }
 
       isRefreshing.value = true
       try {
-        // This will get fresh data from the server
         const freshUserData = await authService.getUser()
-        
-        // Update localStorage with fresh data
         localStorage.setItem('user', JSON.stringify(freshUserData))
-        
-        // Update the reactive reference
         currentUser.value = freshUserData
-        
-        console.log('User data refreshed:', freshUserData) // For debugging
+        console.log('User data refreshed:', freshUserData)
       } catch (error) {
         console.error('Failed to refresh user data:', error)
-        
-        // If we get a 401, redirect to login
         if (error.response?.status === 401) {
           router.push('/login')
         }
@@ -137,7 +157,6 @@ export default {
       }
     }
 
-    // Fetch fresh data on mount (but the UI already has the stored data)
     onMounted(() => {
       fetchUserData()
     })
@@ -181,6 +200,8 @@ export default {
       showLogoutConfirmModal,
       isLoggingOut,
       currentUser,
+      officeId,
+      isChatRoute,
       toggleSidebar,
       toggleMobileSidebar,
       openLogoutConfirmModal,

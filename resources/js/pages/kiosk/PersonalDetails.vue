@@ -72,7 +72,7 @@
 
           <!-- Lane Type -->
           <div>
-            <label class="block text-base font-semibold text-gray-700 mb-2">Uri ng Lane:</label>
+            <label class="block text-base font-semibold text-gray-700 mb-2">Uri ng Pila:</label>
             <div class="flex gap-6">
               <label class="flex items-center">
                 <input 
@@ -96,7 +96,7 @@
           </div>
 
           <!-- Priority Sectors (shown only if Priority is selected) -->
-          <div v-if="form.lane_type === 'priority'" class="mt-4">
+          <div v-if="form.lane_type === 'priority'">
             <label class="block text-base font-semibold text-gray-700 mb-3">Priority Sector:</label>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label 
@@ -115,15 +115,33 @@
             </div>
             <p v-if="errors.priority_sectors" class="text-red-500 text-xs mt-2">{{ errors.priority_sectors }}</p>
           </div>
+
+          <!-- DPA Consent Checkbox -->
+          <div class="pt-4 border-t border-gray-200">
+            <label class="flex items-start space-x-3 cursor-pointer">
+              <input 
+                type="checkbox" 
+                v-model="form.dpa_consent"
+                class="w-5 h-5 text-[#0F5C5C] focus:ring-[#0F5C5C] rounded mt-0.5"
+              >
+              <span class="text-sm text-gray-700 leading-relaxed">
+                Pumapayag ako na gamitin ng opisina ang aking personal na impormasyon para sa layunin ng queuing system at transaksyon alinsunod sa 
+                <span class="font-semibold">Data Privacy Act of 2012 (Republic Act No. 10173)</span>.
+              </span>
+            </label>
+            <p v-if="errors.dpa_consent" class="text-red-500 text-xs mt-2">{{ errors.dpa_consent }}</p>
+          </div>
+
         </form>
       </div>
     </div>
 
-    <!-- Footer with KioskFooter component -->
+    <!-- Footer -->
     <KioskFooter 
       @back="goBack"
       @next="showConfirmationModal"
       :nextVisible="true"
+      :nextDisabled="!isFormValid"
     />
 
     <!-- Confirmation Modal -->
@@ -144,7 +162,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import KioskHeader from '../../components/kiosk/KioskHeader.vue'
 import KioskFooter from '../../components/kiosk/KioskFooter.vue'
-import ConfirmationModal from '../../components/kiosk/ConfirmationModal.vue'  // ✅ Add this import
+import ConfirmationModal from '../../components/kiosk/ConfirmationModal.vue'
 import kioskApi from '../../services/kioskApi'
 
 const router = useRouter()
@@ -152,7 +170,7 @@ const barangays = ref([])
 const prioritySectors = ref([])
 const selectedOffice = ref(null)
 const selectedServices = ref([])
-const showConfirmation = ref(false)  // ✅ Add this variable
+const showConfirmation = ref(false)
 
 // Form data
 const form = ref({
@@ -160,10 +178,27 @@ const form = ref({
   contact_number: '',
   barangay_id: '',
   lane_type: 'regular',
-  priority_sectors: []
+  priority_sectors: [],
+  dpa_consent: false
 })
 
 const errors = ref({})
+
+// Check if form is valid for enabling next button
+const isFormValid = computed(() => {
+  // Check if DPA consent is checked
+  if (!form.value.dpa_consent) return false
+  
+  // Check required fields
+  if (!form.value.full_name || !form.value.full_name.trim()) return false
+  if (!form.value.contact_number || !form.value.contact_number.trim()) return false
+  if (!form.value.barangay_id) return false
+  
+  // Check priority sectors if lane_type is priority
+  if (form.value.lane_type === 'priority' && (!form.value.priority_sectors || form.value.priority_sectors.length === 0)) return false
+  
+  return true
+})
 
 // Confirmation details
 const confirmationDetails = computed(() => ({
@@ -174,12 +209,12 @@ const confirmationDetails = computed(() => ({
 
 // Helper function to get barangay name
 const getBarangayName = (barangay) => {
-  return barangay.barangay_name || barangay.name || barangay.nama || 'Unknown'
+  return barangay.barangay_name || barangay.name || 'Unknown'
 }
 
 // Helper function to get sector name
 const getSectorName = (sector) => {
-  return sector.sector_name || sector.name || sector.nama || 'Unknown'
+  return sector.sector_name || sector.name || 'Unknown'
 }
 
 // Get selected office and services from localStorage
@@ -233,6 +268,7 @@ const fetchPrioritySectors = async () => {
 
 // Compute selected services names for display
 const selectedServicesNames = computed(() => {
+  if (!selectedServices.value || selectedServices.value.length === 0) return ''
   return selectedServices.value.map(s => `${s.name} (${s.code})`).join(', ')
 })
 
@@ -240,11 +276,11 @@ const selectedServicesNames = computed(() => {
 const validateForm = () => {
   const newErrors = {}
   
-  if (!form.value.full_name.trim()) {
+  if (!form.value.full_name || !form.value.full_name.trim()) {
     newErrors.full_name = 'Paki-input ang iyong pangalan.'
   }
   
-  if (!form.value.contact_number.trim()) {
+  if (!form.value.contact_number || !form.value.contact_number.trim()) {
     newErrors.contact_number = 'Paki-input ang iyong contact number.'
   } else if (!/^(09|\+639)\d{9}$/.test(form.value.contact_number)) {
     newErrors.contact_number = 'Gumamit ng tamang format: 09123456789 o +639123456789.'
@@ -254,8 +290,12 @@ const validateForm = () => {
     newErrors.barangay_id = 'Pumili ng iyong barangay.'
   }
   
-  if (form.value.lane_type === 'priority' && form.value.priority_sectors.length === 0) {
+  if (form.value.lane_type === 'priority' && (!form.value.priority_sectors || form.value.priority_sectors.length === 0)) {
     newErrors.priority_sectors = 'Pumili ng kahit isang priority sector.'
+  }
+  
+  if (!form.value.dpa_consent) {
+    newErrors.dpa_consent = 'Kailangan mong pumayag sa Data Privacy Act para magpatuloy.'
   }
   
   errors.value = newErrors

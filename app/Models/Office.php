@@ -91,4 +91,90 @@ class Office extends Model
     {
         return $query->where('is_active', true);
     }
+
+    // ============= CHAT RELATIONSHIPS =============
+
+    /**
+     * Get all messages sent by this office
+     */
+    public function sentMessages()
+    {
+        return $this->hasMany(ChatMessage::class, 'sender_office_id');
+    }
+
+    /**
+     * Get all messages received by this office
+     */
+    public function receivedMessages()
+    {
+        return $this->hasMany(ChatMessage::class, 'receiver_office_id');
+    }
+
+    /**
+     * Get all messages (sent and received)
+     */
+    public function getAllMessages()
+    {
+        return ChatMessage::where('sender_office_id', $this->id)
+            ->orWhere('receiver_office_id', $this->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * Get unread messages count for this office
+     */
+    public function getUnreadMessagesCount(): int
+    {
+        return ChatMessage::where('receiver_office_id', $this->id)
+            ->where('is_read', false)
+            ->count();
+    }
+
+    /**
+     * Get last message (sent or received)
+     */
+    public function getLastMessage(): ?ChatMessage
+    {
+        return ChatMessage::where('sender_office_id', $this->id)
+            ->orWhere('receiver_office_id', $this->id)
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * Get all offices that this office has chatted with
+     */
+    public function getConversations()
+    {
+        // Get unique office IDs from sent messages
+        $sentOfficeIds = ChatMessage::where('sender_office_id', $this->id)
+            ->distinct()
+            ->pluck('receiver_office_id')
+            ->toArray();
+            
+        // Get unique office IDs from received messages
+        $receivedOfficeIds = ChatMessage::where('receiver_office_id', $this->id)
+            ->distinct()
+            ->pluck('sender_office_id')
+            ->toArray();
+            
+        // Merge and remove duplicates
+        $officeIds = array_unique(array_merge($sentOfficeIds, $receivedOfficeIds));
+        
+        // Return offices (excluding self)
+        return Office::whereIn('id', $officeIds)
+            ->where('id', '!=', $this->id)
+            ->get();
+    }
+
+    /**
+     * Check if office is online (can be expanded with presence channels later)
+     */
+    public function isOnline(): bool
+    {
+        // For now, return true if office is active
+        // Later, this can be tied to WebSocket presence
+        return $this->is_active;
+    }
 }

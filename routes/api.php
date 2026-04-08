@@ -22,7 +22,10 @@ use App\Http\Controllers\CsmAnalyticsController;
 // Internal Transactions Controllers
 use App\Http\Controllers\InternalRequestController;
 use App\Http\Controllers\InternalRequestNotificationController;
-use App\Http\Controllers\InternalEvaluationController;  // ✅ I-ADD ITO
+use App\Http\Controllers\InternalEvaluationController;
+
+// Chat Controller
+use App\Http\Controllers\ChatController;
 
 /*
 |--------------------------------------------------------------------------
@@ -77,6 +80,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
     Route::get('/verify', [AuthController::class, 'verify']);
+
+    // ==================== CHAT ROUTES (Available for all authenticated users) ====================
+    Route::prefix('chat')->group(function () {
+        Route::get('/offices', [ChatController::class, 'getOffices']);
+        Route::get('/messages/{officeId}', [ChatController::class, 'getMessages']);
+        Route::post('/send', [ChatController::class, 'sendMessage']);
+        Route::post('/upload', [ChatController::class, 'uploadFile']);
+        Route::post('/read/{senderId}', [ChatController::class, 'markAsRead']);
+        Route::get('/unread-count', [ChatController::class, 'getUnreadCount']);
+        Route::delete('/message/{messageId}', [ChatController::class, 'deleteMessage']);
+    });
 
     // ==================== SUPERADMIN ====================
     Route::middleware('role:SUPERADMIN')->prefix('superadmin')->group(function () {
