@@ -20,7 +20,12 @@ const routes = [
     component: KioskLayout,
     children: [
       {
-        path: 'welcome',
+        path: 'intro',           // Intro video page
+        name: 'kiosk.intro',
+        component: () => import('../pages/kiosk/IntroVideoPage.vue')
+      },
+      {
+        path: 'welcome',         // Welcome page after intro
         name: 'kiosk.welcome',
         component: () => import('../pages/kiosk/Welcome.vue')
       },
@@ -135,7 +140,7 @@ const routes = [
         const user = authService.getCurrentUser()
         return user?.role === 'SUPERADMIN' ? '/superadmin' : '/frontdesk'
       }
-      return '/kiosk/welcome'
+      return '/kiosk/intro'     // Redirect to intro video page for non-authenticated users
     }
   }
 ]
