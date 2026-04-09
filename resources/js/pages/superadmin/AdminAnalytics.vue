@@ -398,18 +398,30 @@
       <h2 class="text-xl font-semibold mb-4">Queue Summary</h2>
 
       <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+          <div class="w-full sm:w-64">
+            <input
+              v-model="queueSummarySearch"
+              type="text"
+              placeholder="Search queue summary..."
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-[#0F5C5C] focus:ring-1 focus:ring-[#0F5C5C] outline-none"
+            >
+          </div>
+          <p class="text-sm text-gray-600 sm:ml-2">Search by queue number, client name, service, or barangay.</p>
+        </div>
+
         <Table class="w-full table-fixed">
           <TableHeader>
             <TableRow>
               <TableHead class="w-[11.11%]">Queue Number</TableHead>
               <TableHead class="w-[11.11%]">Client Name</TableHead>
+              <TableHead class="w-[11.11%]">Barangay</TableHead>
+              <TableHead class="w-[11.11%]">Contact Number</TableHead>
               <TableHead class="w-[11.11%]">Service</TableHead>
               <TableHead class="w-[11.11%]">Lane Type</TableHead>
               <TableHead class="w-[11.11%]">Status</TableHead>
               <TableHead class="w-[11.11%]">Completion Time</TableHead>
-              <TableHead class="w-[11.11%]">Waiting Time</TableHead>
-              <TableHead class="w-[11.11%]">Service Time</TableHead>
-              <TableHead class="w-[11.11%]">Average Satisfaction Rating</TableHead>
+              <TableHead class="w-[5%]"></TableHead>
             </TableRow>
           </TableHeader>
 
@@ -417,7 +429,26 @@
             <TableRow v-for="entry in paginatedQueueSummaryRows" :key="entry.id">
               <TableCell class="font-medium">{{ entry.queueNumber }}</TableCell>
               <TableCell>{{ entry.clientName }}</TableCell>
-              <TableCell>{{ entry.serviceCode }}</TableCell>
+              <TableCell>{{ entry.barangay || 'N/A' }}</TableCell>
+              <TableCell>{{ entry.contactNumber || 'N/A' }}</TableCell>
+              <TableCell>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <span class="cursor-default truncate block">
+                        {{ entry.serviceCode || 'N/A' }}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent class="max-w-xs whitespace-pre-line text-white">
+                      <p class="font-semibold text-white mb-1">Service name(s)</p>
+                      <p v-if="!entry.serviceNames || !entry.serviceNames.length" class="text-gray-100 text-xs">No service names available</p>
+                      <ul v-else class="list-disc list-inside text-xs text-gray-100 space-y-0.5">
+                        <li v-for="(name, idx) in entry.serviceNames" :key="idx">{{ name }}</li>
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </TableCell>
               <TableCell>{{ entry.laneType }}</TableCell>
               <TableCell>
                 <span
@@ -428,9 +459,15 @@
                 </span>
               </TableCell>
               <TableCell>{{ entry.completionTime }}</TableCell>
-              <TableCell>{{ entry.averageWaitingTime }} min</TableCell>
-              <TableCell>{{ entry.averageServingTime }} min</TableCell>
-              <TableCell>{{ entry.averageSatisfactionRating }}</TableCell>
+              <TableCell class="text-right">
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-md p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                  @click="openQueueDetails(entry)"
+                >
+                  <MoreHorizontal class="w-4 h-4" />
+                </button>
+              </TableCell>
             </TableRow>
 
             <TableRow v-if="!isLoadingQueueSummary && paginatedQueueSummaryRows.length === 0">
@@ -438,8 +475,6 @@
                 No queue summary records found.
               </TableCell>
             </TableRow>
-
-            <!-- Intentionally hide in-table loading message to match frontdesk behavior -->
           </TableBody>
         </Table>
 
@@ -476,6 +511,111 @@
         </div>
       </div>
     </div>
+
+    <div v-if="showQueueDetailsModal" class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/60" @click="closeQueueDetails"></div>
+      <div class="relative bg-white rounded-lg w-full max-w-3xl mx-4 py-6 px-6 sm:px-8 shadow-2xl max-h-[90vh] overflow-y-auto z-10">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg sm:text-xl font-semibold text-gray-900">Queue Details</h2>
+          <button type="button" class="text-gray-400 hover:text-gray-600" @click="closeQueueDetails">
+            <span class="sr-only">Close</span>
+            ×
+          </button>
+        </div>
+
+        <div v-if="selectedQueueEntry" class="space-y-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Queue Number</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.queueNumber }}</p>
+            </div>
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Client Name</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.clientName || 'N/A' }}</p>
+            </div>
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Sex</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.sex || 'N/A' }}</p>
+            </div>
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Age</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.age ?? 'N/A' }}</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Barangay</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.barangay || 'N/A' }}</p>
+            </div>
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Contact Number</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.contactNumber || 'N/A' }}</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Service</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.serviceCode || 'N/A' }}</p>
+              <p v-if="selectedQueueEntry.serviceNames && selectedQueueEntry.serviceNames.length" class="mt-1 text-xs text-gray-600">
+                {{ selectedQueueEntry.serviceNames.join(', ') }}
+              </p>
+            </div>
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Lane Type</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ formattedLaneType }}</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Status</p>
+              <p class="mt-1 text-sm font-semibold" :class="selectedQueueEntry.status === 'Completed' ? 'text-green-700' : 'text-red-700'">
+                {{ selectedQueueEntry.status }}
+              </p>
+            </div>
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Completion Time</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.completionTime || 'N/A' }}</p>
+            </div>
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Average Satisfaction Rating</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.averageSatisfactionRating || 'N/A' }}</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Waiting Time</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">
+                {{ selectedQueueEntry.averageWaitingTime != null ? `${selectedQueueEntry.averageWaitingTime} min` : 'N/A' }}
+              </p>
+            </div>
+            <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Service Time</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900">
+                {{ selectedQueueEntry.averageServingTime != null ? `${selectedQueueEntry.averageServingTime} min` : 'N/A' }}
+              </p>
+            </div>
+          </div>
+
+          <div v-if="formattedAssistanceProvided" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Assistance Provided</p>
+            <p class="mt-1 text-sm font-semibold text-emerald-900">{{ formattedAssistanceProvided }}</p>
+            <p v-if="selectedQueueEntry.assistanceProvidedAt" class="mt-0.5 text-xs text-emerald-800">
+              Recorded on: {{ selectedQueueEntry.assistanceProvidedAt }}
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <Button type="button" variant="outline" class="px-4" @click="closeQueueDetails">
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -497,6 +637,7 @@ import {
   Building2,
   Loader2,
   BarChart3,
+  MoreHorizontal,
 } from 'lucide-vue-next'
 import {
   Popover,
@@ -544,6 +685,8 @@ const isLoadingQueueSummary = ref(false)
 const isApplyingDateFilter = ref(false)
 const showExportModal = ref(false)
 const isExportingGraphs = ref(false)
+const showQueueDetailsModal = ref(false)
+const selectedQueueEntry = ref(null)
 
 const stats = ref({
   totalClients: 0,
@@ -578,6 +721,7 @@ const queueMetricExplanations = {
 
 const queueSummaryRowsPerPage = 10
 const currentQueueSummaryPage = ref(1)
+const queueSummarySearch = ref('')
 const queueSummaryPagination = ref({
   currentPage: 1,
   perPage: queueSummaryRowsPerPage,
@@ -590,7 +734,22 @@ const queueSummaryRows = ref([])
 
 const queueSummaryTotalRows = computed(() => queueSummaryPagination.value.totalRows)
 const queueSummaryTotalPages = computed(() => Math.max(1, queueSummaryPagination.value.totalPages))
-const paginatedQueueSummaryRows = computed(() => queueSummaryRows.value)
+const paginatedQueueSummaryRows = computed(() => {
+  const query = queueSummarySearch.value.trim().toLowerCase()
+  if (!query) return queueSummaryRows.value
+
+  return queueSummaryRows.value.filter((row) => {
+    const queueNumber = String(row.queueNumber || '').toLowerCase()
+    const clientName = String(row.clientName || '').toLowerCase()
+    const serviceCode = String(row.serviceCode || '').toLowerCase()
+    const barangay = String(row.barangay || '').toLowerCase()
+
+    return queueNumber.includes(query)
+      || clientName.includes(query)
+      || serviceCode.includes(query)
+      || barangay.includes(query)
+  })
+})
 const queueSummaryStartRow = computed(() => queueSummaryPagination.value.startRow)
 const queueSummaryEndRow = computed(() => queueSummaryPagination.value.endRow)
 const selectedOfficeAcronym = computed(() => {
@@ -1052,13 +1211,21 @@ const fetchQueueSummary = async () => {
       id: row.id,
       queueNumber: row.queue_number,
       clientName: row.client_name,
+      barangay: row.barangay_name,
+      contactNumber: row.contact_number,
       serviceCode: row.service_code,
+      serviceNames: row.service_names || [],
       laneType: row.lane_type,
+      prioritySectors: row.priority_sectors || [],
       status: row.status,
       completionTime: row.completion_time,
       averageWaitingTime: row.waiting_time ?? 0,
       averageServingTime: row.service_time ?? 0,
       averageSatisfactionRating: row.average_satisfaction_rating,
+      sex: row.sex,
+      age: row.age,
+      assistanceProvided: row.assistance_provided,
+      assistanceProvidedAt: row.assistance_provided_at,
     }))
 
     const pagination = payload.pagination || {}
@@ -1084,6 +1251,43 @@ const fetchQueueSummary = async () => {
   } finally {
     isLoadingQueueSummary.value = false
   }
+}
+
+const formattedLaneType = computed(() => {
+  if (!selectedQueueEntry.value) return ''
+  if (!selectedQueueEntry.value.laneType || selectedQueueEntry.value.laneType === 'Regular') {
+    return 'Regular'
+  }
+
+  const sectors = selectedQueueEntry.value.prioritySectors || []
+  if (!sectors.length) return 'Priority'
+
+  return `Priority - ${sectors.join(', ')}`
+})
+
+const formattedAssistanceProvided = computed(() => {
+  if (!selectedQueueEntry.value || selectedQueueEntry.value.assistanceProvided == null) {
+    return null
+  }
+
+  const value = Number(selectedQueueEntry.value.assistanceProvided)
+  if (Number.isNaN(value)) return null
+
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+  }).format(value)
+})
+
+const openQueueDetails = (entry) => {
+  selectedQueueEntry.value = entry
+  showQueueDetailsModal.value = true
+}
+
+const closeQueueDetails = () => {
+  showQueueDetailsModal.value = false
+  selectedQueueEntry.value = null
 }
 
 const fetchAnalyticsData = async () => {

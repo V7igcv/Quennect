@@ -30,6 +30,8 @@ class QueueTransaction extends Model
         'average_satisfaction_rating',
         'waiting_time',
         'serving_time',
+        'assistance_provided',
+        'assistance_provided_at',
     ];
 
     protected $casts = [
@@ -38,6 +40,7 @@ class QueueTransaction extends Model
         'called_at' => 'datetime',
         'completed_at' => 'datetime',
         'skipped_at' => 'datetime',
+        'assistance_provided_at' => 'datetime',
         'status' => TransactionStatus::class,  // ✅ Enum casting
     ];
 
@@ -81,6 +84,11 @@ class QueueTransaction extends Model
     {
         return $this->belongsToMany(PrioritySector::class, 'queue_priority_sectors')
                     ->withTimestamps();
+    }
+
+    public function evaluationSession()
+    {
+        return $this->hasOne(EvaluationSession::class, 'queue_transaction_id');
     }
 
     /**

@@ -544,8 +544,17 @@ class FrontdeskAnalyticsController extends Controller
             $baseQuery = QueueTransaction::query()
                 ->with([
                     'services' => function ($query) {
-                        $query->select('services.id', 'services.service_code')
+                        $query->select('services.id', 'services.service_code', 'services.service_name')
                             ->where('service_type', 'External');
+                    },
+                    'barangay' => function ($query) {
+                        $query->select('id', 'barangay_name');
+                    },
+                    'prioritySectors' => function ($query) {
+                        $query->select('priority_sectors.id', 'priority_sectors.sector_name');
+                    },
+                    'evaluationSession' => function ($query) {
+                        $query->select('id', 'queue_transaction_id', 'sex', 'age');
                     },
                 ])
                 ->where('office_id', $officeId)
@@ -577,16 +586,37 @@ class FrontdeskAnalyticsController extends Controller
                     ? $transaction->skipped_at
                     : $transaction->completed_at;
 
+                $serviceCodes = $transaction->services
+                    ->pluck('service_code')
+                    ->filter()
+                    ->values();
+
+                $serviceNames = $transaction->services
+                    ->pluck('service_name')
+                    ->filter()
+                    ->values();
+
+                $prioritySectors = $transaction->prioritySectors
+                    ->pluck('sector_name')
+                    ->filter()
+                    ->values();
+
+                $evaluationSession = $transaction->evaluationSession;
+
+                $assistanceProvidedAt = $transaction->assistance_provided_at
+                    ? $transaction->assistance_provided_at->format('M d, Y h:i A')
+                    : null;
+
                 return [
                     'id' => $transaction->id,
                     'queue_number' => $transaction->full_queue_number,
                     'client_name' => $transaction->client_name,
-                    'service_code' => $transaction->services
-                        ->pluck('service_code')
-                        ->filter()
-                        ->values()
-                        ->implode(', '),
+                    'barangay_name' => $transaction->barangay?->barangay_name,
+                    'contact_number' => $transaction->contact_number,
+                    'service_code' => $serviceCodes->implode(', '),
+                    'service_names' => $serviceNames->all(),
                     'lane_type' => $transaction->is_priority ? 'Priority' : 'Regular',
+                    'priority_sectors' => $prioritySectors->all(),
                     'status' => $isSkipped ? 'Skipped' : 'Completed',
                     'completion_time' => $completionTime?->format('h:i A'),
                     'waiting_time' => $transaction->waiting_time === null
@@ -598,6 +628,10 @@ class FrontdeskAnalyticsController extends Controller
                     'average_satisfaction_rating' => $isSkipped
                         ? '-'
                         : $this->mapAverageSatisfactionLabel($transaction->average_satisfaction_rating),
+                    'sex' => $evaluationSession?->sex,
+                    'age' => $evaluationSession?->age,
+                    'assistance_provided' => $transaction->assistance_provided,
+                    'assistance_provided_at' => $assistanceProvidedAt,
                 ];
             })->values();
 
