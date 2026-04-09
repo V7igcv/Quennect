@@ -25,4 +25,9 @@ class QueueTransactionService extends Pivot
     {
         return $this->belongsTo(Service::class);
     }
+
+    public function serviceAssistance()
+    {
+        return $this->hasOne(ServiceAssistance::class, 'queue_transaction_service_id');
+    }
 }

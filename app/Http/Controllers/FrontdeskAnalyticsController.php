@@ -549,6 +549,9 @@ class FrontdeskAnalyticsController extends Controller
                         $query->select('services.id', 'services.service_code', 'services.service_name')
                             ->where('service_type', 'External');
                     },
+                    'queueTransactionServices' => function ($query) {
+                        $query->with(['serviceAssistance', 'service']);
+                    },
                     'barangay' => function ($query) {
                         $query->select('id', 'barangay_name');
                     },
@@ -605,9 +608,20 @@ class FrontdeskAnalyticsController extends Controller
 
                 $evaluationSession = $transaction->evaluationSession;
 
-                $assistanceProvidedAt = $transaction->assistance_provided_at
-                    ? $transaction->assistance_provided_at->format('M d, Y h:i A')
-                    : null;
+                // Build service assistance details
+                $serviceAssistanceDetails = [];
+                foreach ($transaction->queueTransactionServices as $qts) {
+                    if ($qts->serviceAssistance) {
+                        $serviceAssistanceDetails[] = [
+                            'service_id' => $qts->service_id,
+                            'service_name' => $qts->service?->service_name ?? 'Unknown',
+                            'assistance_provided' => $qts->serviceAssistance->assistance_provided,
+                            'assistance_provided_at' => $qts->serviceAssistance->assistance_provided_at
+                                ? $qts->serviceAssistance->assistance_provided_at->format('M d, Y h:i A')
+                                : null,
+                        ];
+                    }
+                }
 
                 return [
                     'id' => $transaction->id,
@@ -632,8 +646,7 @@ class FrontdeskAnalyticsController extends Controller
                         : $this->mapAverageSatisfactionLabel($transaction->average_satisfaction_rating),
                     'sex' => $evaluationSession?->sex,
                     'age' => $evaluationSession?->age,
-                    'assistance_provided' => $transaction->assistance_provided,
-                    'assistance_provided_at' => $assistanceProvidedAt,
+                    'service_assistance_details' => $serviceAssistanceDetails,
                 ];
             })->values();
 
@@ -830,6 +843,9 @@ class FrontdeskAnalyticsController extends Controller
                         $query->select('services.id', 'services.service_code', 'services.service_name')
                             ->where('service_type', 'External');
                     },
+                    'queueTransactionServices' => function ($query) {
+                        $query->with(['serviceAssistance', 'service']);
+                    },
                     'barangay' => function ($query) {
                         $query->select('id', 'barangay_name');
                     },
@@ -949,8 +965,19 @@ class FrontdeskAnalyticsController extends Controller
 
                             $evaluationSession = $transaction->evaluationSession;
 
-                            $assistanceProvidedAt = $transaction->assistance_provided_at
-                                ? $transaction->assistance_provided_at->format('M d, Y h:i A')
+                            // Find the service assistance for this specific service and transaction
+                            $serviceAssistance = null;
+                            foreach ($transaction->queueTransactionServices as $qts) {
+                                $serviceName = $qts->service?->service_name ?: $qts->service?->service_code ?: 'N/A';
+                                if ($serviceName === $serviceLabel && $qts->serviceAssistance) {
+                                    $serviceAssistance = $qts->serviceAssistance;
+                                    break;
+                                }
+                            }
+
+                            $assistanceProvided = $serviceAssistance?->assistance_provided;
+                            $assistanceProvidedAt = $serviceAssistance?->assistance_provided_at
+                                ? $serviceAssistance->assistance_provided_at->format('M d, Y h:i A')
                                 : null;
 
                             $rowData = [
@@ -967,7 +994,7 @@ class FrontdeskAnalyticsController extends Controller
                                 $transaction->serving_time === null
                                     ? null
                                     : round((float) $transaction->serving_time, 2),
-                                $transaction->assistance_provided,
+                                $assistanceProvided,
                                 $assistanceProvidedAt,
                             ];
 

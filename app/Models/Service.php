@@ -21,11 +21,13 @@ class Service extends Model
         'status',
         'used_count',
         'is_locked',
+        'provides_assistance',
     ];
 
     protected $casts = [
         'is_free' => 'boolean',
         'is_locked' => 'boolean',
+        'provides_assistance' => 'boolean',
         'used_count' => 'integer',
         'deleted_at' => 'datetime',
     ];

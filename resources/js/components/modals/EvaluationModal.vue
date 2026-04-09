@@ -49,6 +49,11 @@
             <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Barangay</p>
             <p class="mt-1 text-sm font-semibold text-[#1F2937]">{{ barangay || 'N/A' }}</p>
           </div>
+
+          <div class="rounded-md border border-gray-200 bg-white px-3 py-2 sm:col-span-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Service(s)</p>
+            <p class="mt-1 text-sm font-semibold text-[#1F2937]">{{ servicesDisplay }}</p>
+          </div>
         </div>
       </div>
 
@@ -92,6 +97,23 @@
             min="0"
             class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
             placeholder="Enter age"
+          >
+        </div>
+      </div>
+
+      <!-- Assistance Fields per Service -->
+      <div v-if="servicesWithAssistance.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+        <div v-for="service in servicesWithAssistance" :key="service.id">
+          <label class="block text-sm font-medium text-[#2E2E2E] mb-1">
+            {{ service.service_name }} - Assistance (₱)
+          </label>
+          <input
+            v-model.number="assistanceAmounts[service.id]"
+            type="number"
+            min="0"
+            step="0.01"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
+            placeholder="Enter assistance amount"
           >
         </div>
       </div>
@@ -309,6 +331,10 @@ const props = defineProps({
   multipleChoiceQuestions: {
     type: Array,
     default: () => []
+  },
+  services: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -330,6 +356,9 @@ const multipleChoiceAnswers = ref({})
 
 // Form data for Page 2 - Likert ratings
 const likertRatings = ref({})
+
+// Form data for assistance - keyed by service id
+const assistanceAmounts = ref({})
 
 const getOptionValueAndLabel = (optionText) => {
   const raw = String(optionText ?? '').trim()
@@ -391,6 +420,21 @@ const visibleMultipleChoiceQuestions = computed(() => {
   })
 })
 
+const servicesWithAssistance = computed(() => {
+  return Array.isArray(props.services)
+    ? props.services.filter((service) => service.provides_assistance === true)
+    : []
+})
+
+const servicesDisplay = computed(() => {
+  if (!Array.isArray(props.services) || props.services.length === 0) {
+    return 'N/A'
+  }
+  return props.services
+    .map((service) => service.service_name || service.service_code || 'Unknown')
+    .join(', ')
+})
+
 watch(multipleChoiceQuestions, (questions) => {
   const next = {}
   questions.forEach((question) => {
@@ -405,6 +449,14 @@ watch(likertQuestions, (questions) => {
     next[question.id] = likertRatings.value[question.id] ?? ''
   })
   likertRatings.value = next
+}, { immediate: true })
+
+watch(servicesWithAssistance, (services) => {
+  const newAmounts = {}
+  services.forEach((service) => {
+    newAmounts[service.id] = assistanceAmounts.value[service.id] ?? ''
+  })
+  assistanceAmounts.value = newAmounts
 }, { immediate: true })
 
 watch(cc1Value, (value) => {
@@ -438,6 +490,7 @@ const resetForm = () => {
   clientType.value = ''
   sex.value = ''
   age.value = ''
+  assistanceAmounts.value = {}
   multipleChoiceAnswers.value = Object.fromEntries(
     multipleChoiceQuestions.value.map((question) => [question.id, ''])
   )
@@ -529,6 +582,31 @@ const handleSubmit = () => {
     return
   }
 
+  // Validate assistance amounts for services that provide assistance
+  if (servicesWithAssistance.value.length > 0) {
+    for (const service of servicesWithAssistance.value) {
+      const amount = assistanceAmounts.value[service.id]
+      if (amount === '' || amount === null || amount === undefined) {
+        emit('alert', { title: 'Validation Error', message: `Please enter assistance amount for ${service.service_name}.` })
+        currentPage.value = 1
+        return
+      }
+
+      const assistanceValue = Number(amount)
+      if (isNaN(assistanceValue) || assistanceValue < 0) {
+        emit('alert', { title: 'Validation Error', message: `Assistance amount for ${service.service_name} must be a valid positive number.` })
+        currentPage.value = 1
+        return
+      }
+    }
+  }
+
+  // Build assistance per service data
+  const assistancePerService = servicesWithAssistance.value.map((service) => ({
+    service_id: service.id,
+    amount: Number(assistanceAmounts.value[service.id])
+  }))
+
   // Combine all form data
   const formData = {
     // Page 1 data
@@ -538,6 +616,8 @@ const handleSubmit = () => {
     age: normalizedAge,
     // Page 2 data
     likertRatings: likertRatings.value,
+    // Assistance data (if applicable)
+    ...(assistancePerService.length > 0 && { assistance_per_service: assistancePerService }),
     // Customer info
     queueNumber: props.queueNumber,
     customerName: props.customerName,

@@ -660,7 +660,19 @@
             </div>
           </div>
 
-          <div v-if="formattedAssistanceProvided" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+          <div v-if="selectedQueueEntry.serviceAssistanceDetails && selectedQueueEntry.serviceAssistanceDetails.length > 0" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Service Assistance Details</p>
+            <div class="mt-2 space-y-2">
+              <div v-for="assist in selectedQueueEntry.serviceAssistanceDetails" :key="assist.service_id" class="text-sm text-emerald-900">
+                <p class="font-medium">{{ assist.service_name }}: ₱{{ Number(assist.assistance_provided).toFixed(2) }}</p>
+                <p v-if="assist.assistance_provided_at" class="text-xs text-emerald-800">
+                  Recorded on: {{ assist.assistance_provided_at }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="formattedAssistanceProvided" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
             <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Assistance Provided</p>
             <p class="mt-1 text-sm font-semibold text-emerald-900">{{ formattedAssistanceProvided }}</p>
             <p v-if="selectedQueueEntry.assistanceProvidedAt" class="mt-0.5 text-xs text-emerald-800">
@@ -1335,6 +1347,7 @@ const fetchQueueSummary = async () => {
       age: row.age,
       assistanceProvided: row.assistance_provided,
       assistanceProvidedAt: row.assistance_provided_at,
+      serviceAssistanceDetails: row.service_assistance_details || [],
     }))
 
     const pagination = payload.pagination || {}

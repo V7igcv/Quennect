@@ -78,6 +78,14 @@ class QueueTransaction extends Model
     }
 
     /**
+     * Get the pivot table records (queue_transaction_services)
+     */
+    public function queueTransactionServices()
+    {
+        return $this->hasMany(QueueTransactionService::class, 'queue_transaction_id');
+    }
+
+    /**
      * Get all priority sectors for this transaction
      */
     public function prioritySectors()

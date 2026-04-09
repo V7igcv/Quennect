@@ -427,6 +427,7 @@
       :customer-name="selectedCustomerName"
       :contact-number="selectedContactNumber"
       :barangay="selectedBarangay"
+      :services="selectedServices"
       :multiple-choice-questions="multipleChoiceQuestions"
       :likert-questions="likertQuestions"
       @submit="handleEvaluationSubmit"
@@ -503,6 +504,7 @@ const selectedCustomerName = ref('')
 const selectedContactNumber = ref('')
 const selectedBarangay = ref('')
 const selectedQueueId = ref(null)
+const selectedServices = ref([])
 const multipleChoiceQuestions = ref([])
 const likertQuestions = ref([])
 
@@ -977,6 +979,7 @@ const openEvaluationModal = async (queueData) => {
       selectedContactNumber.value = transaction.contact_number
       selectedBarangay.value = transaction.barangay_name || ''
       selectedQueueId.value = queueData.id
+      selectedServices.value = transaction.services || []
       showEvaluationModal.value = true
     }
   } catch (error) {
@@ -993,6 +996,7 @@ const handleEvaluationSubmit = async (formData) => {
   try {
     const multipleChoiceAnswers = formData.multipleChoiceAnswers || {}
     const likertAnswers = formData.likertRatings || {}
+    const assistancePerService = formData.assistance_per_service || []
 
     // Format the data for the backend API
     const evaluationData = {
@@ -1012,7 +1016,8 @@ const handleEvaluationSubmit = async (formData) => {
             .filter(([, value]) => value !== '' && value !== null && value !== undefined)
             .map(([questionId, value]) => [questionId, String(value)])
         )
-      }
+      },
+      ...(assistancePerService.length > 0 && { assistance_per_service: assistancePerService })
     }
 
     const response = await api.post(`/frontdesk/evaluation/submit/${selectedQueueId.value}`, evaluationData)
@@ -1030,6 +1035,7 @@ const handleEvaluationSubmit = async (formData) => {
       selectedCustomerName.value = ''
       selectedContactNumber.value = ''
       selectedBarangay.value = ''
+      selectedServices.value = []
       
       alertTitle.value = 'Success'
       alertMessage.value = smsSent

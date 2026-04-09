@@ -7,6 +7,8 @@ use App\Models\EvaluationQuestion;
 use App\Models\EvaluationResponse;
 use App\Models\EvaluationSession;
 use App\Models\QueueTransaction;
+use App\Models\QueueTransactionService;
+use App\Models\ServiceAssistance;
 use App\Services\MonitorDataService;
 use App\Services\Sms\SmsNotificationService;
 use Illuminate\Http\Request;
@@ -90,7 +92,12 @@ class EvaluationController extends Controller
         $user = Auth::user();
 
         try {
-            $transaction = QueueTransaction::with('barangay')
+            $transaction = QueueTransaction::with([
+                'barangay',
+                'services' => function ($query) {
+                    $query->select('services.id', 'services.service_name', 'services.service_code', 'services.provides_assistance');
+                }
+            ])
                 ->where('id', $queueId)
                 ->where('office_id', $user->office_id)
                 ->where('status', 'SERVING')
@@ -117,7 +124,7 @@ class EvaluationController extends Controller
                     'client_name' => $transaction->client_name,
                     'contact_number' => $transaction->contact_number,
                     'barangay_name' => $transaction->barangay?->barangay_name,
-                    'services' => $transaction->services->pluck('service_code')->implode(', ')
+                    'services' => $transaction->services
                 ]
             ]);
 
@@ -150,7 +157,11 @@ class EvaluationController extends Controller
             'responses.multiple_choice' => 'sometimes|array',
             'responses.multiple_choice.*' => 'required|string', // question_id => answer_value
             'responses.likert' => 'sometimes|array',
-            'responses.likert.*' => 'required|string' // question_id => rating_value or 'NA'
+            'responses.likert.*' => 'required|string', // question_id => rating_value or 'NA'
+            'assistance_provided' => 'nullable|numeric|min:0',
+            'assistance_per_service' => 'nullable|array',
+            'assistance_per_service.*.service_id' => 'required_with:assistance_per_service|integer',
+            'assistance_per_service.*.amount' => 'required_with:assistance_per_service|numeric|min:0'
         ]);
 
         try {
@@ -281,6 +292,35 @@ class EvaluationController extends Controller
                 $transaction->serving_time = (int) round($transaction->called_at->diffInMinutes($transaction->completed_at));
             }
             $transaction->average_satisfaction_rating = $averageRating;
+            
+            // Save per-service assistance records
+            $assistancePerService = $request->input('assistance_per_service');
+            
+            if (!empty($assistancePerService) && is_array($assistancePerService)) {
+                foreach ($assistancePerService as $serviceAssistance) {
+                    $serviceId = $serviceAssistance['service_id'] ?? null;
+                    $amount = $serviceAssistance['amount'] ?? null;
+                    
+                    if ($serviceId && $amount !== null) {
+                        // Find the queue_transaction_service record
+                        $queueTransactionService = QueueTransactionService::where('queue_transaction_id', $transaction->id)
+                            ->where('service_id', $serviceId)
+                            ->first();
+                        
+                        if ($queueTransactionService) {
+                            // Create or update service assistance record
+                            ServiceAssistance::updateOrCreate(
+                                ['queue_transaction_service_id' => $queueTransactionService->id],
+                                [
+                                    'assistance_provided' => $amount,
+                                    'assistance_provided_at' => now()
+                                ]
+                            );
+                        }
+                    }
+                }
+            }
+            
             $transaction->save();
 
             DB::commit();
