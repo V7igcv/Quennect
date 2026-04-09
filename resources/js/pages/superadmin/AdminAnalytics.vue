@@ -211,6 +211,54 @@
       </Transition>
     </Teleport>
 
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showExportTableModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60" @click="closeExportTableModal"></div>
+          <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 z-10 mx-4">
+            <button
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+              type="button"
+              :disabled="isExportingTable"
+              @click="closeExportTableModal"
+            >
+              <span class="sr-only">Close</span>
+              ×
+            </button>
+
+            <h2 class="text-xl font-semibold text-gray-900 mb-3">Export Queue Summary Table</h2>
+            <p class="text-sm text-gray-600 mb-6">
+              This will generate an Excel file containing the queue summary table for
+              <span class="font-semibold">{{ selectedOfficeDisplayName }}</span>
+              for
+              <span class="font-semibold">{{ dateFilterLabel }}</span>.
+              Only completed transactions will be included; skipped transactions are excluded from this export.
+            </p>
+
+            <div class="flex justify-end gap-3">
+              <button
+                class="px-4 py-2 rounded-sm border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium cursor-pointer"
+                type="button"
+                :disabled="isExportingTable"
+                @click="closeExportTableModal"
+              >
+                Cancel
+              </button>
+              <Button
+                class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white text-sm font-medium"
+                type="button"
+                :disabled="isExportingTable || !selectedOffice"
+                @click="confirmExportTable"
+              >
+                <span v-if="!isExportingTable">Export Table</span>
+                <span v-else>Exporting...</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <div
       v-if="isLoadingAnalytics"
       class="mb-4 flex items-center gap-2 rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm font-medium text-[#0F5C5C]"
@@ -395,7 +443,19 @@
 
     <!-- Queue Summary Table -->
     <div class="mt-8">
-      <h2 class="text-xl font-semibold mb-4">Queue Summary</h2>
+      <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h2 class="text-xl font-semibold">Queue Summary</h2>
+        <Button
+          type="button"
+          class="h-10 px-4 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white flex items-center gap-2 whitespace-nowrap self-start sm:self-auto"
+          :disabled="!selectedOffice || isExportingTable"
+          @click="openExportTableModal"
+        >
+          <FileSpreadsheet class="h-4 w-4" />
+          <span v-if="!isExportingTable">Export Table</span>
+          <span v-else>Exporting...</span>
+        </Button>
+      </div>
 
       <div class="bg-white rounded-xl shadow-sm p-6">
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
@@ -638,6 +698,7 @@ import {
   Loader2,
   BarChart3,
   MoreHorizontal,
+  FileSpreadsheet,
 } from 'lucide-vue-next'
 import {
   Popover,
@@ -685,6 +746,8 @@ const isLoadingQueueSummary = ref(false)
 const isApplyingDateFilter = ref(false)
 const showExportModal = ref(false)
 const isExportingGraphs = ref(false)
+const showExportTableModal = ref(false)
+const isExportingTable = ref(false)
 const showQueueDetailsModal = ref(false)
 const selectedQueueEntry = ref(null)
 
@@ -1066,6 +1129,52 @@ const confirmExportGraphs = async () => {
     window.alert('Failed to generate PDF report. Please try again.')
   } finally {
     isExportingGraphs.value = false
+  }
+}
+
+const openExportTableModal = () => {
+  if (!selectedOffice.value) return
+  showExportTableModal.value = true
+}
+
+const closeExportTableModal = () => {
+  if (isExportingTable.value) return
+  showExportTableModal.value = false
+}
+
+const confirmExportTable = async () => {
+  if (isExportingTable.value || !selectedOffice.value) return
+
+  isExportingTable.value = true
+
+  try {
+    const response = await api.get('/superadmin/analytics/queue-summary/export', {
+      params: getDateFilterParams(),
+      responseType: 'blob',
+    })
+
+    const blob = new Blob([
+      response.data,
+    ], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+    const safeOfficeName = selectedOfficeDisplayName.value.replace(/[\\/]/g, '-')
+    const fileName = `${safeOfficeName} Queue Data Summary - ${dateFilterLabel.value}.xlsx`
+
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    showExportTableModal.value = false
+  } catch (error) {
+    console.error('Error exporting superadmin queue summary table:', error)
+    window.alert('Failed to generate Excel report. Please try again.')
+  } finally {
+    isExportingTable.value = false
   }
 }
 

@@ -14,6 +14,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class FrontdeskAnalyticsController extends Controller
 {
@@ -770,6 +772,244 @@ class FrontdeskAnalyticsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error exporting analytics graphs',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Export queue summary data as an Excel file grouped by barangay.
+     *
+     * This endpoint is primarily intended for SUPERADMIN usage (via office_id)
+     * but shares the same filtering rules as the queue summary API.
+     */
+    public function exportQueueSummary(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+            ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
+
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+
+            $periodLabel = $this->buildPeriodLabel($period, $date, $month, $year);
+
+            $office = Office::find($officeId);
+            $officeName = $office?->office_name ?? 'Unknown Office';
+            $officeAcronym = $office?->office_acronym;
+            $officeDisplayName = $officeAcronym
+                ? sprintf('%s (%s)', $officeName, $officeAcronym)
+                : $officeName;
+
+            $baseQuery = QueueTransaction::query()
+                ->with([
+                    'services' => function ($query) {
+                        $query->select('services.id', 'services.service_code', 'services.service_name')
+                            ->where('service_type', 'External');
+                    },
+                    'barangay' => function ($query) {
+                        $query->select('id', 'barangay_name');
+                    },
+                    'prioritySectors' => function ($query) {
+                        $query->select('priority_sectors.id', 'priority_sectors.sector_name');
+                    },
+                    'evaluationSession' => function ($query) {
+                        $query->select('id', 'queue_transaction_id', 'sex', 'age');
+                    },
+                ])
+                ->where('office_id', $officeId)
+                ->where('status', TransactionStatus::COMPLETED->value)
+                ->whereHas('services', function (Builder $query) {
+                    $query->where('service_type', 'External');
+                })
+                ->orderByRaw('COALESCE(skipped_at, completed_at) DESC')
+                ->orderBy('id', 'desc');
+
+            $filteredQuery = $this->applyDateFilter(
+                $baseQuery,
+                $period,
+                $date,
+                $month,
+                $year
+            );
+
+            $transactions = $filteredQuery->get();
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Queue Summary');
+
+            $rowIndex = 1;
+
+            if ($transactions->isEmpty()) {
+                $sheet->setCellValue("A{$rowIndex}", 'No queue summary data available for the selected filters.');
+                $sheet->getStyle("A{$rowIndex}")->getFont()->setBold(true);
+            } else {
+                $groupedByBarangay = $transactions->groupBy(function (QueueTransaction $transaction) {
+                    return $transaction->barangay?->barangay_name ?? 'No Barangay';
+                });
+
+                foreach ($groupedByBarangay as $barangayName => $barangayTransactions) {
+                    // Barangay title row
+                    $sheet->setCellValue("A{$rowIndex}", (string) $barangayName);
+                    $sheet->getStyle("A{$rowIndex}")->getFont()->setBold(true);
+                    $rowIndex++;
+
+                    // Header row
+                    $headers = [
+                        'Services',
+                        'Queue Number',
+                        'Client Name',
+                        'Sex',
+                        'Age',
+                        'Barangay',
+                        'Lane Type',
+                        'Waiting Time (min)',
+                        'Service Time (min)',
+                        'Assistance Provided',
+                        'Assistance Record Date',
+                    ];
+
+                    $sheet->fromArray($headers, null, "A{$rowIndex}", true);
+                    $sheet->getStyle("A{$rowIndex}:K{$rowIndex}")->getFont()->setBold(true);
+                    $rowIndex++;
+
+                    // Expand each transaction into one row per associated service,
+                    // then group by service label so each service appears once with
+                    // its related transactions listed underneath.
+                    $expanded = collect();
+
+                    foreach ($barangayTransactions as $transaction) {
+                        $services = $transaction->services;
+
+                        if ($services->isEmpty()) {
+                            $expanded->push([
+                                'service_label' => 'N/A',
+                                'transaction' => $transaction,
+                            ]);
+                            continue;
+                        }
+
+                        foreach ($services as $service) {
+                            $label = $service->service_name
+                                ?: $service->service_code
+                                ?: 'N/A';
+
+                            $expanded->push([
+                                'service_label' => $label,
+                                'transaction' => $transaction,
+                            ]);
+                        }
+                    }
+
+                    $serviceGroups = $expanded->groupBy('service_label');
+
+                    foreach ($serviceGroups as $serviceLabel => $entries) {
+                        $isFirstForService = true;
+
+                        foreach ($entries as $entry) {
+                            /** @var QueueTransaction $transaction */
+                            $transaction = $entry['transaction'];
+
+                            $laneType = $transaction->is_priority ? 'Priority' : 'Regular';
+
+                            if ($transaction->is_priority) {
+                                $sectors = $transaction->prioritySectors
+                                    ->pluck('sector_name')
+                                    ->filter()
+                                    ->values();
+
+                                if ($sectors->isNotEmpty()) {
+                                    $laneType .= ' - ' . $sectors->implode(', ');
+                                }
+                            }
+
+                            $evaluationSession = $transaction->evaluationSession;
+
+                            $assistanceProvidedAt = $transaction->assistance_provided_at
+                                ? $transaction->assistance_provided_at->format('M d, Y h:i A')
+                                : null;
+
+                            $rowData = [
+                                $isFirstForService ? (string) $serviceLabel : '',
+                                $transaction->full_queue_number,
+                                $transaction->client_name,
+                                $evaluationSession?->sex,
+                                $evaluationSession?->age,
+                                $transaction->barangay?->barangay_name,
+                                $laneType,
+                                $transaction->waiting_time === null
+                                    ? null
+                                    : round((float) $transaction->waiting_time, 2),
+                                $transaction->serving_time === null
+                                    ? null
+                                    : round((float) $transaction->serving_time, 2),
+                                $transaction->assistance_provided,
+                                $assistanceProvidedAt,
+                            ];
+
+                            $sheet->fromArray($rowData, null, "A{$rowIndex}", true);
+                            $rowIndex++;
+                            $isFirstForService = false;
+                        }
+                    }
+
+                    // Blank row between barangays
+                    $rowIndex++;
+                }
+            }
+
+            // Auto-size columns
+            foreach (range('A', 'K') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $fileName = sprintf('%s Queue Data Summary - %s.xlsx', $officeDisplayName, $periodLabel);
+            $tempFile = tempnam(sys_get_temp_dir(), 'queue_summary_');
+
+            if ($tempFile === false) {
+                throw new \RuntimeException('Unable to create temporary file for export.');
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $writer->save($tempFile);
+
+            return response()->download(
+                $tempFile,
+                $fileName,
+                ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+            )->deleteFileAfterSend(true);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Frontdesk analytics export queue summary error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error exporting queue summary data',
                 'error' => $e->getMessage(),
             ], 500);
         }
