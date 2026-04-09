@@ -20,12 +20,12 @@ const routes = [
     component: KioskLayout,
     children: [
       {
-        path: 'intro',           // <--- BAGONG ROUTE: Intro video page
+        path: 'intro',           // Intro video page
         name: 'kiosk.intro',
         component: () => import('../pages/kiosk/IntroVideoPage.vue')
       },
       {
-        path: 'welcome',         // <--- EXISTING: Welcome page mo
+        path: 'welcome',         // Welcome page after intro
         name: 'kiosk.welcome',
         component: () => import('../pages/kiosk/Welcome.vue')
       },
@@ -140,7 +140,7 @@ const routes = [
         const user = authService.getCurrentUser()
         return user?.role === 'SUPERADMIN' ? '/superadmin' : '/frontdesk'
       }
-      return '/kiosk/intro'     // <--- PINAGBAGO: dating /kiosk/welcome, ngayon /kiosk/intro na
+      return '/kiosk/intro'     // Redirect to intro video page for non-authenticated users
     }
   }
 ]
@@ -187,4 +187,4 @@ router.beforeEach((to, from) => {
   return true
 })
 
-export default route
+export default router
