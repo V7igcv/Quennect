@@ -3,13 +3,13 @@
   <div class="relative min-h-screen overflow-hidden">
     
    <div class="absolute inset-0">
-  <img 
-    src="/storage/images/LGU-Ligao.jpg" 
-    class="w-full h-full block" 
-    style="opacity: 1; position: absolute; top: 0; left: 0;"
-    alt="background"
-  />
-</div>
+      <img 
+        src="/storage/images/LGU-Ligao.jpg" 
+        class="w-full h-full block" 
+        style="opacity: 1; position: absolute; top: 0; left: 0;"
+        alt="background"
+      />
+    </div>
 
     <!-- Optional overlay para hindi masyadong bright -->
     <div class="absolute inset-0 bg-black bg-opacity-30 -z-5"></div>
@@ -17,35 +17,32 @@
     <!-- Content Container - lahat ng content naka-wrap dito -->
     <div class="relative z-10 flex flex-col items-center justify-between min-h-screen py-8 px-4">
       
-      
       <!-- Header spacer -->
       <div></div>
 
       <!-- Main Content -->
       <div class="text-center space-y-8">
         <!-- System Title -->
-       <div>
+        <div>
           <h1 class="text-4xl font-bold" style="color: #1F4E79;">Quennect</h1>
         </div>
 
         <!-- Government Seal -->
-     <div class="flex flex-col items-center space-y-2">
-  <div class="w-50 h-50 bg-gray-200 rounded-full flex items-center justify-center shadow-lg animate-float">
-    
-    <img 
-        src="/storage/logos/Ligao City Seal.png"
-        alt="Ligao City Seal"
-        class="w-56 h-56 object-contain glow-blink"
-      />
-
-  </div>
-</div>
+        <div class="flex flex-col items-center space-y-2">
+          <div class="w-50 h-50 bg-gray-200 rounded-full flex items-center justify-center shadow-lg animate-float">
+            <img 
+              src="/storage/logos/Ligao City Seal.png"
+              alt="Ligao City Seal"
+              class="w-56 h-56 object-contain glow-blink"
+            />
+          </div>
+        </div>
 
         <!-- Welcome Message -->
         <div>
-      <p class="text-2xl" style="color: #000000;">MALIGAYANG PAGDATING SA</p>
-      <p class="text-3xl font-bold" style="color: #000000;">LIGAO CITY HALL!</p>
-    </div>
+          <p class="text-2xl" style="color: #000000;">MALIGAYANG PAGDATING SA</p>
+          <p class="text-3xl font-bold" style="color: #000000;">LIGAO CITY HALL!</p>
+        </div>
 
         <!-- Get Number Button -->
         <button 
@@ -68,12 +65,49 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { onMounted, onUnmounted } from 'vue'
 
 const router = useRouter()
+
+let idleTimer
+
+// Function to reset the idle timer
+const resetIdleTimer = () => {
+  clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => {
+    // Balik sa intro page
+    router.push('/kiosk/intro')
+  }, 30000) // 30 seconds
+}
+
+// Track user activity
+const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
+
+const startIdleTimer = () => {
+  resetIdleTimer()
+  activityEvents.forEach(event => {
+    window.addEventListener(event, resetIdleTimer)
+  })
+}
+
+const stopIdleTimer = () => {
+  clearTimeout(idleTimer)
+  activityEvents.forEach(event => {
+    window.removeEventListener(event, resetIdleTimer)
+  })
+}
 
 const goToOfficeSelection = () => {
   router.push('/kiosk/office-selection')
 }
+
+onMounted(() => {
+  startIdleTimer()
+})
+
+onUnmounted(() => {
+  stopIdleTimer()
+})
 </script>
 
 <style scoped>
@@ -110,8 +144,6 @@ button {
 
 .animate-float {
   animation: float 6s ease-in-out infinite;
-  /* Add this para sure na kita */
- 
 }
 
 @keyframes glowBlink {
@@ -127,4 +159,3 @@ button {
   animation: glowBlink 1.8s infinite ease-in-out;
 }
 </style>
-
