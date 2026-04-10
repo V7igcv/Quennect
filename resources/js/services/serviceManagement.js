@@ -29,5 +29,10 @@ export const serviceManagementService = {
   async toggleStatus(officeId, serviceId) {
     const response = await api.patch(`/superadmin/office-management/offices/${officeId}/services/${serviceId}/toggle-status`)
     return response.data
+  },
+
+  async toggleProvidesAssistance(officeId, serviceId) {
+    const response = await api.patch(`/superadmin/office-management/offices/${officeId}/services/${serviceId}/toggle-provides-assistance`)
+    return response.data
   }
 }

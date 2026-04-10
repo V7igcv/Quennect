@@ -38,6 +38,7 @@
             <TableHead class="font-semibold text-gray-600">Service Name</TableHead>
             <TableHead class="font-semibold text-gray-600">Service Code</TableHead>
             <TableHead class="font-semibold text-gray-600 text-center">Is Free</TableHead>
+            <TableHead class="font-semibold text-gray-600 text-center">Provides Assistance</TableHead>
             <TableHead class="font-semibold text-gray-600 text-center">Classification</TableHead>
             <TableHead class="font-semibold text-gray-600 text-center">Status</TableHead>
             <TableHead class="font-semibold text-gray-600 text-center">Lock Status</TableHead>
@@ -46,7 +47,7 @@
         </TableHeader>
         <TableBody>
           <TableRow v-if="isLoading">
-            <TableCell colspan="7" class="text-center py-12 text-gray-400">Loading services...</TableCell>
+            <TableCell colspan="8" class="text-center py-12 text-gray-400">Loading services...</TableCell>
           </TableRow>
           <TableRow v-for="service in paginatedServices" v-else :key="service.id" class="hover:bg-gray-50 transition-colors">
             <TableCell class="font-medium text-gray-800">{{ service.name }}</TableCell>
@@ -58,6 +59,15 @@
                 :class="service.is_free ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'"
               >
                 {{ service.is_free ? 'Yes' : 'No' }}
+              </button>
+            </TableCell>
+            <TableCell class="text-center">
+              <button
+                @click.stop="toggleServiceProvidesAssistance(service)"
+                class="px-2 py-0.5 rounded-sm text-xs font-semibold transition-colors cursor-pointer"
+                :class="service.provides_assistance ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'"
+              >
+                {{ service.provides_assistance ? 'Yes' : 'No' }}
               </button>
             </TableCell>
             <TableCell class="text-center text-gray-600">{{ service.classification }}</TableCell>
@@ -89,7 +99,7 @@
             </TableCell>
           </TableRow>
           <TableRow v-if="!isLoading && paginatedServices.length === 0">
-            <TableCell colspan="7" class="text-center py-12 text-gray-400">No services found.</TableCell>
+            <TableCell colspan="8" class="text-center py-12 text-gray-400">No services found.</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -159,26 +169,7 @@
                 ></textarea>
               </div>
               <div>
-                <label class="block text-sm text-gray-700 mb-1">Is Free:</label>
-
-                <div class="relative">
-                  <select
-                    v-model="newService.is_free"
-                    class="w-full appearance-none border border-gray-300 rounded-lg px-4 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-[#164980] focus:border-transparent transition"
-                  >
-                    <option :value="true">Yes</option>
-                    <option :value="false">No</option>
-                  </select>
-
-                  <!-- Custom arrow -->
-                  <ChevronDown
-                    class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-sm text-gray-700 mb-1">Service Type:</label>
+                <label class="block text-sm text-gray-700 mb-3">Service Type:</label>
                 <div class="relative">
                   <select
                     v-model="newService.service_type"
@@ -192,6 +183,26 @@
                     class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
                   />
                 </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input
+                    v-model="newService.is_free"
+                    type="checkbox"
+                    class="w-4 h-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#164980]"
+                  />
+                  <span class="text-sm text-gray-700">Is Free</span>
+                </label>
+
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input
+                    v-model="newService.provides_assistance"
+                    type="checkbox"
+                    class="w-4 h-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#164980]"
+                  />
+                  <span class="text-sm text-gray-700">Provides Assistance</span>
+                </label>
               </div>
 
               <div>
@@ -437,6 +448,7 @@ const normalizeService = (service) => ({
   service_type: service.service_type,
   classification: formatClassificationFromApi(service.classification),
   is_free: Boolean(service.is_free),
+  provides_assistance: Boolean(service.provides_assistance),
   status: service.status_label ?? (service.status === 'active' ? 'Active' : 'Inactive'),
   is_locked: Boolean(service.is_locked),
 })
@@ -535,13 +547,24 @@ const toggleServiceStatus = async (service) => {
   }
 }
 
+const toggleServiceProvidesAssistance = async (service) => {
+  try {
+    const response = await serviceManagementService.toggleProvidesAssistance(officeId, service.id)
+    const updated = normalizeService(response.data)
+    services.value = services.value.map((item) => (item.id === updated.id ? updated : item))
+  } catch (error) {
+    console.error('Failed to toggle provides_assistance:', error)
+    handleApiError(error, 'Unable to update service assistance setting.')
+  }
+}
+
 // ---- ADD MODAL ----
 const showAddModal = ref(false)
-const newService = ref({ name: '', code: '', description: '', is_free: true, service_type: 'External', classification: 'Simple' })
+const newService = ref({ name: '', code: '', description: '', is_free: false, provides_assistance: false, service_type: 'External', classification: 'Simple' })
 
 const closeAddModal = () => {
   showAddModal.value = false
-  newService.value = { name: '', code: '', description: '', is_free: true, service_type: selectedServiceView.value, classification: 'Simple' }
+  newService.value = { name: '', code: '', description: '', is_free: false, provides_assistance: false, service_type: selectedServiceView.value, classification: 'Simple' }
 }
 
 const handleAddService = async () => {
@@ -559,6 +582,7 @@ const handleAddService = async () => {
       service_type: newService.value.service_type,
       classification: formatClassificationToApi(newService.value.classification),
       is_free: newService.value.is_free,
+      provides_assistance: newService.value.provides_assistance,
     }
 
     const response = await serviceManagementService.createService(officeId, payload)

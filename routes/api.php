@@ -114,6 +114,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/office-management/offices/{office}/services/{service}', [ServiceManagementController::class, 'destroy']);
         Route::patch('/office-management/offices/{office}/services/{service}/toggle-is-free', [ServiceManagementController::class, 'toggleIsFree']);
         Route::patch('/office-management/offices/{office}/services/{service}/toggle-status', [ServiceManagementController::class, 'toggleStatus']);
+        Route::patch('/office-management/offices/{office}/services/{service}/toggle-provides-assistance', [ServiceManagementController::class, 'toggleProvidesAssistance']);
 
         // Analytics
         Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);

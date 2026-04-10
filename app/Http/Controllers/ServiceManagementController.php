@@ -65,6 +65,7 @@ class ServiceManagementController extends Controller
             'service_type' => ['required', Rule::in(['External', 'Internal'])],
             'classification' => ['nullable', Rule::in(['Simple', 'Complex', 'Highly_Technical'])],
             'is_free' => ['required', 'boolean'],
+            'provides_assistance' => ['required', 'boolean'],
         ]);
 
         try {
@@ -78,6 +79,7 @@ class ServiceManagementController extends Controller
                 'service_type' => $validated['service_type'],
                 'classification' => $validated['classification'] ?? 'Simple',
                 'is_free' => $validated['is_free'],
+                'provides_assistance' => $validated['provides_assistance'],
                 'status' => 'active',
                 'used_count' => 0,
                 'is_locked' => false,
@@ -256,6 +258,38 @@ class ServiceManagementController extends Controller
         }
     }
 
+    /**
+     * Toggle service provides_assistance value.
+     */
+    public function toggleProvidesAssistance(Office $office, Service $service): JsonResponse
+    {
+        if ($service->office_id !== $office->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Service not found for this office.',
+            ], 404);
+        }
+
+        $this->syncUsageAndLockState($service);
+
+        try {
+            $service->update(['provides_assistance' => !$service->provides_assistance]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Service assistance setting updated successfully.',
+                'data' => $this->transformService($service->fresh()),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to toggle service provides_assistance: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to update service assistance setting. Please try again.',
+            ], 500);
+        }
+    }
+
     private function syncUsageAndLockState(Service $service): void
     {
         $usedCount = $service->queueTransactions()
@@ -285,6 +319,8 @@ class ServiceManagementController extends Controller
             'classification' => $service->classification,
             'is_free' => (bool) $service->is_free,
             'is_free_label' => $service->is_free ? 'Yes' : 'No',
+            'provides_assistance' => (bool) $service->provides_assistance,
+            'provides_assistance_label' => $service->provides_assistance ? 'Yes' : 'No',
             'status' => $service->status,
             'status_label' => $service->status === 'active' ? 'Active' : 'Inactive',
             'used_count' => (int) $service->used_count,
