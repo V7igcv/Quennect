@@ -104,17 +104,60 @@
       <!-- Assistance Fields per Service -->
       <div v-if="servicesWithAssistance.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
         <div v-for="service in servicesWithAssistance" :key="service.id">
-          <label class="block text-sm font-medium text-[#2E2E2E] mb-1">
-            {{ service.service_name }} - Assistance (₱)
-          </label>
-          <input
-            v-model.number="assistanceAmounts[service.id]"
-            type="number"
-            min="0"
-            step="0.01"
-            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
-            placeholder="Enter assistance amount"
-          >
+          
+          <!-- Traditional Service (no assistance types) - Show input field only -->
+          <template v-if="!hasAssistanceTypes(service.id)">
+            <label class="block text-sm font-medium text-[#2E2E2E] mb-1">
+              {{ service.service_name }} - Assistance (₱)
+            </label>
+            <input
+              v-model.number="assistanceAmounts[service.id]"
+              type="number"
+              min="0"
+              step="0.01"
+              class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
+              placeholder="Enter assistance amount"
+            >
+          </template>
+
+          <!-- Categorized Service (AICS-like) - Show dropdown + input field -->
+          <template v-else>
+            <label class="block text-sm font-medium text-[#2E2E2E] mb-1">
+              {{ service.service_name }} - Select Assistance Type
+            </label>
+            <div class="relative mb-2">
+              <select
+                v-model="selectedAssistanceTypes[getQueueTransactionServiceId(service.id)]"
+                class="w-full appearance-none border border-gray-300 rounded-md px-3 pr-8 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
+              >
+                <option value="">-- Select Assistance Type --</option>
+                <option 
+                  v-for="type in assistanceTypes[service.id]"
+                  :key="type.id"
+                  :value="type.id"
+                >
+                  {{ type.assistance_name }}
+                </option>
+              </select>
+              <ChevronDown class="w-4 h-4 text-gray-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            <!-- Amount input appears only if assistance type selected -->
+            <div v-if="selectedAssistanceTypes[getQueueTransactionServiceId(service.id)]">
+              <label class="block text-sm font-medium text-[#2E2E2E] mb-1">
+                Amount (₱)
+              </label>
+              <input
+                v-model.number="assistanceAmounts[service.id]"
+                type="number"
+                min="0"
+                step="0.01"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
+                placeholder="Enter assistance amount"
+              >
+            </div>
+          </template>
+
         </div>
       </div>
 
@@ -360,6 +403,15 @@ const likertRatings = ref({})
 // Form data for assistance - keyed by service id
 const assistanceAmounts = ref({})
 
+// Assistance types - keyed by service id
+const assistanceTypes = ref({})
+
+// Selected assistance types - keyed by queue_transaction_service_id
+const selectedAssistanceTypes = ref({})
+
+// Map of service_id to queue_transaction_service_id
+const queueTransactionServices = ref({})
+
 const getOptionValueAndLabel = (optionText) => {
   const raw = String(optionText ?? '').trim()
   const match = raw.match(/^(\d+)\s*[-.)]\s*(.+)$/)
@@ -459,6 +511,32 @@ watch(servicesWithAssistance, (services) => {
   assistanceAmounts.value = newAmounts
 }, { immediate: true })
 
+// Extract assistance types from services response
+watch(() => props.services, (services) => {
+  const types = {}
+  const queueTxServices = {}
+  
+  if (Array.isArray(services)) {
+    services.forEach((service) => {
+      // Store assistance types keyed by service id
+      if (service.assistance_types && Array.isArray(service.assistance_types)) {
+        types[service.id] = service.assistance_types
+      } else {
+        types[service.id] = []
+      }
+      
+      // Store queue_transaction_service_id mapping
+      queueTxServices[service.id] = {
+        queue_transaction_service_id: service.queue_transaction_service_id,
+        service_name: service.service_name
+      }
+    })
+  }
+  
+  assistanceTypes.value = types
+  queueTransactionServices.value = queueTxServices
+}, { immediate: true })
+
 watch(cc1Value, (value) => {
   if (value !== '4') return
 
@@ -491,6 +569,7 @@ const resetForm = () => {
   sex.value = ''
   age.value = ''
   assistanceAmounts.value = {}
+  selectedAssistanceTypes.value = {}
   multipleChoiceAnswers.value = Object.fromEntries(
     multipleChoiceQuestions.value.map((question) => [question.id, ''])
   )
@@ -585,27 +664,54 @@ const handleSubmit = () => {
   // Validate assistance amounts for services that provide assistance
   if (servicesWithAssistance.value.length > 0) {
     for (const service of servicesWithAssistance.value) {
+      const queueTxServiceId = getQueueTransactionServiceId(service.id)
+      
+      // If service has assistance types (categorized), check that one is selected
+      if (hasAssistanceTypes(service.id)) {
+        if (!selectedAssistanceTypes.value[queueTxServiceId]) {
+          emit('alert', { 
+            title: 'Validation Error', 
+            message: `Please select an assistance type for ${service.service_name}.` 
+          })
+          currentPage.value = 1
+          return
+        }
+      }
+      
+      // Check that amount is entered
       const amount = assistanceAmounts.value[service.id]
       if (amount === '' || amount === null || amount === undefined) {
-        emit('alert', { title: 'Validation Error', message: `Please enter assistance amount for ${service.service_name}.` })
+        emit('alert', { 
+          title: 'Validation Error', 
+          message: `Please enter assistance amount for ${service.service_name}.` 
+        })
         currentPage.value = 1
         return
       }
 
       const assistanceValue = Number(amount)
       if (isNaN(assistanceValue) || assistanceValue < 0) {
-        emit('alert', { title: 'Validation Error', message: `Assistance amount for ${service.service_name} must be a valid positive number.` })
+        emit('alert', { 
+          title: 'Validation Error', 
+          message: `Assistance amount for ${service.service_name} must be a valid positive number.` 
+        })
         currentPage.value = 1
         return
       }
     }
   }
 
-  // Build assistance per service data
-  const assistancePerService = servicesWithAssistance.value.map((service) => ({
-    service_id: service.id,
-    amount: Number(assistanceAmounts.value[service.id])
-  }))
+  // Build assistance per queue_transaction_service data
+  const assistancePerQueueTxService = servicesWithAssistance.value.map((service) => {
+    const queueTxServiceId = getQueueTransactionServiceId(service.id)
+    const assistanceTypeId = selectedAssistanceTypes.value[queueTxServiceId] || null
+    
+    return {
+      queue_transaction_service_id: queueTxServiceId,
+      assistance_type_id: assistanceTypeId,  // null for traditional, id for categorized
+      amount: Number(assistanceAmounts.value[service.id])
+    }
+  })
 
   // Combine all form data
   const formData = {
@@ -617,7 +723,7 @@ const handleSubmit = () => {
     // Page 2 data
     likertRatings: likertRatings.value,
     // Assistance data (if applicable)
-    ...(assistancePerService.length > 0 && { assistance_per_service: assistancePerService }),
+    ...(assistancePerQueueTxService.length > 0 && { assistance_per_queue_transaction_service: assistancePerQueueTxService }),
     // Customer info
     queueNumber: props.queueNumber,
     customerName: props.customerName,
@@ -628,5 +734,20 @@ const handleSubmit = () => {
   // Emit the form data
   emit('submit', formData)
   closeModal()
+}
+
+// Helper method to check if a service has assistance types (categorized service)
+const hasAssistanceTypes = (serviceId) => {
+  return assistanceTypes.value[serviceId]?.length > 0
+}
+
+// Helper method to get queue_transaction_service_id from service
+const getQueueTransactionServiceId = (serviceId) => {
+  return queueTransactionServices.value[serviceId]?.queue_transaction_service_id
+}
+
+// Helper method to get service name from service
+const getServiceName = (serviceId) => {
+  return queueTransactionServices.value[serviceId]?.service_name || 'Unknown Service'
 }
 </script>

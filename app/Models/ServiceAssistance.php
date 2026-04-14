@@ -13,6 +13,7 @@ class ServiceAssistance extends Model
 
     protected $fillable = [
         'queue_transaction_service_id',
+        'assistance_type_id',
         'assistance_provided',
         'assistance_provided_at',
     ];
@@ -29,4 +30,29 @@ class ServiceAssistance extends Model
     {
         return $this->belongsTo(QueueTransactionService::class);
     }
+
+    /**
+     * Get the assistance type (for categorized assistance like AICS)
+     * Returns null if this is a traditional service assistance
+     */
+    public function assistanceType()
+    {
+        return $this->belongsTo(AssistanceType::class);
+    }
+
+    /**
+     * Get the service associated with this assistance record
+     * Works for both traditional and categorized services
+     * For traditional: derives from queue_transaction_service → service
+     * For categorized: derives from assistance_type → service
+     */
+    public function getService()
+    {
+        if ($this->assistanceType) {
+            return $this->assistanceType->service;
+        }
+
+        return $this->queueTransactionService->service ?? null;
+    }
 }
+

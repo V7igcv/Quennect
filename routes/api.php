@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FrontdeskController;
 use App\Http\Controllers\CounterController;
 use App\Http\Controllers\EvaluationController;
+use App\Http\Controllers\AssistanceTypeController;
 use App\Http\Controllers\MonitorController;
 
 use App\Http\Controllers\OfficeController;
@@ -168,6 +169,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/evaluation/transaction/{queueId}', [EvaluationController::class, 'getTransactionForEvaluation']);
         Route::post('/evaluation/submit/{queueId}', [EvaluationController::class, 'submitEvaluation']);
         Route::get('/evaluation/results/{queueId}', [EvaluationController::class, 'getEvaluationResults']);
+
+        // Assistance Types
+        Route::get('/services/{serviceId}/assistance-types', [AssistanceTypeController::class, 'getByService']);
 
         // Analytics
         Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);

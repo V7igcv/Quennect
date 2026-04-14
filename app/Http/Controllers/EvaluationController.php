@@ -94,8 +94,8 @@ class EvaluationController extends Controller
         try {
             $transaction = QueueTransaction::with([
                 'barangay',
-                'services' => function ($query) {
-                    $query->select('services.id', 'services.service_name', 'services.service_code', 'services.provides_assistance');
+                'queueTransactionServices' => function ($query) {
+                    $query->with('service.assistanceTypes');
                 }
             ])
                 ->where('id', $queueId)
@@ -116,6 +116,24 @@ class EvaluationController extends Controller
                 ], 400);
             }
 
+            // Transform queue_transaction_services to include both service and pivot data
+            $services = $transaction->queueTransactionServices->map(function ($queueTransactionService) {
+                $service = $queueTransactionService->service;
+                return [
+                    'id' => $service->id,
+                    'queue_transaction_service_id' => $queueTransactionService->id,
+                    'service_name' => $service->service_name,
+                    'service_code' => $service->service_code,
+                    'provides_assistance' => $service->provides_assistance,
+                    'assistance_types' => $service->assistanceTypes->map(function ($type) {
+                        return [
+                            'id' => $type->id,
+                            'assistance_name' => $type->assistance_name
+                        ];
+                    })->values()->all()
+                ];
+            });
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -124,7 +142,7 @@ class EvaluationController extends Controller
                     'client_name' => $transaction->client_name,
                     'contact_number' => $transaction->contact_number,
                     'barangay_name' => $transaction->barangay?->barangay_name,
-                    'services' => $transaction->services
+                    'services' => $services
                 ]
             ]);
 
@@ -159,9 +177,10 @@ class EvaluationController extends Controller
             'responses.likert' => 'sometimes|array',
             'responses.likert.*' => 'required|string', // question_id => rating_value or 'NA'
             'assistance_provided' => 'nullable|numeric|min:0',
-            'assistance_per_service' => 'nullable|array',
-            'assistance_per_service.*.service_id' => 'required_with:assistance_per_service|integer',
-            'assistance_per_service.*.amount' => 'required_with:assistance_per_service|numeric|min:0'
+            'assistance_per_queue_transaction_service' => 'nullable|array',
+            'assistance_per_queue_transaction_service.*.queue_transaction_service_id' => 'required_with:assistance_per_queue_transaction_service|integer|exists:queue_transaction_services,id',
+            'assistance_per_queue_transaction_service.*.assistance_type_id' => 'nullable|integer|exists:assistance_types,id',
+            'assistance_per_queue_transaction_service.*.amount' => 'required_with:assistance_per_queue_transaction_service|numeric|min:0'
         ]);
 
         try {
@@ -293,30 +312,26 @@ class EvaluationController extends Controller
             }
             $transaction->average_satisfaction_rating = $averageRating;
             
-            // Save per-service assistance records
-            $assistancePerService = $request->input('assistance_per_service');
+            // Save per-queue-transaction-service assistance records
+            $assistancePerQueueTxService = $request->input('assistance_per_queue_transaction_service');
             
-            if (!empty($assistancePerService) && is_array($assistancePerService)) {
-                foreach ($assistancePerService as $serviceAssistance) {
-                    $serviceId = $serviceAssistance['service_id'] ?? null;
+            if (!empty($assistancePerQueueTxService) && is_array($assistancePerQueueTxService)) {
+                foreach ($assistancePerQueueTxService as $serviceAssistance) {
+                    $queueTransactionServiceId = $serviceAssistance['queue_transaction_service_id'] ?? null;
+                    $assistanceTypeId = $serviceAssistance['assistance_type_id'] ?? null;
                     $amount = $serviceAssistance['amount'] ?? null;
                     
-                    if ($serviceId && $amount !== null) {
-                        // Find the queue_transaction_service record
-                        $queueTransactionService = QueueTransactionService::where('queue_transaction_id', $transaction->id)
-                            ->where('service_id', $serviceId)
-                            ->first();
-                        
-                        if ($queueTransactionService) {
-                            // Create or update service assistance record
-                            ServiceAssistance::updateOrCreate(
-                                ['queue_transaction_service_id' => $queueTransactionService->id],
-                                [
-                                    'assistance_provided' => $amount,
-                                    'assistance_provided_at' => now()
-                                ]
-                            );
-                        }
+                    if ($queueTransactionServiceId && $amount !== null) {
+                        // Create or update service assistance record
+                        // assistance_type_id can be NULL (traditional service) or have a value (categorized service)
+                        ServiceAssistance::updateOrCreate(
+                            ['queue_transaction_service_id' => $queueTransactionServiceId],
+                            [
+                                'assistance_type_id' => $assistanceTypeId,
+                                'assistance_provided' => $amount,
+                                'assistance_provided_at' => now()
+                            ]
+                        );
                     }
                 }
             }

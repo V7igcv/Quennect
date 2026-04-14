@@ -996,7 +996,7 @@ const handleEvaluationSubmit = async (formData) => {
   try {
     const multipleChoiceAnswers = formData.multipleChoiceAnswers || {}
     const likertAnswers = formData.likertRatings || {}
-    const assistancePerService = formData.assistance_per_service || []
+    const assistancePerService = formData.assistance_per_queue_transaction_service || []
 
     // Format the data for the backend API
     const evaluationData = {
@@ -1017,7 +1017,7 @@ const handleEvaluationSubmit = async (formData) => {
             .map(([questionId, value]) => [questionId, String(value)])
         )
       },
-      ...(assistancePerService.length > 0 && { assistance_per_service: assistancePerService })
+      ...(assistancePerService.length > 0 && { assistance_per_queue_transaction_service: assistancePerService })
     }
 
     const response = await api.post(`/frontdesk/evaluation/submit/${selectedQueueId.value}`, evaluationData)

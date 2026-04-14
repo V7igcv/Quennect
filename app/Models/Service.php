@@ -54,4 +54,13 @@ class Service extends Model
         return $this->belongsToMany(QueueTransaction::class, 'queue_transaction_services')
                     ->withTimestamps();
     }
+
+    /**
+     * Get all assistance types for this service
+     * (One-to-many relationship for categorized assistance)
+     */
+    public function assistanceTypes()
+    {
+        return $this->hasMany(AssistanceType::class);
+    }
 }
