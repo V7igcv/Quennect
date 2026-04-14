@@ -550,7 +550,12 @@ class FrontdeskAnalyticsController extends Controller
                             ->where('service_type', 'External');
                     },
                     'queueTransactionServices' => function ($query) {
-                        $query->with(['serviceAssistance', 'service']);
+                        $query->with([
+                            'serviceAssistance' => function ($query) {
+                                $query->with('assistanceType');  // ✅ Eager load assistance type
+                            },
+                            'service'
+                        ]);
                     },
                     'barangay' => function ($query) {
                         $query->select('id', 'barangay_name');
@@ -612,9 +617,17 @@ class FrontdeskAnalyticsController extends Controller
                 $serviceAssistanceDetails = [];
                 foreach ($transaction->queueTransactionServices as $qts) {
                     if ($qts->serviceAssistance) {
+                        $assistanceTypeName = $qts->serviceAssistance->assistanceType?->assistance_name;
+                        
+                        // Format service label with assistance type if available
+                        $serviceLabel = $qts->service?->service_name ?? 'Unknown';
+                        if ($assistanceTypeName) {
+                            $serviceLabel .= " ({$assistanceTypeName})";
+                        }
+                        
                         $serviceAssistanceDetails[] = [
                             'service_id' => $qts->service_id,
-                            'service_name' => $qts->service?->service_name ?? 'Unknown',
+                            'service_name' => $serviceLabel,
                             'assistance_provided' => $qts->serviceAssistance->assistance_provided,
                             'assistance_provided_at' => $qts->serviceAssistance->assistance_provided_at
                                 ? $qts->serviceAssistance->assistance_provided_at->format('M d, Y h:i A')
@@ -844,7 +857,12 @@ class FrontdeskAnalyticsController extends Controller
                             ->where('service_type', 'External');
                     },
                     'queueTransactionServices' => function ($query) {
-                        $query->with(['serviceAssistance', 'service']);
+                        $query->with([
+                            'serviceAssistance' => function ($query) {
+                                $query->with('assistanceType');  // ✅ Eager load assistance type
+                            },
+                            'service'
+                        ]);
                     },
                     'barangay' => function ($query) {
                         $query->select('id', 'barangay_name');
@@ -856,8 +874,6 @@ class FrontdeskAnalyticsController extends Controller
                         $query->select('id', 'queue_transaction_id', 'sex', 'age');
                     },
                 ])
-                ->where('office_id', $officeId)
-                ->where('status', TransactionStatus::COMPLETED->value)
                 ->whereHas('services', function (Builder $query) {
                     $query->where('service_type', 'External');
                 })
@@ -889,12 +905,23 @@ class FrontdeskAnalyticsController extends Controller
                 });
 
                 foreach ($groupedByBarangay as $barangayName => $barangayTransactions) {
+                    // Check if this barangay has any assistance records
+                    $hasAssistanceInBarangay = false;
+                    foreach ($barangayTransactions as $transaction) {
+                        foreach ($transaction->queueTransactionServices as $qts) {
+                            if ($qts->serviceAssistance && $qts->serviceAssistance->assistance_provided !== null) {
+                                $hasAssistanceInBarangay = true;
+                                break 2;
+                            }
+                        }
+                    }
+
                     // Barangay title row
                     $sheet->setCellValue("A{$rowIndex}", (string) $barangayName);
                     $sheet->getStyle("A{$rowIndex}")->getFont()->setBold(true);
                     $rowIndex++;
 
-                    // Header row
+                    // Header row (conditionally include assistance columns)
                     $headers = [
                         'Services',
                         'Queue Number',
@@ -905,17 +932,24 @@ class FrontdeskAnalyticsController extends Controller
                         'Lane Type',
                         'Waiting Time (min)',
                         'Service Time (min)',
-                        'Assistance Provided',
-                        'Assistance Record Date',
                     ];
 
+                    if ($hasAssistanceInBarangay) {
+                        $headers[] = 'Assistance Provided';
+                        $headers[] = 'Assistance Record Date';
+                    }
+
                     $sheet->fromArray($headers, null, "A{$rowIndex}", true);
-                    $sheet->getStyle("A{$rowIndex}:K{$rowIndex}")->getFont()->setBold(true);
+                    $endColumn = $hasAssistanceInBarangay ? 'K' : 'I';
+                    $sheet->getStyle("A{$rowIndex}:{$endColumn}{$rowIndex}")->getFont()->setBold(true);
                     $rowIndex++;
 
+                    // Track total assistance for this barangay
+                    $barangayTotalAssistance = 0;
+
                     // Expand each transaction into one row per associated service,
-                    // then group by service label so each service appears once with
-                    // its related transactions listed underneath.
+                    // then group by service label (including assistance type) so each service+type combination
+                    // appears separately with its related transactions listed underneath.
                     $expanded = collect();
 
                     foreach ($barangayTransactions as $transaction) {
@@ -924,6 +958,7 @@ class FrontdeskAnalyticsController extends Controller
                         if ($services->isEmpty()) {
                             $expanded->push([
                                 'service_label' => 'N/A',
+                                'service_id' => null,
                                 'transaction' => $transaction,
                             ]);
                             continue;
@@ -934,8 +969,23 @@ class FrontdeskAnalyticsController extends Controller
                                 ?: $service->service_code
                                 ?: 'N/A';
 
+                            // Check if this service has assistance with a type
+                            $assistanceTypeName = null;
+                            foreach ($transaction->queueTransactionServices as $qts) {
+                                if ($qts->service_id === $service->id && $qts->serviceAssistance) {
+                                    $assistanceTypeName = $qts->serviceAssistance->assistanceType?->assistance_name;
+                                    break;
+                                }
+                            }
+
+                            // Append assistance type to label if it exists
+                            if ($assistanceTypeName) {
+                                $label .= " ({$assistanceTypeName})";
+                            }
+
                             $expanded->push([
                                 'service_label' => $label,
+                                'service_id' => $service->id,
                                 'transaction' => $transaction,
                             ]);
                         }
@@ -949,6 +999,7 @@ class FrontdeskAnalyticsController extends Controller
                         foreach ($entries as $entry) {
                             /** @var QueueTransaction $transaction */
                             $transaction = $entry['transaction'];
+                            $serviceId = $entry['service_id'];
 
                             $laneType = $transaction->is_priority ? 'Priority' : 'Regular';
 
@@ -967,15 +1018,22 @@ class FrontdeskAnalyticsController extends Controller
 
                             // Find the service assistance for this specific service and transaction
                             $serviceAssistance = null;
-                            foreach ($transaction->queueTransactionServices as $qts) {
-                                $serviceName = $qts->service?->service_name ?: $qts->service?->service_code ?: 'N/A';
-                                if ($serviceName === $serviceLabel && $qts->serviceAssistance) {
-                                    $serviceAssistance = $qts->serviceAssistance;
-                                    break;
+                            if ($serviceId !== null) {
+                                foreach ($transaction->queueTransactionServices as $qts) {
+                                    if ($qts->service_id === $serviceId && $qts->serviceAssistance) {
+                                        $serviceAssistance = $qts->serviceAssistance;
+                                        break;
+                                    }
                                 }
                             }
 
                             $assistanceProvided = $serviceAssistance?->assistance_provided;
+                            
+                            // Track total assistance for this barangay
+                            if ($assistanceProvided !== null) {
+                                $barangayTotalAssistance += $assistanceProvided;
+                            }
+                            
                             $assistanceProvidedAt = $serviceAssistance?->assistance_provided_at
                                 ? $serviceAssistance->assistance_provided_at->format('M d, Y h:i A')
                                 : null;
@@ -994,9 +1052,13 @@ class FrontdeskAnalyticsController extends Controller
                                 $transaction->serving_time === null
                                     ? null
                                     : round((float) $transaction->serving_time, 2),
-                                $assistanceProvided,
-                                $assistanceProvidedAt,
                             ];
+
+                            // Conditionally add assistance columns
+                            if ($hasAssistanceInBarangay) {
+                                $rowData[] = $assistanceProvided;
+                                $rowData[] = $assistanceProvidedAt;
+                            }
 
                             $sheet->fromArray($rowData, null, "A{$rowIndex}", true);
                             $rowIndex++;
@@ -1004,13 +1066,23 @@ class FrontdeskAnalyticsController extends Controller
                         }
                     }
 
+                    // Add total assistance row for this barangay (only if barangay has assistance)
+                    if ($hasAssistanceInBarangay) {
+                        $sheet->setCellValue("A{$rowIndex}", 'TOTAL ASSISTANCE PROVIDED');
+                        $sheet->getStyle("A{$rowIndex}")->getFont()->setBold(true);
+                        $sheet->setCellValue("J{$rowIndex}", $barangayTotalAssistance);
+                        $sheet->getStyle("J{$rowIndex}")->getFont()->setBold(true);
+                        $rowIndex++;
+                    }
+
                     // Blank row between barangays
                     $rowIndex++;
                 }
             }
 
-            // Auto-size columns
-            foreach (range('A', 'K') as $column) {
+            // Auto-size columns (K if assistance is included, I if not)
+            $endColumn = 'K';
+            foreach (range('A', $endColumn) as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
 
