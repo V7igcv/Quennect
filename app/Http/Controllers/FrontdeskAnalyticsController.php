@@ -1428,10 +1428,10 @@ class FrontdeskAnalyticsController extends Controller
 
     private function resolveOfficeId($user, array $validated): int
     {
-        if ($user->isSuperadmin()) {
+        if ($user->isSuperadmin() || $user->isCityMayor()) {
             if (empty($validated['office_id'])) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'office_id' => ['The office_id field is required for superadmin analytics.'],
+                    'office_id' => ['The office_id field is required for superadmin/city mayor analytics.'],
                 ]);
             }
 

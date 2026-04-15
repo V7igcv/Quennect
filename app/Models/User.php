@@ -82,12 +82,17 @@ class User extends Authenticatable
         return $this->hasRole('OFFICE FRONTDESK');
     }
 
+    public function isCityMayor(): bool
+    {
+        return $this->hasRole('CITY MAYOR');
+    }
+
     /**
      * Check if user can access a specific office
      */
     public function canAccessOffice(Office $office): bool
     {
-        if ($this->isSuperadmin()) {
+        if ($this->isSuperadmin() || $this->isCityMayor()) {
             return true;
         }
         

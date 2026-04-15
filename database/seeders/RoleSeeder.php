@@ -17,14 +17,16 @@ class RoleSeeder extends Seeder
             [
                 'name' => 'OFFICE FRONTDESK',
             ],
+            [
+                'name' => 'CITY MAYOR',
+            ],
         ];
 
         foreach ($roles as $role) {
-            DB::table('roles')->insert([
-                'name' => $role['name'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            DB::table('roles')->updateOrInsert(
+                ['name' => $role['name']],
+                ['updated_at' => now(), 'created_at' => now()]
+            );
         }
     }
 }

@@ -67,6 +67,10 @@ import {
 } from '@/components/ui/select'
 
 const props = defineProps({
+  apiBasePath: {
+    type: String,
+    default: '/frontdesk/analytics/csm',
+  },
   serviceType: {
     type: String,
     default: 'external',
@@ -185,7 +189,7 @@ const normalizeCategoryForApi = (category) => {
 
 const fetchDemographicData = async () => {
   try {
-    const response = await api.get('/frontdesk/analytics/csm/demographic-profile', {
+    const response = await api.get(`${props.apiBasePath}/demographic-profile`, {
       params: {
         ...props.filterParams,
         service_type: props.serviceType,

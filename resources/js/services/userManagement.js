@@ -6,6 +6,11 @@ export const userManagementService = {
     return response.data
   },
 
+  async getRoles() {
+    const response = await api.get('/superadmin/user-management/roles')
+    return response.data
+  },
+
   async getOffices() {
     const response = await api.get('/superadmin/user-management/offices')
     return response.data

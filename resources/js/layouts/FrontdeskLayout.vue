@@ -2,9 +2,10 @@
   <div class="min-h-screen bg-[#FCFCFC]">
     <!-- Desktop Sidebar -->
     <div class="hidden lg:block">
-      <FrontdeskSidebar 
+      <Sidebar
         :is-collapsed="sidebarCollapsed"
         :user-data="currentUser"
+        role="frontdesk"
         @toggle-collapse="toggleSidebar"
         @logout="openLogoutConfirmModal"
       />
@@ -47,9 +48,10 @@
           v-if="mobileSidebarOpen" 
           class="fixed inset-y-0 left-0 z-60 lg:hidden"
         >
-          <FrontdeskSidebar 
+          <Sidebar
             :is-collapsed="false"
             :user-data="currentUser"
+            role="frontdesk"
             @toggle-collapse="mobileSidebarOpen = false"
             @logout="openLogoutConfirmModal"
           />
@@ -95,14 +97,14 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Header from '../components/common/Header.vue'
-import FrontdeskSidebar from '../components/frontdesk/FrontdeskSidebar.vue'
+import Sidebar from '../components/common/Sidebar.vue'
 import { authService } from '../services/auth'
 
 export default {
   name: 'FrontdeskLayout',
   components: {
     Header,
-    FrontdeskSidebar
+    Sidebar
   },
   setup() {
     const router = useRouter()

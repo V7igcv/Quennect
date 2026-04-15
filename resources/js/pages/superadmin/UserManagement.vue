@@ -31,13 +31,19 @@
             <TableCell>
               <span
                 class="px-2 py-0.5 rounded-sm text-xs font-semibold"
-                :class="user.role === 'SUPERADMIN' ? 'bg-[#BCEDE4] text-[#0F5C5C]' : 'bg-blue-100 text-blue-700'"
+                :class="
+                  user.role === 'SUPERADMIN'
+                    ? 'bg-[#BCEDE4] text-[#0F5C5C]'
+                    : user.role === 'CITY MAYOR'
+                      ? 'bg-violet-100 text-violet-700'
+                      : 'bg-blue-100 text-blue-700'
+                "
               >
                 {{ user.roleLabel }}
               </span>
             </TableCell>
             <TableCell class="text-gray-600">
-              {{ user.role === 'SUPERADMIN' ? '—' : getOfficeLabel(user.officeId) }}
+              {{ user.role === 'OFFICE FRONTDESK' ? getOfficeLabel(user.officeId) : '—' }}
             </TableCell>
             <TableCell class="text-center">
               <button
@@ -119,8 +125,7 @@
                 <div class="relative">
                   <select v-model="newUser.role" @change="handleRoleChange(newUser)"
                     class="w-full border appearance-none border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#164980] focus:border-transparent transition">
-                    <option value="SUPERADMIN">Superadmin</option>
-                    <option value="OFFICE FRONTDESK">Office Frontdesk</option>
+                    <option v-for="role in roleOptions" :key="`new-role-${role.name}`" :value="role.name">{{ role.label }}</option>
                   </select>
                   <ChevronDown
                     class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -205,8 +210,7 @@
                 <div class="relative">
                   <select v-model="editUser.role" @change="handleRoleChange(editUser)"
                     class="w-full border appearance-none border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#164980] focus:border-transparent transition">
-                    <option value="SUPERADMIN">Superadmin</option>
-                    <option value="OFFICE FRONTDESK">Office Frontdesk</option>
+                    <option v-for="role in roleOptions" :key="`edit-role-${role.name}`" :value="role.name">{{ role.label }}</option>
                   </select>
                   <ChevronDown
                     class="w-4 h-4 text-gray-500 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -253,6 +257,7 @@ import {
 import { userManagementService } from '@/services/userManagement'
 
 const offices = ref([])
+const roleOptions = ref([])
 const users = ref([])
 const isLoading = ref(false)
 const isSubmitting = ref(false)
@@ -293,12 +298,21 @@ const paginatedUsers = computed(() =>
   users.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
 )
 
+const getDefaultRole = () => {
+  const frontdeskRole = roleOptions.value.find((role) => role.name === 'OFFICE FRONTDESK')
+  if (frontdeskRole) {
+    return frontdeskRole.name
+  }
+
+  return roleOptions.value[0]?.name || ''
+}
+
 const showAddModal = ref(false)
 const showNewPassword = ref(false)
-const newUser = ref({ username: '', password: '', role: 'OFFICE FRONTDESK', officeId: null })
+const newUser = ref({ username: '', password: '', role: '', officeId: null })
 
 const handleRoleChange = (form) => {
-  if (form.role === 'SUPERADMIN') {
+  if (form.role !== 'OFFICE FRONTDESK') {
     form.officeId = null
   }
 }
@@ -319,13 +333,19 @@ const fetchUserManagementData = async () => {
   errorMessage.value = ''
 
   try {
-    const [usersResponse, officesResponse] = await Promise.all([
+    const [usersResponse, rolesResponse, officesResponse] = await Promise.all([
       userManagementService.getUsers(),
+      userManagementService.getRoles(),
       userManagementService.getOffices()
     ])
 
     users.value = usersResponse.data.map(normalizeUser)
+    roleOptions.value = rolesResponse.data
     offices.value = officesResponse.data
+
+    if (!newUser.value.role) {
+      newUser.value.role = getDefaultRole()
+    }
 
     if (currentPage.value > totalPages.value) {
       currentPage.value = totalPages.value
@@ -342,12 +362,17 @@ const closeAddModal = () => {
   showAddModal.value = false
   showNewPassword.value = false
   formError.value = ''
-  newUser.value = { username: '', password: '', role: 'OFFICE FRONTDESK', officeId: null }
+  newUser.value = { username: '', password: '', role: getDefaultRole(), officeId: null }
 }
 
 const handleAddUser = async () => {
   if (!newUser.value.username.trim() || !newUser.value.password.trim()) {
     formError.value = 'Username and password are required.'
+    return
+  }
+
+  if (!newUser.value.role) {
+    formError.value = 'Role is required.'
     return
   }
 
@@ -383,7 +408,7 @@ const handleAddUser = async () => {
 
 const showEditModal = ref(false)
 const showEditPassword = ref(false)
-const editUser = ref({ username: '', password: '', role: 'OFFICE FRONTDESK', officeId: null })
+const editUser = ref({ username: '', password: '', role: '', officeId: null })
 const userToEdit = ref(null)
 
 const openEditModal = (user) => {
@@ -403,6 +428,11 @@ const closeEditModal = () => {
 const handleSaveUser = async () => {
   if (!editUser.value.username.trim()) {
     formError.value = 'Username is required.'
+    return
+  }
+
+  if (!editUser.value.role) {
+    formError.value = 'Role is required.'
     return
   }
 

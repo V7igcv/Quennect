@@ -10,12 +10,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class UserManagementController extends Controller
 {
-    private const ALLOWED_ROLES = ['SUPERADMIN', 'OFFICE FRONTDESK'];
-
     /**
      * Get users for the superadmin user management table.
      */
@@ -41,6 +40,36 @@ class UserManagementController extends Controller
     }
 
     /**
+     * Get available roles for the user management role dropdown.
+     */
+    public function roles(): JsonResponse
+    {
+        try {
+            $roles = Role::query()
+                ->orderBy('name')
+                ->get(['id', 'name']);
+
+            return response()->json([
+                'success' => true,
+                'data' => $roles->map(function (Role $role) {
+                    return [
+                        'id' => $role->id,
+                        'name' => $role->name,
+                        'label' => $this->formatRoleLabel($role->name),
+                    ];
+                }),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch user management roles: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to fetch roles. Please try again.',
+            ], 500);
+        }
+    }
+
+    /**
      * Create a new user account.
      */
     public function store(Request $request): JsonResponse
@@ -48,7 +77,7 @@ class UserManagementController extends Controller
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:100', 'unique:users,username'],
             'password' => ['required', 'string', 'min:8'],
-            'role' => ['required', 'string', Rule::in(self::ALLOWED_ROLES)],
+            'role' => ['required', 'string', Rule::exists('roles', 'name')],
             'office_id' => [
                 'nullable',
                 'integer',
@@ -112,7 +141,7 @@ class UserManagementController extends Controller
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:100', Rule::unique('users', 'username')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:8'],
-            'role' => ['required', 'string', Rule::in(self::ALLOWED_ROLES)],
+            'role' => ['required', 'string', Rule::exists('roles', 'name')],
             'office_id' => [
                 'nullable',
                 'integer',
@@ -216,7 +245,8 @@ class UserManagementController extends Controller
 
     private function transformUser(User $user): array
     {
-        $isFrontdesk = $user->role?->name === 'OFFICE FRONTDESK';
+        $roleName = $user->role?->name;
+        $isFrontdesk = $roleName === 'OFFICE FRONTDESK';
         $office = $isFrontdesk && $user->office
             ? [
                 'id' => $user->office->id,
@@ -226,16 +256,35 @@ class UserManagementController extends Controller
             ]
             : null;
 
+        $roleLabel = $this->formatRoleLabel($roleName);
+
         return [
             'id' => $user->id,
             'username' => $user->username,
             'role' => [
                 'id' => $user->role?->id,
-                'name' => $user->role?->name,
-                'label' => $isFrontdesk ? 'Office Frontdesk' : 'Superadmin',
+                'name' => $roleName,
+                'label' => $roleLabel,
             ],
             'office_id' => $office['id'] ?? null,
             'office' => $office,
         ];
+    }
+
+    private function formatRoleLabel(?string $roleName): string
+    {
+        if (empty($roleName)) {
+            return 'Unknown Role';
+        }
+
+        if ($roleName === 'OFFICE FRONTDESK') {
+            return 'Office Frontdesk';
+        }
+
+        return Str::of($roleName)
+            ->lower()
+            ->replace('_', ' ')
+            ->title()
+            ->value();
     }
 }

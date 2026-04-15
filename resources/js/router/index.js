@@ -5,6 +5,13 @@ import { authService } from '../services/auth'
 import KioskLayout from '../layouts/KioskLayout.vue'
 import FrontdeskLayout from '../layouts/FrontdeskLayout.vue'
 import SuperadminLayout from '../layouts/SuperadminLayout.vue'
+import CityMayorLayout from '../layouts/CityMayorLayout.vue'
+
+const getHomePathForRole = (role) => {
+  if (role === 'SUPERADMIN') return '/superadmin'
+  if (role === 'CITY MAYOR') return '/city-mayor'
+  return '/frontdesk'
+}
 
 const routes = [
   {
@@ -71,12 +78,12 @@ const routes = [
       {
         path: 'analytics',
         name: 'frontdesk.analytics',
-        component: () => import('../pages/frontdesk/FrontDeskAnalytics.vue')
+        component: () => import('../pages/shared/QueueAnalytics.vue')
       },
       {
         path: 'csm-analytics',
         name: 'frontdesk.csm-analytics',
-        component: () => import('../pages/frontdesk/CSMAnalytics.vue')
+        component: () => import('../pages/shared/CSMAnalytics.vue')
       },
       {
         path: 'internal-transactions',
@@ -105,7 +112,7 @@ const routes = [
       {
         path: '',
         name: 'superadmin.dashboard',
-        component: () => import('../pages/superadmin/AdminAnalytics.vue')
+        component: () => import('../pages/shared/QueueAnalytics.vue')
       },
       {
         path: 'offices',
@@ -124,6 +131,25 @@ const routes = [
       }
     ]
   },
+
+  // City Mayor routes (protected - CITY MAYOR only)
+  {
+    path: '/city-mayor',
+    component: CityMayorLayout,
+    meta: { requiresAuth: true, role: 'CITY MAYOR' },
+    children: [
+      {
+        path: '',
+        name: 'city-mayor.dashboard',
+        component: () => import('../pages/shared/QueueAnalytics.vue')
+      },
+      {
+        path: 'csm-analytics',
+        name: 'city-mayor.csm-analytics',
+        component: () => import('../pages/shared/CSMAnalytics.vue')
+      }
+    ]
+  },
   
   // Monitor routes (public)
   {
@@ -138,7 +164,7 @@ const routes = [
     redirect: () => {
       if (authService.isAuthenticated()) {
         const user = authService.getCurrentUser()
-        return user?.role === 'SUPERADMIN' ? '/superadmin' : '/frontdesk'
+        return getHomePathForRole(user?.role)
       }
       return '/kiosk/intro'     // Redirect to intro video page for non-authenticated users
     }
@@ -164,7 +190,7 @@ router.beforeEach((to, from) => {
   if (to.meta.requiresGuest) {
     if (isAuthenticated) {
       // If already logged in, redirect to appropriate dashboard
-      return user?.role === 'SUPERADMIN' ? '/superadmin' : '/frontdesk'
+      return getHomePathForRole(user?.role)
     }
     return true // Allow access
   }
@@ -177,9 +203,10 @@ router.beforeEach((to, from) => {
     }
     
     // Check role-based access
-    if (to.meta.role && user?.role !== to.meta.role) {
+    const requiredRoles = Array.isArray(to.meta.role) ? to.meta.role : [to.meta.role].filter(Boolean)
+    if (requiredRoles.length && !requiredRoles.includes(user?.role)) {
       // User doesn't have required role, redirect to their appropriate dashboard
-      return user?.role === 'SUPERADMIN' ? '/superadmin' : '/frontdesk'
+      return getHomePathForRole(user?.role)
     }
   }
   

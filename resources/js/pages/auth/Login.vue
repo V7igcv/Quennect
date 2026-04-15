@@ -125,6 +125,8 @@ export default {
             router.push('/superadmin')
           } else if (user.role === 'OFFICE FRONTDESK') {
             router.push('/frontdesk')
+          } else if (user.role === 'CITY MAYOR') {
+            router.push('/city-mayor')
           } else {
             error.value = 'Invalid user role'
           }

@@ -98,6 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // User Management
         Route::get('/user-management/users', [UserManagementController::class, 'index']);
+        Route::get('/user-management/roles', [UserManagementController::class, 'roles']);
         Route::get('/user-management/offices', [UserManagementController::class, 'offices']);
         Route::post('/user-management/users', [UserManagementController::class, 'store']);
         Route::put('/user-management/users/{user}', [UserManagementController::class, 'update']);
@@ -212,6 +213,28 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('/status/{id}', [InternalEvaluationController::class, 'checkEvaluationStatus']);
             });
         });
+    });
+
+    // ==================== CITY MAYOR ====================
+    Route::middleware('role:CITY MAYOR')->prefix('city-mayor')->group(function () {
+
+        // Office Options (for office filter dropdown)
+        Route::get('/user-management/offices', [UserManagementController::class, 'offices']);
+
+        // Queue Analytics (read-only)
+        Route::get('/analytics/cards', [FrontdeskAnalyticsController::class, 'getCardStats']);
+        Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
+        Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
+        Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
+        Route::get('/analytics/assistance-distribution', [FrontdeskAnalyticsController::class, 'getAssistanceDistribution']);
+        Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
+
+        // CSM Analytics (read-only)
+        Route::get('/analytics/csm/overview', [CsmAnalyticsController::class, 'getOverviewStats']);
+        Route::get('/analytics/csm/citizen-charter', [CsmAnalyticsController::class, 'getCitizenCharterCounts']);
+        Route::get('/analytics/csm/sqd-results', [CsmAnalyticsController::class, 'getSqdResults']);
+        Route::get('/analytics/csm/demographic-profile', [CsmAnalyticsController::class, 'getDemographicProfile']);
+        Route::get('/analytics/csm/overall-score-per-service', [CsmAnalyticsController::class, 'getOverallScorePerService']);
     });
 
 });

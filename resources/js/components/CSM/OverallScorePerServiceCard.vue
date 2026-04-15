@@ -135,6 +135,10 @@ import {
 import { Info } from 'lucide-vue-next'
 
 const props = defineProps({
+  apiBasePath: {
+    type: String,
+    default: '/frontdesk/analytics/csm',
+  },
   serviceType: {
     type: String,
     default: 'external',
@@ -191,7 +195,7 @@ const getRatingText = (percentage) => {
 
 const fetchOverallScore = async () => {
   try {
-    const response = await api.get('/frontdesk/analytics/csm/overall-score-per-service', {
+    const response = await api.get(`${props.apiBasePath}/overall-score-per-service`, {
       params: {
         ...props.filterParams,
         service_type: props.serviceType,

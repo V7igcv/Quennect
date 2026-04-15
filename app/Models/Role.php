@@ -34,6 +34,11 @@ class Role extends Model
         return $this->name === 'FRONTDESK';
     }
 
+    public function isCityMayor()
+    {
+        return $this->name === 'CITY MAYOR';
+    }
+
     /**
      * Get role by name
      */

@@ -80,8 +80,15 @@ class AuthController extends Controller
         $user->tokens()->delete();
 
         // Create new token
+        $ability = 'frontdesk';
+        if ($user->isSuperadmin()) {
+            $ability = 'superadmin';
+        } elseif ($user->isCityMayor()) {
+            $ability = 'city-mayor';
+        }
+
         $token = $user->createToken('auth-token', [
-            $user->isSuperadmin() ? 'superadmin' : 'frontdesk'
+            $ability,
         ])->plainTextToken;
 
         // Prepare response

@@ -1,19 +1,16 @@
 <template>
   <div class="min-h-screen bg-[#FCFCFC]">
-    <!-- Desktop Sidebar -->
     <div class="hidden lg:block">
       <Sidebar
         :is-collapsed="sidebarCollapsed"
         :user-data="currentUser"
-        role="superadmin"
+        role="city_mayor"
         @toggle-collapse="toggleSidebar"
         @logout="openLogoutConfirmModal"
       />
     </div>
-    
-    <!-- Main content -->
+
     <div class="transition-all duration-300" :class="sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'">
-      <!-- Mobile menu button -->
       <button
         class="lg:hidden fixed top-3 left-3 z-60 bg-[#0F5C5C] text-white p-2 rounded-md shadow-md"
         @click="toggleMobileSidebar"
@@ -23,35 +20,31 @@
         </svg>
       </button>
 
-      <!-- Header -->
       <Header :user="currentUser" />
-      
-      <!-- Mobile sidebar overlay (for small screens) -->
+
       <Transition name="mobile-overlay-fade">
-        <div 
-          v-if="mobileSidebarOpen" 
+        <div
+          v-if="mobileSidebarOpen"
           class="fixed inset-0 bg-black/50 z-50 lg:hidden"
           @click="mobileSidebarOpen = false"
         ></div>
       </Transition>
-      
-      <!-- Mobile sidebar (for small screens) -->
+
       <Transition name="mobile-sidebar-slide">
-        <div 
-          v-if="mobileSidebarOpen" 
+        <div
+          v-if="mobileSidebarOpen"
           class="fixed inset-y-0 left-0 z-60 lg:hidden"
         >
           <Sidebar
             :is-collapsed="false"
             :user-data="currentUser"
-            role="superadmin"
+            role="city_mayor"
             @toggle-collapse="mobileSidebarOpen = false"
             @logout="openLogoutConfirmModal"
           />
         </div>
       </Transition>
-      
-      <!-- Page Content -->
+
       <main class="p-6">
         <router-view />
       </main>
@@ -86,17 +79,17 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue' // Add onMounted
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Header from '../components/common/Header.vue'
 import Sidebar from '../components/common/Sidebar.vue'
 import { authService } from '../services/auth'
 
 export default {
-  name: 'SuperadminLayout',
+  name: 'CityMayorLayout',
   components: {
     Header,
-    Sidebar
+    Sidebar,
   },
   setup() {
     const router = useRouter()
@@ -106,31 +99,21 @@ export default {
     const showLogoutConfirmModal = ref(false)
     const isLoggingOut = ref(false)
 
-    // Initialize with stored user data immediately - this prevents "Loading..." flash
     const currentUser = ref(authService.getCurrentUser())
 
     const fetchUserData = async () => {
-      // Only fetch if we have a token (user is authenticated)
       if (!authService.isAuthenticated()) {
         return
       }
 
       isRefreshing.value = true
       try {
-        // This will get fresh data from the server
         const freshUserData = await authService.getUser()
-        
-        // Update localStorage with fresh data
         localStorage.setItem('user', JSON.stringify(freshUserData))
-        
-        // Update the reactive reference
         currentUser.value = freshUserData
-        
-        console.log('User data refreshed:', freshUserData) // For debugging
       } catch (error) {
         console.error('Failed to refresh user data:', error)
-        
-        // If we get a 401, redirect to login
+
         if (error.response?.status === 401) {
           router.push('/login')
         }
@@ -139,15 +122,14 @@ export default {
       }
     }
 
-    // Fetch fresh data on mount (but the UI already has the stored data)
     onMounted(() => {
       fetchUserData()
     })
-    
+
     const toggleSidebar = () => {
       sidebarCollapsed.value = !sidebarCollapsed.value
     }
-    
+
     const toggleMobileSidebar = () => {
       mobileSidebarOpen.value = !mobileSidebarOpen.value
     }
@@ -156,7 +138,7 @@ export default {
       mobileSidebarOpen.value = false
       showLogoutConfirmModal.value = true
     }
-    
+
     const handleLogout = async () => {
       if (isLoggingOut.value) {
         return
@@ -175,7 +157,7 @@ export default {
         showLogoutConfirmModal.value = false
       }
     }
-    
+
     return {
       sidebarCollapsed,
       mobileSidebarOpen,
@@ -186,9 +168,9 @@ export default {
       toggleSidebar,
       toggleMobileSidebar,
       openLogoutConfirmModal,
-      handleLogout
+      handleLogout,
     }
-  }
+  },
 }
 </script>
 
