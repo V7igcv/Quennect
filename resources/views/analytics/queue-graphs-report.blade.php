@@ -499,5 +499,58 @@
             <div class="text-sm text-muted">No lane type distribution data available for the selected period.</div>
         @endif
     </div>
+
+    {{-- Assistance Distribution --}}
+    @php
+        $assistanceGraphsData = $assistanceGraphs ?? [];
+        $hasAssistanceServices = $hasAssistanceServices ?? false;
+    @endphp
+
+    @if ($hasAssistanceServices)
+        <div class="mb-4">
+            <div class="section-title">Assistance Distribution</div>
+            <div class="section-subtitle">
+                Distribution of total assistance provided per service for All Barangay and each barangay with assistance data.
+            </div>
+
+            @if (!empty($assistanceGraphsData))
+                @foreach ($assistanceGraphsData as $graph)
+                    @php
+                        $graphLabel = $graph['label'] ?? 'All Barangay';
+                        $graphChartPath = $graph['chart_path'] ?? null;
+                        $graphSummary = $graph['summary'] ?? [];
+                        $graphTotalClients = $graphSummary['total_clients'] ?? 0;
+                        $graphTotalAssistance = $graphSummary['total_assistance'] ?? 0;
+                    @endphp
+
+                    <div class="mt-3">
+                        <div class="text-sm" style="font-weight: 700;">{{ $graphLabel }}</div>
+
+                        @if (!empty($graphChartPath))
+                            <div class="chart-image-wrapper">
+                                <img
+                                    src="{{ public_path('storage/' . $graphChartPath) }}"
+                                    alt="Assistance Distribution Chart - {{ $graphLabel }}"
+                                    class="chart-image"
+                                >
+                            </div>
+                        @endif
+
+                        <div class="small-note">
+                            <span class="total-clients-highlight">
+                                Total clients: {{ number_format($graphTotalClients) }}
+                            </span>
+                            &nbsp;|&nbsp;
+                            <span class="total-clients-highlight">
+                                Total Amount of Assistance Provided: Php {{ number_format((float) $graphTotalAssistance, 2) }}
+                            </span>
+                        </div>
+                    </div>
+                @endforeach
+            @else
+                <div class="text-sm text-muted">No assistance distribution data available for the selected period.</div>
+            @endif
+        </div>
+    @endif
 </body>
 </html>

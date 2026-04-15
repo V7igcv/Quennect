@@ -166,6 +166,79 @@ class ChartImageService
     }
 
     /**
+     * Generate a doughnut chart image for assistance distribution.
+     *
+     * @param array $distribution Array of [label/name, total_assistance]
+     * @param string $officeDisplayName
+     * @param string $periodLabel
+     * @param string $barangayLabel
+     * @return string|null Relative path under the public storage disk
+     */
+    public function generateAssistanceDonutChart(
+        array $distribution,
+        string $officeDisplayName,
+        string $periodLabel,
+        string $barangayLabel
+    ): ?string {
+        if (empty($distribution)) {
+            return null;
+        }
+
+        $labels = array_map(static function (array $segment) {
+            return $segment['label'] ?? ($segment['name'] ?? '-');
+        }, $distribution);
+
+        $values = array_map(static function (array $segment) {
+            return (float) ($segment['total_assistance'] ?? 0);
+        }, $distribution);
+
+        $colorPalette = ['#2563EB', '#16A34A', '#F59E0B', '#DC2626', '#7C3AED', '#0891B2', '#D946EF', '#4F46E5', '#EA580C', '#15803D'];
+        $backgroundColors = [];
+        foreach ($labels as $index => $_) {
+            $backgroundColors[] = $colorPalette[$index % count($colorPalette)];
+        }
+
+        $config = [
+            'type' => 'doughnut',
+            'data' => [
+                'labels' => $labels,
+                'datasets' => [[
+                    'data' => $values,
+                    'backgroundColor' => $backgroundColors,
+                ]],
+            ],
+            'options' => [
+                'responsive' => true,
+                'plugins' => [
+                    'title' => [
+                        'display' => true,
+                        'text' => sprintf('Assistance Distribution - %s (%s) - %s', $officeDisplayName, $periodLabel, $barangayLabel),
+                        'font' => [
+                            'size' => 13,
+                        ],
+                    ],
+                    'legend' => [
+                        'display' => false,
+                    ],
+                    'datalabels' => [
+                        'color' => '#FFFFFF',
+                        'font' => [
+                            'size' => 10,
+                            'weight' => 'bold',
+                        ],
+                        'backgroundColor' => 'transparent',
+                        'anchor' => 'center',
+                        'align' => 'center',
+                        'formatter' => "function(value, ctx) { var data = ctx.chart.data.datasets[0].data || []; var sum = data.reduce(function(a, b) { return a + b; }, 0); var pct = sum ? (value / sum * 100).toFixed(1) : 0; return 'Php ' + Number(value).toLocaleString('en-US') + ' (' + pct + '%)'; }",
+                    ],
+                ],
+            ],
+        ];
+
+        return $this->requestAndStoreChart($config, 'assistance');
+    }
+
+    /**
      * Generate a horizontal bar chart for a Citizen's Charter question.
      *
      * @param array $options Array of [description, count, percentage, option, label]

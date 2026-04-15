@@ -320,57 +320,146 @@
       </Card>
     </div>
 
-    <!-- Lane Type Distribution Row -->
+    <!-- Lane Type + Assistance Distribution Row -->
     <div class="mt-6">
-      <div class="mb-3 flex items-center gap-1">
-        <h2 class="text-lg font-semibold">Lane Type Distribution</h2>
-        <CsmMetricExplanation
-          :title="queueMetricExplanations.laneType.title"
-          :meaning="queueMetricExplanations.laneType.meaning"
-          :computation="queueMetricExplanations.laneType.computation"
-          :formula="queueMetricExplanations.laneType.formula"
-          :interpretation="queueMetricExplanations.laneType.interpretation"
-        />
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div :class="!showAssistanceChart ? 'lg:col-span-2' : ''">
+          <div class="mb-3 flex items-center gap-1">
+            <h2 class="text-lg font-semibold">Lane Type Distribution</h2>
+            <CsmMetricExplanation
+              :title="queueMetricExplanations.laneType.title"
+              :meaning="queueMetricExplanations.laneType.meaning"
+              :computation="queueMetricExplanations.laneType.computation"
+              :formula="queueMetricExplanations.laneType.formula"
+              :interpretation="queueMetricExplanations.laneType.interpretation"
+            />
+          </div>
+          <Card class="w-full">
+            <CardContent>
+              <div class="h-[300px] w-full mt-2 flex items-center justify-center">
+                <div
+                  class="relative h-52 w-52"
+                  @mousemove="handleLaneDonutMouseMove"
+                  @mouseleave="clearLaneHoverSegment"
+                >
+                  <div class="h-full w-full rounded-full" :style="{ background: lanePieGradient }"></div>
+                  <div class="absolute inset-6 rounded-full bg-white flex flex-col items-center justify-center">
+                    <span class="text-2xl font-bold text-gray-900">{{ laneTotalClients }}</span>
+                    <span class="text-xs text-gray-500">Total Clients</span>
+                  </div>
+
+                  <div
+                    v-if="hoveredLaneSegment"
+                    class="pointer-events-none absolute z-20 min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg"
+                    :style="{ left: `${laneTooltipPosition.x}px`, top: `${laneTooltipPosition.y}px`, transform: 'translate(8px, -110%)' }"
+                  >
+                    <p class="font-semibold text-gray-900">{{ hoveredLaneSegment.name }}</p>
+                    <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ hoveredLaneSegment.value }}</span></p>
+                    <p class="text-gray-600">Percentage: <span class="font-semibold">{{ hoveredLaneSegment.percentage }}%</span></p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 pt-4 border-t border-gray-100">
+                <div
+                  v-for="(segment, index) in laneTypeChartData"
+                  :key="`lane-segment-${index}`"
+                  class="flex items-center gap-2 text-sm"
+                >
+                  <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getLaneSegmentColor(index) }"></div>
+                  <span class="text-gray-600">{{ segment.name }}</span>
+                  <span class="text-gray-900 font-medium ml-auto">{{ segment.percentage }}%</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div v-if="showAssistanceChart">
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1">
+              <h2 class="text-lg font-semibold">Assistance Distribution</h2>
+              <CsmMetricExplanation
+                :title="queueMetricExplanations.assistanceDistribution.title"
+                :meaning="queueMetricExplanations.assistanceDistribution.meaning"
+                :computation="queueMetricExplanations.assistanceDistribution.computation"
+                :formula="queueMetricExplanations.assistanceDistribution.formula"
+                :interpretation="queueMetricExplanations.assistanceDistribution.interpretation"
+              />
+            </div>
+          </div>
+
+          <Card class="w-full">
+            <CardHeader class="flex flex-row items-start justify-end space-y-0 pt-4 px-4">
+              <Select v-model="selectedBarangayIdForAssistance">
+                <SelectTrigger class="w-[180px] bg-white">
+                  <SelectValue placeholder="All Barangay" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Barangay</SelectItem>
+                  <SelectItem
+                    v-for="barangay in availableBarangaysForAssistance"
+                    :key="`assist-barangay-${barangay.id}`"
+                    :value="barangay.id"
+                  >
+                    {{ barangay.name }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent>
+              <div class="h-[300px] w-full flex items-center justify-center">
+                <div
+                  class="relative h-52 w-52"
+                  @mousemove="handleAssistanceDonutMouseMove"
+                  @mouseleave="clearAssistanceHoverSegment"
+                >
+                  <div class="h-full w-full rounded-full" :style="{ background: assistancePieGradient }"></div>
+                  <div class="absolute inset-6 rounded-full bg-white flex flex-col items-center justify-center px-2 text-center">
+                    <span class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Total Assistance Provided</span>
+                    <span class="mt-1 text-sm font-semibold text-gray-900">{{ assistanceTotalClients }} clients</span>
+                    <span class="text-xs font-medium text-emerald-700">{{ formatPesoAmount(assistanceTotalAssistance) }}</span>
+                  </div>
+
+                  <div
+                    v-if="hoveredAssistanceSegment"
+                    class="pointer-events-none absolute z-20 min-w-44 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg"
+                    :style="{ left: `${assistanceTooltipPosition.x}px`, top: `${assistanceTooltipPosition.y}px`, transform: 'translate(8px, -110%)' }"
+                  >
+                    <p class="font-semibold text-gray-900">{{ hoveredAssistanceSegment.name }}</p>
+                    <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ hoveredAssistanceSegment.totalClients }}</span></p>
+                    <p class="text-gray-600">Total Amount: <span class="font-semibold">{{ formatPesoAmount(hoveredAssistanceSegment.totalAssistance) }}</span></p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 pt-4 border-t border-gray-100">
+                <div
+                  v-for="(segment, index) in assistanceChartData"
+                  :key="`assistance-segment-${index}`"
+                  class="flex items-center gap-2 text-sm"
+                >
+                  <div
+                    class="h-3 w-3 min-h-3 min-w-3 shrink-0 rounded-full"
+                    :style="{ backgroundColor: getAssistanceSegmentColor(index) }"
+                  ></div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <span class="text-gray-600 truncate cursor-help">{{ segment.name }}</span>
+                      </TooltipTrigger>
+                      <TooltipContent class="min-w-44 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
+                        <p class="font-semibold text-gray-900">{{ segment.name }}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <span class="text-gray-900 font-medium ml-auto">{{ formatPesoAmount(segment.totalAssistance) }}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-      <Card class="w-full">
-        <CardContent>
-          <div class="h-[300px] w-full mt-2 flex items-center justify-center">
-            <div
-              class="relative h-52 w-52"
-              @mousemove="handleLaneDonutMouseMove"
-              @mouseleave="clearLaneHoverSegment"
-            >
-              <div class="h-full w-full rounded-full" :style="{ background: lanePieGradient }"></div>
-              <div class="absolute inset-6 rounded-full bg-white flex flex-col items-center justify-center">
-                <span class="text-2xl font-bold text-gray-900">{{ laneTotalClients }}</span>
-                <span class="text-xs text-gray-500">Total Clients</span>
-              </div>
-
-              <div
-                v-if="hoveredLaneSegment"
-                class="pointer-events-none absolute z-20 min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg"
-                :style="{ left: `${laneTooltipPosition.x}px`, top: `${laneTooltipPosition.y}px`, transform: 'translate(8px, -110%)' }"
-              >
-                <p class="font-semibold text-gray-900">{{ hoveredLaneSegment.name }}</p>
-                <p class="mt-1 text-gray-600">Clients: <span class="font-semibold">{{ hoveredLaneSegment.value }}</span></p>
-                <p class="text-gray-600">Percentage: <span class="font-semibold">{{ hoveredLaneSegment.percentage }}%</span></p>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4 pt-4 border-t border-gray-100">
-            <div
-              v-for="(segment, index) in laneTypeChartData"
-              :key="`lane-segment-${index}`"
-              class="flex items-center gap-2 text-sm"
-            >
-              <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: getLaneSegmentColor(index) }"></div>
-              <span class="text-gray-600">{{ segment.name }}</span>
-              <span class="text-gray-900 font-medium ml-auto">{{ segment.percentage }}%</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
 
     <!-- Queue Summary Table -->
@@ -648,6 +737,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -703,6 +799,16 @@ const queueMetricExplanations = {
     interpretation: [
       'Bigger donut slices indicate higher client share for that lane type.',
       'Use this to monitor if lane demand is balanced or skewed toward specific client groups.',
+    ],
+  },
+  assistanceDistribution: {
+    title: 'Assistance Distribution',
+    meaning: 'This chart shows the total assistance amount distributed by external services that provide assistance.',
+    computation: 'Each segment represents one service, or one service-assistance type pair, with slice size based on total assistance amount and tooltip showing total clients served and total assistance given.',
+    formula: 'Service Assistance Share = (Service Total Assistance / Total Assistance Provided) * 100',
+    interpretation: [
+      'Larger slices indicate services that distributed a higher share of total assistance.',
+      'Use the barangay filter to compare where assistance spending and clients are concentrated.',
     ],
   },
 }
@@ -793,6 +899,15 @@ const hoveredLaneSegment = ref(null)
 const laneTooltipPosition = ref({ x: 0, y: 0 })
 
 const laneColorPalette = ['#2563EB', '#16A34A', '#F59E0B', '#DC2626', '#7C3AED']
+const assistanceColorPalette = ['#2563EB', '#16A34A', '#F59E0B', '#DC2626', '#7C3AED', '#0891B2', '#D946EF', '#4F46E5', '#EA580C', '#15803D']
+
+const assistanceDistributionData = ref([])
+const assistanceDistributionSummary = ref({ total_clients: 0, total_assistance: 0 })
+const showAssistanceChart = ref(false)
+const selectedBarangayIdForAssistance = ref('all')
+const availableBarangaysForAssistance = ref([])
+const hoveredAssistanceSegment = ref(null)
+const assistanceTooltipPosition = ref({ x: 0, y: 0 })
 
 const maxClientSatisfactionValue = computed(() => {
   const values = clientSatisfactionData.value.map(item => item.value)
@@ -819,6 +934,51 @@ const lanePieGradient = computed(() => {
     current = end
     return `${getLaneSegmentColor(index)} ${start}% ${end}%`
   })
+  return `conic-gradient(${slices.join(', ')})`
+})
+
+const assistanceChartData = computed(() => {
+  const totalAssistance = Number(assistanceDistributionSummary.value?.total_assistance || 0)
+  if (!assistanceDistributionData.value.length) {
+    return []
+  }
+
+  return assistanceDistributionData.value.map((segment) => {
+    const amount = Number(segment.total_assistance ?? 0)
+    const percentage = totalAssistance > 0
+      ? Number(((amount / totalAssistance) * 100).toFixed(2))
+      : 0
+
+    return {
+      serviceId: segment.service_id ?? null,
+      assistanceTypeId: segment.assistance_type_id ?? null,
+      name: segment.label
+        || (segment.assistance_type_name
+          ? `${segment.service_name} (${segment.assistance_type_name})`
+          : segment.service_name),
+      totalClients: Number(segment.total_clients ?? 0),
+      totalAssistance: amount,
+      percentage,
+    }
+  })
+})
+
+const assistanceTotalClients = computed(() => Number(assistanceDistributionSummary.value?.total_clients || 0))
+const assistanceTotalAssistance = computed(() => Number(assistanceDistributionSummary.value?.total_assistance || 0))
+
+const assistancePieGradient = computed(() => {
+  if (!assistanceChartData.value.length) {
+    return 'conic-gradient(#E5E7EB 0% 100%)'
+  }
+
+  let current = 0
+  const slices = assistanceChartData.value.map((segment, index) => {
+    const start = current
+    const end = current + segment.percentage
+    current = end
+    return `${getAssistanceSegmentColor(index)} ${start}% ${end}%`
+  })
+
   return `conic-gradient(${slices.join(', ')})`
 })
 
@@ -861,6 +1021,18 @@ const getLaneSegmentColor = (index) => {
   return laneColorPalette[index % laneColorPalette.length]
 }
 
+const getAssistanceSegmentColor = (index) => {
+  return assistanceColorPalette[index % assistanceColorPalette.length]
+}
+
+const formatPesoAmount = (value) => {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+  }).format(Number(value || 0))
+}
+
 const getLaneSegmentByPercent = (percent) => {
   let cumulative = 0
 
@@ -901,6 +1073,48 @@ const handleLaneDonutMouseMove = (event) => {
 
 const clearLaneHoverSegment = () => {
   hoveredLaneSegment.value = null
+}
+
+const getAssistanceSegmentByPercent = (percent) => {
+  let cumulative = 0
+
+  for (const segment of assistanceChartData.value) {
+    cumulative += segment.percentage
+    if (percent <= cumulative) {
+      return segment
+    }
+  }
+
+  return assistanceChartData.value[assistanceChartData.value.length - 1] || null
+}
+
+const handleAssistanceDonutMouseMove = (event) => {
+  const rect = event.currentTarget.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+
+  const center = 104
+  const dx = x - center
+  const dy = y - center
+  const distance = Math.sqrt((dx * dx) + (dy * dy))
+
+  const outerRadius = 104
+  const innerRadius = 80
+
+  if (distance > outerRadius || distance < innerRadius) {
+    hoveredAssistanceSegment.value = null
+    return
+  }
+
+  const angle = (Math.atan2(dy, dx) * (180 / Math.PI) + 90 + 360) % 360
+  const percent = (angle / 360) * 100
+
+  hoveredAssistanceSegment.value = getAssistanceSegmentByPercent(percent)
+  assistanceTooltipPosition.value = { x, y }
+}
+
+const clearAssistanceHoverSegment = () => {
+  hoveredAssistanceSegment.value = null
 }
 
 const bodyOriginalOverflow = ref('')
@@ -1185,6 +1399,41 @@ const fetchBarangayDistribution = async () => {
   barangayTotalClientsValue.value = payload.total_clients ?? 0
 }
 
+const fetchAssistanceDistribution = async () => {
+  try {
+    const params = {
+      ...getDateFilterParams(),
+      barangay_id: selectedBarangayIdForAssistance.value === 'all'
+        ? null
+        : Number(selectedBarangayIdForAssistance.value),
+    }
+
+    const response = await api.get('/frontdesk/analytics/assistance-distribution', {
+      params,
+    })
+
+    const payload = response?.data?.data || {}
+    showAssistanceChart.value = Boolean(payload.has_assistance_services)
+    availableBarangaysForAssistance.value = Array.isArray(payload.available_barangays)
+      ? payload.available_barangays.map((item) => ({
+          id: String(item.barangay_id),
+          name: item.barangay_name,
+        }))
+      : []
+    assistanceDistributionData.value = payload.distribution?.length ? payload.distribution : []
+    assistanceDistributionSummary.value = {
+      total_clients: Number(payload.summary?.total_clients ?? 0),
+      total_assistance: Number(payload.summary?.total_assistance ?? 0),
+    }
+    hoveredAssistanceSegment.value = null
+  } catch (error) {
+    showAssistanceChart.value = false
+    availableBarangaysForAssistance.value = []
+    assistanceDistributionData.value = []
+    assistanceDistributionSummary.value = { total_clients: 0, total_assistance: 0 }
+  }
+}
+
 const fetchQueueSummary = async ({ showLoading = true } = {}) => {
   if (showLoading) {
     isLoadingQueueSummary.value = true
@@ -1294,6 +1543,7 @@ const fetchAnalyticsData = async () => {
       fetchCardStats(),
       fetchBarangayDistribution(),
       fetchLaneTypeDistribution(),
+      fetchAssistanceDistribution(),
       fetchQueueSummary(),
     ])
   } catch (error) {
@@ -1306,6 +1556,11 @@ const fetchAnalyticsData = async () => {
 watch(currentQueueSummaryPage, () => {
   if (isApplyingDateFilter.value) return
   fetchQueueSummary({ showLoading: false })
+})
+
+watch(selectedBarangayIdForAssistance, () => {
+  if (isLoadingAnalytics.value) return
+  fetchAssistanceDistribution()
 })
 
 const applyDateFilterAndReload = async () => {
@@ -1334,7 +1589,7 @@ watch(selectedYear, () => {
   applyDateFilterAndReload()
 })
 
-onMounted(() => {
-  fetchAnalyticsData()
+onMounted(async () => {
+  await fetchAnalyticsData()
 })
 </script>

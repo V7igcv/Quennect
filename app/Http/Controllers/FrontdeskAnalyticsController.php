@@ -6,6 +6,7 @@ use App\Enums\TransactionStatus;
 use App\Models\EvaluationResponse;
 use App\Models\Office;
 use App\Models\QueueTransaction;
+use App\Models\Service;
 use App\Services\Analytics\ChartImageService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -496,6 +498,90 @@ class FrontdeskAnalyticsController extends Controller
     }
 
     /**
+     * Get assistance distribution for donut chart and summary totals.
+     *
+     * Supported filters:
+     * - period=daily&date=YYYY-MM-DD (default)
+     * - period=monthly&month=1-12&year=YYYY
+     * - period=yearly&year=YYYY
+     * - barangay_id=<id> (optional)
+     */
+    public function getAssistanceDistribution(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+                'barangay_id' => 'nullable|integer|exists:barangays,id',
+            ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
+
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+            $barangayId = isset($validated['barangay_id']) ? (int) $validated['barangay_id'] : null;
+
+            $assistancePayload = $this->buildAssistanceDistributionPayload(
+                $officeId,
+                $period,
+                $date,
+                $month,
+                $year,
+                $barangayId
+            );
+
+            $availableBarangays = $this->getAssistanceBarangayOptionsWithData(
+                $officeId,
+                $period,
+                $date,
+                $month,
+                $year
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    ...$assistancePayload,
+                    'available_barangays' => $availableBarangays,
+                ],
+                'filter' => [
+                    ...$this->buildFilterPayload($period, $date, $month, $year),
+                    'barangay_id' => $barangayId,
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Frontdesk analytics assistance distribution error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching assistance distribution',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Get queue summary table data with pagination.
      *
      * Supported filters:
@@ -751,8 +837,26 @@ class FrontdeskAnalyticsController extends Controller
             $laneTypePayload = $laneTypeResponse->getData(true);
             $laneTypeStats = $laneTypePayload['data'] ?? [];
 
+            $assistanceAllPayload = $this->buildAssistanceDistributionPayload(
+                $officeId,
+                $period,
+                $date,
+                $month,
+                $year,
+                null
+            );
+            $hasAssistanceServices = (bool) ($assistanceAllPayload['has_assistance_services'] ?? false);
+            $assistanceBarangayOptions = $this->getAssistanceBarangayOptionsWithData(
+                $officeId,
+                $period,
+                $date,
+                $month,
+                $year
+            );
+
             $barangayChartPath = null;
             $laneTypeChartPath = null;
+            $assistanceGraphs = [];
 
             if (!empty($barangayStats['distribution'] ?? [])) {
                 $barangayChartPath = $this->chartImageService->generateBarangayBarChart(
@@ -770,6 +874,63 @@ class FrontdeskAnalyticsController extends Controller
                 );
             }
 
+            if ($hasAssistanceServices
+                && !empty($assistanceAllPayload['distribution'] ?? [])
+            ) {
+                $chartPath = $this->chartImageService->generateAssistanceDonutChart(
+                    $assistanceAllPayload['distribution'],
+                    $officeDisplayName,
+                    $periodLabel,
+                    'All Barangay'
+                );
+
+                if (!empty($chartPath)) {
+                    $assistanceGraphs[] = [
+                        'label' => 'All Barangay',
+                        'chart_path' => $chartPath,
+                        'summary' => $assistanceAllPayload['summary'] ?? [
+                            'total_clients' => 0,
+                            'total_assistance' => 0,
+                        ],
+                    ];
+                }
+            }
+
+            foreach ($assistanceBarangayOptions as $barangayOption) {
+                $barangayAssistancePayload = $this->buildAssistanceDistributionPayload(
+                    $officeId,
+                    $period,
+                    $date,
+                    $month,
+                    $year,
+                    (int) $barangayOption['barangay_id']
+                );
+
+                if (empty($barangayAssistancePayload['distribution'] ?? [])) {
+                    continue;
+                }
+
+                $chartPath = $this->chartImageService->generateAssistanceDonutChart(
+                    $barangayAssistancePayload['distribution'],
+                    $officeDisplayName,
+                    $periodLabel,
+                    $barangayOption['barangay_name']
+                );
+
+                if (empty($chartPath)) {
+                    continue;
+                }
+
+                $assistanceGraphs[] = [
+                    'label' => $barangayOption['barangay_name'],
+                    'chart_path' => $chartPath,
+                    'summary' => $barangayAssistancePayload['summary'] ?? [
+                        'total_clients' => 0,
+                        'total_assistance' => 0,
+                    ],
+                ];
+            }
+
             $pdf = Pdf::loadView('analytics.queue-graphs-report', [
                 'officeName' => $officeName,
                 'officeAcronym' => $officeAcronym,
@@ -784,6 +945,8 @@ class FrontdeskAnalyticsController extends Controller
                 'laneTypeStats' => $laneTypeStats,
                 'barangayChartPath' => $barangayChartPath,
                 'laneTypeChartPath' => $laneTypeChartPath,
+                'assistanceGraphs' => $assistanceGraphs,
+                'hasAssistanceServices' => $hasAssistanceServices,
             ])->setPaper('a4', 'portrait');
 
             $safeOfficeName = str_replace(['/', '\\'], '-', $officeDisplayName);
@@ -1114,6 +1277,136 @@ class FrontdeskAnalyticsController extends Controller
         }
     }
 
+    /**
+     * Build assistance distribution payload used by both API response and PDF export.
+     */
+    private function buildAssistanceDistributionPayload(
+        int $officeId,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year,
+        ?int $barangayId
+    ): array {
+        $hasAssistanceServices = Service::query()
+            ->where('office_id', $officeId)
+            ->where('service_type', 'External')
+            ->where('provides_assistance', true)
+            ->exists();
+
+        if (!$hasAssistanceServices) {
+            return [
+                'has_assistance_services' => false,
+                'distribution' => [],
+                'summary' => [
+                    'total_clients' => 0,
+                    'total_assistance' => 0,
+                ],
+            ];
+        }
+
+        $baseQuery = DB::table('service_assistance as sa')
+            ->join('queue_transaction_services as qts', 'qts.id', '=', 'sa.queue_transaction_service_id')
+            ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
+            ->join('services as s', 's.id', '=', 'qts.service_id')
+            ->leftJoin('assistance_types as at', 'at.id', '=', 'sa.assistance_type_id')
+            ->whereNotNull('qts.queue_transaction_id')
+            ->where('qt.office_id', $officeId)
+            ->where('qt.status', TransactionStatus::COMPLETED->value)
+            ->where('s.service_type', 'External')
+            ->where('s.provides_assistance', true);
+
+        $this->applyDateFilterToColumn($baseQuery, $period, $date, $month, $year, 'qt.queue_date');
+
+        if ($barangayId !== null) {
+            $baseQuery->where('qt.barangay_id', $barangayId);
+        }
+
+        $distribution = (clone $baseQuery)
+            ->selectRaw('s.id as service_id')
+            ->selectRaw('s.service_name as service_name')
+            ->selectRaw('at.id as assistance_type_id')
+            ->selectRaw('at.assistance_name as assistance_type_name')
+            ->selectRaw('COUNT(DISTINCT qt.id) as total_clients')
+            ->selectRaw('COALESCE(SUM(sa.assistance_provided), 0) as total_assistance')
+            ->groupBy('s.id', 's.service_name', 'at.id', 'at.assistance_name')
+            ->orderByDesc('total_assistance')
+            ->get()
+            ->map(function ($row) {
+                $hasType = !is_null($row->assistance_type_id) && !empty($row->assistance_type_name);
+
+                return [
+                    'service_id' => (int) $row->service_id,
+                    'service_name' => (string) $row->service_name,
+                    'assistance_type_id' => $row->assistance_type_id === null ? null : (int) $row->assistance_type_id,
+                    'assistance_type_name' => $row->assistance_type_name,
+                    'label' => $hasType
+                        ? sprintf('%s (%s)', $row->service_name, $row->assistance_type_name)
+                        : (string) $row->service_name,
+                    'total_clients' => (int) $row->total_clients,
+                    'total_assistance' => round((float) $row->total_assistance, 2),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $summaryRow = (clone $baseQuery)
+            ->selectRaw('COUNT(DISTINCT qt.id) as total_clients')
+            ->selectRaw('COALESCE(SUM(sa.assistance_provided), 0) as total_assistance')
+            ->first();
+
+        return [
+            'has_assistance_services' => true,
+            'distribution' => $distribution,
+            'summary' => [
+                'total_clients' => (int) ($summaryRow->total_clients ?? 0),
+                'total_assistance' => round((float) ($summaryRow->total_assistance ?? 0), 2),
+            ],
+        ];
+    }
+
+    /**
+     * Get barangay options with assistance records for the selected filters.
+     */
+    private function getAssistanceBarangayOptionsWithData(
+        int $officeId,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year
+    ): array {
+        $query = DB::table('service_assistance as sa')
+            ->join('queue_transaction_services as qts', 'qts.id', '=', 'sa.queue_transaction_service_id')
+            ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
+            ->join('services as s', 's.id', '=', 'qts.service_id')
+            ->join('barangays as b', 'b.id', '=', 'qt.barangay_id')
+            ->whereNotNull('qts.queue_transaction_id')
+            ->where('qt.office_id', $officeId)
+            ->where('qt.status', TransactionStatus::COMPLETED->value)
+            ->where('s.service_type', 'External')
+            ->where('s.provides_assistance', true)
+            ->whereNotNull('qt.barangay_id');
+
+        $this->applyDateFilterToColumn($query, $period, $date, $month, $year, 'qt.queue_date');
+
+        return $query
+            ->selectRaw('qt.barangay_id as barangay_id')
+            ->selectRaw('b.barangay_name as barangay_name')
+            ->selectRaw('COALESCE(SUM(sa.assistance_provided), 0) as total_assistance')
+            ->groupBy('qt.barangay_id', 'b.barangay_name')
+            ->orderBy('b.barangay_name')
+            ->get()
+            ->map(static function ($row) {
+                return [
+                    'barangay_id' => (int) $row->barangay_id,
+                    'barangay_name' => (string) $row->barangay_name,
+                    'total_assistance' => round((float) $row->total_assistance, 2),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     private function mapAverageSatisfactionLabel($averageRating): string
     {
         if ($averageRating === null) {
@@ -1155,12 +1448,12 @@ class FrontdeskAnalyticsController extends Controller
     }
 
     private function applyDateFilter(
-        Builder $query,
+        $query,
         string $period,
         Carbon $date,
         int $month,
         int $year
-    ): Builder {
+    ) {
         return match ($period) {
             'monthly' => $query
                 ->whereYear('queue_date', $year)
@@ -1169,6 +1462,28 @@ class FrontdeskAnalyticsController extends Controller
                 ->whereYear('queue_date', $year),
             default => $query
                 ->whereDate('queue_date', $date->toDateString()),
+        };
+    }
+
+    /**
+     * Apply date filter to a specific date column (for joined/aliased query builders).
+     */
+    private function applyDateFilterToColumn(
+        $query,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year,
+        string $dateColumn
+    ) {
+        return match ($period) {
+            'monthly' => $query
+                ->whereYear($dateColumn, $year)
+                ->whereMonth($dateColumn, $month),
+            'yearly' => $query
+                ->whereYear($dateColumn, $year),
+            default => $query
+                ->whereDate($dateColumn, $date->toDateString()),
         };
     }
 

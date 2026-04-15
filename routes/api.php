@@ -122,6 +122,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
         Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
+        Route::get('/analytics/assistance-distribution', [FrontdeskAnalyticsController::class, 'getAssistanceDistribution']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
         Route::get('/analytics/queue-summary/export', [FrontdeskAnalyticsController::class, 'exportQueueSummary']);
         Route::get('/analytics/export-graphs', [FrontdeskAnalyticsController::class, 'exportGraphs']);
@@ -178,6 +179,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/client-satisfaction', [FrontdeskAnalyticsController::class, 'getClientSatisfactionDistribution']);
         Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
+        Route::get('/analytics/assistance-distribution', [FrontdeskAnalyticsController::class, 'getAssistanceDistribution']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
         Route::get('/analytics/export-graphs', [FrontdeskAnalyticsController::class, 'exportGraphs']);
 
