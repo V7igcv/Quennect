@@ -136,8 +136,9 @@
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import api from '../../services/api'
 
 export default {
   name: 'Sidebar',
@@ -162,6 +163,8 @@ export default {
     const route = useRoute()
     const chatUnreadCount = ref(0)
     let resetUnreadInterval = null
+    let unreadSyncInterval = null
+    const chatChannelName = ref(null)
 
     const navItems = computed(() => {
       if (props.role === 'superadmin') {
@@ -248,24 +251,97 @@ export default {
       if (props.role !== 'frontdesk') return
 
       try {
-        const token = localStorage.getItem('token')
-        if (!token) return
+        const response = await api.get('/chat/unread-count')
+        const payload = response.data || {}
 
-        const response = await fetch('/api/chat/unread-count', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success) {
-            chatUnreadCount.value = data.unread_count || 0
-          }
+        if (payload.success) {
+          chatUnreadCount.value = payload.unread_count || 0
         }
       } catch (error) {
         console.error('Failed to fetch unread count:', error)
+      }
+    }
+
+    const getFrontdeskOfficeId = () => {
+      const officeFromProps = Number(
+        props.userData?.office_id
+        ?? props.userData?.officeId
+        ?? props.userData?.office?.id
+      )
+
+      if (Number.isFinite(officeFromProps) && officeFromProps > 0) {
+        return officeFromProps
+      }
+
+      try {
+        const rawUser = localStorage.getItem('user')
+        if (!rawUser) return null
+
+        const parsedUser = JSON.parse(rawUser)
+        const officeFromStorage = Number(
+          parsedUser?.office_id
+          ?? parsedUser?.officeId
+          ?? parsedUser?.office?.id
+        )
+
+        return Number.isFinite(officeFromStorage) && officeFromStorage > 0
+          ? officeFromStorage
+          : null
+      } catch (error) {
+        console.error('Failed to parse user for chat office id:', error)
+        return null
+      }
+    }
+
+    const subscribeToChatRealtime = (resolvedOfficeId = null) => {
+      if (props.role !== 'frontdesk' || !window.Echo) {
+        return
+      }
+
+      const officeId = Number(resolvedOfficeId ?? getFrontdeskOfficeId())
+      if (!officeId) {
+        return
+      }
+
+      const nextChannel = `chat.office.${officeId}`
+
+      if (chatChannelName.value === nextChannel) {
+        return
+      }
+
+      unsubscribeFromChatRealtime()
+      chatChannelName.value = nextChannel
+
+      const handleIncomingChat = (event) => {
+        const payload = event || {}
+        const receiverOfficeId = Number(payload.receiver_office_id)
+
+        if (receiverOfficeId !== officeId) {
+          return
+        }
+
+        // Optimistic increment so badge updates instantly even
+        // before unread-count API response resolves.
+        if (route.path !== '/frontdesk/chat') {
+          chatUnreadCount.value += 1
+        }
+
+        fetchUnreadCount()
+      }
+
+      window.Echo
+        .channel(chatChannelName.value)
+        .listen('.chat.message.sent', handleIncomingChat)
+        .listen('chat.message.sent', handleIncomingChat)
+        .error((socketError) => {
+          console.error('Sidebar chat websocket error:', socketError)
+        })
+    }
+
+    const unsubscribeFromChatRealtime = () => {
+      if (chatChannelName.value && window.Echo) {
+        window.Echo.leave(chatChannelName.value)
+        chatChannelName.value = null
       }
     }
 
@@ -283,18 +359,45 @@ export default {
       }
     }
 
+    watch(
+      () => [props.role, props.userData?.office_id, props.userData?.officeId, props.userData?.office?.id],
+      () => {
+        if (props.role !== 'frontdesk') {
+          unsubscribeFromChatRealtime()
+          return
+        }
+
+        const officeId = getFrontdeskOfficeId()
+        if (!officeId) {
+          return
+        }
+
+        subscribeToChatRealtime(officeId)
+        fetchUnreadCount()
+      },
+      { immediate: true }
+    )
+
     onMounted(() => {
       if (props.role !== 'frontdesk') return
 
       fetchUnreadCount()
       window.addEventListener('new-chat-message', handleNewMessage)
+      window.addEventListener('reset-chat-unread', fetchUnreadCount)
+      subscribeToChatRealtime()
       resetUnreadInterval = setInterval(checkAndResetUnread, 1000)
+      unreadSyncInterval = setInterval(fetchUnreadCount, 15000)
     })
 
     onUnmounted(() => {
       window.removeEventListener('new-chat-message', handleNewMessage)
+      window.removeEventListener('reset-chat-unread', fetchUnreadCount)
+      unsubscribeFromChatRealtime()
       if (resetUnreadInterval) {
         clearInterval(resetUnreadInterval)
+      }
+      if (unreadSyncInterval) {
+        clearInterval(unreadSyncInterval)
       }
     })
 

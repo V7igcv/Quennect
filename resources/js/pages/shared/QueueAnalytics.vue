@@ -452,7 +452,6 @@
                 :title="queueMetricExplanations.assistanceDistribution.title"
                 :meaning="queueMetricExplanations.assistanceDistribution.meaning"
                 :computation="queueMetricExplanations.assistanceDistribution.computation"
-                :formula="queueMetricExplanations.assistanceDistribution.formula"
                 :interpretation="queueMetricExplanations.assistanceDistribution.interpretation"
               />
             </div>
@@ -564,14 +563,78 @@
         <Table class="w-full table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead class="w-[11.11%]">Queue Number</TableHead>
-              <TableHead class="w-[11.11%]">Client Name</TableHead>
-              <TableHead class="w-[11.11%]">Barangay</TableHead>
-              <TableHead class="w-[11.11%]">Contact Number</TableHead>
-              <TableHead class="w-[11.11%]">Service</TableHead>
-              <TableHead class="w-[11.11%]">Lane Type</TableHead>
-              <TableHead class="w-[11.11%]">Status</TableHead>
-              <TableHead class="w-[11.11%]">Completion Time</TableHead>
+              <TableHead class="w-[11.11%]">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleQueueSummarySort('queueNumber')">
+                  Queue Number
+                  <ArrowUpDown
+                    class="h-4 w-4 shrink-0"
+                    :class="queueSummarySortKey === 'queueNumber' ? 'text-[#0F5C5C]' : 'text-gray-400'"
+                  />
+                </button>
+              </TableHead>
+              <TableHead class="w-[11.11%]">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleQueueSummarySort('clientName')">
+                  Client Name
+                  <ArrowUpDown
+                    class="h-4 w-4 shrink-0"
+                    :class="queueSummarySortKey === 'clientName' ? 'text-[#0F5C5C]' : 'text-gray-400'"
+                  />
+                </button>
+              </TableHead>
+              <TableHead class="w-[11.11%]">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleQueueSummarySort('barangay')">
+                  Barangay
+                  <ArrowUpDown
+                    class="h-4 w-4 shrink-0"
+                    :class="queueSummarySortKey === 'barangay' ? 'text-[#0F5C5C]' : 'text-gray-400'"
+                  />
+                </button>
+              </TableHead>
+              <TableHead class="w-[11.11%]">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleQueueSummarySort('contactNumber')">
+                  Contact Number
+                  <ArrowUpDown
+                    class="h-4 w-4 shrink-0"
+                    :class="queueSummarySortKey === 'contactNumber' ? 'text-[#0F5C5C]' : 'text-gray-400'"
+                  />
+                </button>
+              </TableHead>
+              <TableHead class="w-[11.11%]">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleQueueSummarySort('serviceCode')">
+                  Service
+                  <ArrowUpDown
+                    class="h-4 w-4 shrink-0"
+                    :class="queueSummarySortKey === 'serviceCode' ? 'text-[#0F5C5C]' : 'text-gray-400'"
+                  />
+                </button>
+              </TableHead>
+              <TableHead class="w-[11.11%]">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleQueueSummarySort('laneType')">
+                  Lane Type
+                  <ArrowUpDown
+                    class="h-4 w-4 shrink-0"
+                    :class="queueSummarySortKey === 'laneType' ? 'text-[#0F5C5C]' : 'text-gray-400'"
+                  />
+                </button>
+              </TableHead>
+              <TableHead class="w-[11.11%]">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleQueueSummarySort('status')">
+                  Status
+                  <ArrowUpDown
+                    class="h-4 w-4 shrink-0"
+                    :class="queueSummarySortKey === 'status' ? 'text-[#0F5C5C]' : 'text-gray-400'"
+                  />
+                </button>
+              </TableHead>
+              <TableHead class="w-[11.11%]">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleQueueSummarySort('completionTime')">
+                  Completion Date and Time
+                  <ArrowUpDown
+                    class="h-4 w-4 shrink-0"
+                    :class="queueSummarySortKey === 'completionTime' ? 'text-[#0F5C5C]' : 'text-gray-400'"
+                  />
+                </button>
+              </TableHead>
               <TableHead class="w-[5%]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -803,6 +866,7 @@ import {
   BarChart3,
   MoreHorizontal,
   FileSpreadsheet,
+  ArrowUpDown,
 } from 'lucide-vue-next'
 import {
   Popover,
@@ -882,29 +946,28 @@ const stats = ref({
 const queueMetricExplanations = {
   clientSatisfaction: {
     title: 'Barangay Distribution',
-    meaning: 'This bar chart shows how clients are distributed across barangays for the selected office and date range.',
-    computation: 'Each bar represents the number of queue transactions per barangay (based on barangay_id) for the selected date range, limited to external services and filtered by the selected office.',
+    meaning: 'This bar chart shows how clients are distributed across barangays of Ligao City.',
+    computation: 'Each bar represents the number of queue transactions per barangay for the selected date range, limited to external services.',
     formula: 'Barangay Percentage = (Barangay Client Count / Total Clients) * 100',
     interpretation: [
       'Taller bars indicate barangays with more clients served.',
-      'Use this to identify which barangays are most served by the selected office.',
+      'This graph identifies which barangays are most served by the selected office.',
     ],
   },
   laneType: {
     title: 'Lane Type Distribution',
-    meaning: 'This chart shows how clients are distributed across lane types for the selected office and date range.',
+    meaning: 'This chart shows how clients are distributed across lane types.',
     computation: 'Each lane type includes a client count and percentage share of the total clients.',
     formula: 'Lane Type Percentage = (Lane Type Client Count / Total Clients) * 100',
     interpretation: [
       'Larger slices indicate higher lane utilization.',
-      'Use this to identify lane demand and staffing needs per office.',
+      'This graph identifies lane demand and staffing needs per office.',
     ],
   },
   assistanceDistribution: {
     title: 'Assistance Distribution',
-    meaning: 'This chart shows the total assistance amount distributed by external services that provide assistance for the selected office and date range.',
-    computation: 'Each segment represents one service, or one service-assistance type pair, with slice size based on total assistance amount and tooltip showing total clients served and total assistance given.',
-    formula: 'Service Assistance Share = (Service Total Assistance / Total Assistance Provided) * 100',
+    meaning: 'This chart shows the total assistance amount distributed by external services that provide assistance.',
+    computation: 'Each segment represents one service, with slice size based on total assistance amount, showing total clients served and total assistance given.',
     interpretation: [
       'Larger slices indicate services that distributed a higher share of total assistance.',
       'Use the barangay filter to compare where assistance spending and clients are concentrated.',
@@ -915,6 +978,8 @@ const queueMetricExplanations = {
 const queueSummaryRowsPerPage = 10
 const currentQueueSummaryPage = ref(1)
 const queueSummarySearch = ref('')
+const queueSummarySortKey = ref('completionTime')
+const queueSummarySortDirection = ref('desc')
 const queueSummaryPagination = ref({
   currentPage: 1,
   perPage: queueSummaryRowsPerPage,
@@ -927,7 +992,7 @@ const queueSummaryRows = ref([])
 
 const queueSummaryTotalRows = computed(() => queueSummaryPagination.value.totalRows)
 const queueSummaryTotalPages = computed(() => Math.max(1, queueSummaryPagination.value.totalPages))
-const paginatedQueueSummaryRows = computed(() => {
+const filteredQueueSummaryRows = computed(() => {
   const query = queueSummarySearch.value.trim().toLowerCase()
   if (!query) return queueSummaryRows.value
 
@@ -943,6 +1008,47 @@ const paginatedQueueSummaryRows = computed(() => {
       || barangay.includes(query)
   })
 })
+
+const getQueueSummarySortValue = (row, key) => {
+  if (key === 'completionTime') {
+    const parsed = Date.parse(row.completionTime || '')
+    return Number.isNaN(parsed) ? -1 : parsed
+  }
+
+  return String(row[key] ?? '').toLowerCase()
+}
+
+const paginatedQueueSummaryRows = computed(() => {
+  const rows = [...filteredQueueSummaryRows.value]
+
+  if (!queueSummarySortKey.value) {
+    return rows
+  }
+
+  const direction = queueSummarySortDirection.value === 'asc' ? 1 : -1
+  const sortKey = queueSummarySortKey.value
+
+  rows.sort((a, b) => {
+    const valueA = getQueueSummarySortValue(a, sortKey)
+    const valueB = getQueueSummarySortValue(b, sortKey)
+
+    if (valueA < valueB) return -1 * direction
+    if (valueA > valueB) return 1 * direction
+    return 0
+  })
+
+  return rows
+})
+
+const toggleQueueSummarySort = (key) => {
+  if (queueSummarySortKey.value === key) {
+    queueSummarySortDirection.value = queueSummarySortDirection.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+
+  queueSummarySortKey.value = key
+  queueSummarySortDirection.value = 'asc'
+}
 const queueSummaryStartRow = computed(() => queueSummaryPagination.value.startRow)
 const queueSummaryEndRow = computed(() => queueSummaryPagination.value.endRow)
 

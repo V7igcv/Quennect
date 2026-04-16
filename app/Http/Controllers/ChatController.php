@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ChatMessageSent;
 use App\Models\ChatMessage;
 use App\Models\Office;
 use Illuminate\Http\Request;
@@ -29,7 +30,7 @@ class ChatController extends Controller
             
             $offices = Office::where('id', '!=', $currentOfficeId)
                 ->where('is_active', true)
-                ->select('id', 'office_name as name', 'office_description', 'office_acronym')
+                ->select('id', 'office_name as name', 'office_description', 'office_acronym', 'logo')
                 ->get()
                 ->map(function ($office) use ($currentOfficeId) {
                     // Get last message
@@ -48,6 +49,7 @@ class ChatController extends Controller
                         'name' => $office->name,
                         'description' => $office->office_description,
                         'acronym' => $office->office_acronym,
+                        'logo_url' => $office->logo ? $office->logo_url : null,
                         'isOnline' => $office->is_active,
                         'lastMessage' => $lastMessage?->content ?? null,
                         'lastMessageTime' => $lastMessage?->created_at?->diffForHumans() ?? null,
@@ -174,6 +176,8 @@ class ChatController extends Controller
                 'content' => $request->content,
                 'is_read' => false
             ]);
+
+            event(new ChatMessageSent($message));
             
             return response()->json([
                 'success' => true,
@@ -255,6 +259,8 @@ class ChatController extends Controller
                 'file_size' => $fileSize,
                 'is_read' => false
             ]);
+
+            event(new ChatMessageSent($message));
             
             return response()->json([
                 'success' => true,

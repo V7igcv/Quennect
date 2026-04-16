@@ -19,7 +19,7 @@
         <span class="text-md font-normal tabular-nums min-w-25 text-left">{{ currentTime }}</span>
 
         <!-- Notifications (Frontdesk only) -->
-        <div v-if="isFrontdeskUser" class="relative mr-4">
+        <div v-if="isFrontdeskUser" ref="notificationRootRef" class="relative mr-4">
           <button
             type="button"
             class="relative p-2 bg-white/15 hover:bg-white/30 rounded-full transition-colors focus:outline-none shadow-sm shrink-0 cursor-pointer"
@@ -109,6 +109,7 @@
     <div
       v-if="showModal && selectedNotification"
       class="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-4"
+      @click.self="closeModal"
     >
       <div class="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between">
@@ -181,6 +182,7 @@ export default {
     const showDropdown = ref(false)
     const showModal = ref(false)
     const selectedNotification = ref(null)
+    const notificationRootRef = ref(null)
 
     const isFrontdeskUser = computed(() => {
       return props.user && props.user.role === 'OFFICE FRONTDESK'
@@ -273,6 +275,7 @@ export default {
         }
       }
 
+      showDropdown.value = false
       selectedNotification.value = notification
       showModal.value = true
       await markAsRead(notification)
@@ -281,6 +284,17 @@ export default {
     const closeModal = () => {
       showModal.value = false
       selectedNotification.value = null
+    }
+
+    const handleDocumentClick = (event) => {
+      if (!showDropdown.value) {
+        return
+      }
+
+      const root = notificationRootRef.value
+      if (root && !root.contains(event.target)) {
+        showDropdown.value = false
+      }
     }
 
     const markAllAsRead = async () => {
@@ -322,6 +336,10 @@ export default {
           const newNotification = payload.notification
           const newUnreadCount = payload.unread_count
 
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('internal-notification-created', { detail: payload }))
+          }
+
           if (newNotification) {
             notifications.value.unshift(newNotification)
             if (notifications.value.length > 10) {
@@ -351,6 +369,7 @@ export default {
       updateDateTime()
       // Update every second
       timerInterval = setInterval(updateDateTime, 1000)
+      document.addEventListener('click', handleDocumentClick)
 
        if (isFrontdeskUser.value) {
          fetchUnreadCount()
@@ -366,6 +385,7 @@ export default {
       if (unreadPollingInterval) {
         clearInterval(unreadPollingInterval)
       }
+      document.removeEventListener('click', handleDocumentClick)
       unsubscribeFromNotificationChannel()
     })
     
@@ -378,6 +398,7 @@ export default {
       showDropdown,
       showModal,
       selectedNotification,
+      notificationRootRef,
       isFrontdeskUser,
       subscribeToNotificationChannel,
       toggleDropdown,

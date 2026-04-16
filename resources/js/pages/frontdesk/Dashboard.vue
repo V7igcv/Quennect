@@ -220,8 +220,8 @@
       </div>
 
       <div class="w-full xl:flex-1">
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="text-xl font-semibold mb-4">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <h2 class="text-xl font-semibold">
             Counters
           </h2> 
           <Button 

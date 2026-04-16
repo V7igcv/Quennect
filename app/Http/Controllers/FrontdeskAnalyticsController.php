@@ -733,7 +733,7 @@ class FrontdeskAnalyticsController extends Controller
                     'lane_type' => $transaction->is_priority ? 'Priority' : 'Regular',
                     'priority_sectors' => $prioritySectors->all(),
                     'status' => $isSkipped ? 'Skipped' : 'Completed',
-                    'completion_time' => $completionTime?->format('h:i A'),
+                    'completion_time' => $completionTime?->format('M d, Y h:i A'),
                     'waiting_time' => $transaction->waiting_time === null
                         ? null
                         : round((float) $transaction->waiting_time, 2),
@@ -1040,6 +1040,7 @@ class FrontdeskAnalyticsController extends Controller
                 ->whereHas('services', function (Builder $query) {
                     $query->where('service_type', 'External');
                 })
+                ->where('status', TransactionStatus::COMPLETED->value)
                 ->orderByRaw('COALESCE(skipped_at, completed_at) DESC')
                 ->orderBy('id', 'desc');
 
@@ -1089,10 +1090,12 @@ class FrontdeskAnalyticsController extends Controller
                         'Services',
                         'Queue Number',
                         'Client Name',
+                        'Contact Number',
                         'Sex',
                         'Age',
                         'Barangay',
                         'Lane Type',
+                        'Completion Date and Time',
                         'Waiting Time (min)',
                         'Service Time (min)',
                     ];
@@ -1103,7 +1106,7 @@ class FrontdeskAnalyticsController extends Controller
                     }
 
                     $sheet->fromArray($headers, null, "A{$rowIndex}", true);
-                    $endColumn = $hasAssistanceInBarangay ? 'K' : 'I';
+                    $endColumn = $hasAssistanceInBarangay ? 'M' : 'K';
                     $sheet->getStyle("A{$rowIndex}:{$endColumn}{$rowIndex}")->getFont()->setBold(true);
                     $rowIndex++;
 
@@ -1179,6 +1182,13 @@ class FrontdeskAnalyticsController extends Controller
 
                             $evaluationSession = $transaction->evaluationSession;
 
+                            $isSkipped = $transaction->status->value === TransactionStatus::SKIPPED->value
+                                || !is_null($transaction->skipped_at);
+
+                            $completionDateTime = $isSkipped
+                                ? $transaction->skipped_at
+                                : $transaction->completed_at;
+
                             // Find the service assistance for this specific service and transaction
                             $serviceAssistance = null;
                             if ($serviceId !== null) {
@@ -1205,10 +1215,12 @@ class FrontdeskAnalyticsController extends Controller
                                 $isFirstForService ? (string) $serviceLabel : '',
                                 $transaction->full_queue_number,
                                 $transaction->client_name,
+                                $transaction->contact_number,
                                 $evaluationSession?->sex,
                                 $evaluationSession?->age,
                                 $transaction->barangay?->barangay_name,
                                 $laneType,
+                                $completionDateTime?->format('M d, Y h:i A'),
                                 $transaction->waiting_time === null
                                     ? null
                                     : round((float) $transaction->waiting_time, 2),
@@ -1233,8 +1245,8 @@ class FrontdeskAnalyticsController extends Controller
                     if ($hasAssistanceInBarangay) {
                         $sheet->setCellValue("A{$rowIndex}", 'TOTAL ASSISTANCE PROVIDED');
                         $sheet->getStyle("A{$rowIndex}")->getFont()->setBold(true);
-                        $sheet->setCellValue("J{$rowIndex}", $barangayTotalAssistance);
-                        $sheet->getStyle("J{$rowIndex}")->getFont()->setBold(true);
+                        $sheet->setCellValue("L{$rowIndex}", $barangayTotalAssistance);
+                        $sheet->getStyle("L{$rowIndex}")->getFont()->setBold(true);
                         $rowIndex++;
                     }
 
@@ -1243,8 +1255,8 @@ class FrontdeskAnalyticsController extends Controller
                 }
             }
 
-            // Auto-size columns (K if assistance is included, I if not)
-            $endColumn = 'K';
+            // Auto-size columns up to assistance record date.
+            $endColumn = 'M';
             foreach (range('A', $endColumn) as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }

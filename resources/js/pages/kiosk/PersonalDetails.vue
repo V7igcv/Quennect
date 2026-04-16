@@ -57,16 +57,34 @@
           <!-- Barangay Dropdown -->
           <div>
             <label class="block text-base font-semibold text-gray-700 mb-2">Barangay:</label>
-            <select 
-              v-model="form.barangay_id"
-              class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#0F5C5C] focus:border-transparent outline-none transition bg-white"
-              :class="{ 'border-red-500': errors.barangay_id }"
-            >
-              <option value="">Pumili ng Barangay</option>
-              <option v-for="barangay in barangays" :key="barangay.id" :value="barangay.id">
-                {{ getBarangayName(barangay) }}
-              </option>
-            </select>
+            <div class="relative">
+              <select 
+                v-model="form.barangay_id"
+                class="w-full px-4 py-3 pr-10 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#0F5C5C] focus:border-transparent outline-none transition bg-white appearance-none"
+                :class="[
+                  form.barangay_id ? 'text-gray-900' : 'text-gray-500',
+                  { 'border-red-500': errors.barangay_id }
+                ]"
+              >
+                <option value="" class="text-gray-500">Pumili ng Barangay</option>
+                <option v-for="barangay in barangays" :key="barangay.id" :value="barangay.id" class="text-gray-900">
+                  {{ getBarangayName(barangay) }}
+                </option>
+              </select>
+              <svg
+                class="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </div>
             <p v-if="errors.barangay_id" class="text-red-500 text-xs mt-1">{{ errors.barangay_id }}</p>
           </div>
 

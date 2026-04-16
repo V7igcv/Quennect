@@ -104,6 +104,8 @@ class AuthController extends Controller
                         'id' => $user->office->id,
                         'name' => $user->office->office_name,
                         'acronym' => $user->office->office_acronym,
+                        'logo' => $user->office->logo,
+                        'logo_url' => $user->office->logo ? $user->office->logo_url : null,
                     ] : null,
                 ],
                 'token' => $token,
@@ -150,6 +152,8 @@ class AuthController extends Controller
                     'id' => $user->office->id,
                     'name' => $user->office->office_name,
                     'acronym' => $user->office->office_acronym,
+                    'logo' => $user->office->logo,
+                    'logo_url' => $user->office->logo ? $user->office->logo_url : null,
                 ] : null,
                 'last_login' => $user->last_login_at,
             ]

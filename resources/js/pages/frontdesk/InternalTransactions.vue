@@ -207,23 +207,77 @@
 
     <!-- Table -->
     <div v-else class="bg-white rounded-lg shadow overflow-hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 px-4 pt-4 mb-4">
+        <div class="w-full sm:w-64">
+          <input
+            v-model="tableSearch"
+            type="text"
+            placeholder="Search internal transactions..."
+            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-[#0F5C5C] focus:ring-1 focus:ring-[#0F5C5C] outline-none"
+          >
+        </div>
+        <p class="text-sm text-gray-600 sm:ml-2">
+          Search by transaction ID, office, services, or client.
+        </p>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Transaction ID</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">{{ activeTab === 'received' ? 'From' : 'To' }}</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Services</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Client</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Requirement Link</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Deadline</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Date</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleRequestSort('transaction_id')">
+                  Transaction ID
+                  <ArrowUpDown class="h-4 w-4 shrink-0" :class="requestSortKey === 'transaction_id' ? 'text-[#0F5C5C]' : 'text-gray-400'" />
+                </button>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleRequestSort('office')">
+                  {{ activeTab === 'received' ? 'From' : 'To' }}
+                  <ArrowUpDown class="h-4 w-4 shrink-0" :class="requestSortKey === 'office' ? 'text-[#0F5C5C]' : 'text-gray-400'" />
+                </button>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleRequestSort('services')">
+                  Services
+                  <ArrowUpDown class="h-4 w-4 shrink-0" :class="requestSortKey === 'services' ? 'text-[#0F5C5C]' : 'text-gray-400'" />
+                </button>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleRequestSort('client')">
+                  Client
+                  <ArrowUpDown class="h-4 w-4 shrink-0" :class="requestSortKey === 'client' ? 'text-[#0F5C5C]' : 'text-gray-400'" />
+                </button>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleRequestSort('status')">
+                  Status
+                  <ArrowUpDown class="h-4 w-4 shrink-0" :class="requestSortKey === 'status' ? 'text-[#0F5C5C]' : 'text-gray-400'" />
+                </button>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleRequestSort('requirement_link')">
+                  Requirement Link
+                  <ArrowUpDown class="h-4 w-4 shrink-0" :class="requestSortKey === 'requirement_link' ? 'text-[#0F5C5C]' : 'text-gray-400'" />
+                </button>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleRequestSort('deadline')">
+                  Deadline
+                  <ArrowUpDown class="h-4 w-4 shrink-0" :class="requestSortKey === 'deadline' ? 'text-[#0F5C5C]' : 'text-gray-400'" />
+                </button>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                <button type="button" class="inline-flex items-center gap-1 text-left" @click="toggleRequestSort('date')">
+                  Date
+                  <ArrowUpDown class="h-4 w-4 shrink-0" :class="requestSortKey === 'date' ? 'text-[#0F5C5C]' : 'text-gray-400'" />
+                </button>
+              </th>
               <th class="px-4 py-3 text-right text-xs font-medium text-gray-500">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
-            <tr v-for="req in requests" :key="req.id" class="hover:bg-gray-50">
+            <tr v-for="req in filteredSortedRequests" :key="req.id" class="hover:bg-gray-50">
               <td class="px-4 py-3 text-sm font-mono">{{ req.transaction_id || req.id }}</td>
               <td class="px-4 py-3 text-sm">{{ activeTab === 'received' ? req.from_office : req.to_office }}</td>
               <td class="px-4 py-3 text-sm">
@@ -234,7 +288,7 @@
                 <span class="text-xs text-gray-400">{{ req.contact_number }}</span>
               </td>
               <td class="px-4 py-3">
-                <span class="px-2 py-1 text-xs rounded-full" :class="getStatusClass(req)">
+                <span class="inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 text-xs rounded-full" :class="getStatusClass(req)">
                   {{ getStatusLabel(req) }}
                 </span>
               </td>
@@ -302,6 +356,12 @@
                     </svg>
                   </button>
                 </div>
+              </td>
+            </tr>
+
+            <tr v-if="filteredSortedRequests.length === 0">
+              <td colspan="9" class="px-4 py-8 text-center text-sm text-gray-500">
+                No requests found.
               </td>
             </tr>
           </tbody>
@@ -435,7 +495,7 @@
     />
 
     <!-- Success Output Modal -->
-    <div v-if="showSuccessModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div v-if="showSuccessModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg max-w-sm w-full mx-4 p-6 shadow-xl text-center">
         <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -497,7 +557,8 @@ import {
   XCircle, 
   Calendar,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ArrowUpDown
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -508,6 +569,9 @@ const stats = ref({
   sent: { pending: 0, on_process: 0, completed: 0, denied: 0, overdue: 0 }
 })
 const requests = ref([])
+const tableSearch = ref('')
+const requestSortKey = ref('date')
+const requestSortDirection = ref('desc')
 const pagination = ref({ current_page: 1, last_page: 1 })
 const activeTab = ref('received')
 const showAcceptModal = ref(false)
@@ -526,6 +590,9 @@ const submittedAverageRating = ref('')
 const showAlertModal = ref(false)
 const alertTitle = ref('')
 const alertMessage = ref('')
+const internalNotificationChannelName = ref(null)
+const realtimeRefreshTimeout = ref(null)
+const isRealtimeSyncing = ref(false)
 
 const evaluationFormQuestions = ref({
   multiple_choice: [],
@@ -695,6 +762,79 @@ const getCount = (tab) => {
   return counts[tab] || 0
 }
 
+const getOfficeLabel = (req) => {
+  return activeTab.value === 'received' ? req.from_office : req.to_office
+}
+
+const filteredSortedRequests = computed(() => {
+  const query = tableSearch.value.trim().toLowerCase()
+
+  let rows = requests.value
+
+  if (query) {
+    rows = rows.filter((req) => {
+      const transactionId = String(req.transaction_id || req.id || '').toLowerCase()
+      const office = String(getOfficeLabel(req) || '').toLowerCase()
+      const services = String(req.services || '').toLowerCase()
+      const client = String(req.full_name || '').toLowerCase()
+
+      return transactionId.includes(query)
+        || office.includes(query)
+        || services.includes(query)
+        || client.includes(query)
+    })
+  }
+
+  const sortKey = requestSortKey.value
+  const direction = requestSortDirection.value === 'asc' ? 1 : -1
+
+  const getSortValue = (req) => {
+    switch (sortKey) {
+      case 'transaction_id':
+        return String(req.transaction_id || req.id || '').toLowerCase()
+      case 'office':
+        return String(getOfficeLabel(req) || '').toLowerCase()
+      case 'services':
+        return String(req.services || '').toLowerCase()
+      case 'client':
+        return String(req.full_name || '').toLowerCase()
+      case 'status':
+        return String(getStatusLabel(req) || '').toLowerCase()
+      case 'requirement_link':
+        return String(req.requirement_link || '').toLowerCase()
+      case 'deadline': {
+        const parsedDeadline = Date.parse(req.expected_completion_date || '')
+        return Number.isNaN(parsedDeadline) ? -1 : parsedDeadline
+      }
+      case 'date': {
+        const parsedDate = Date.parse(req.created_at || '')
+        return Number.isNaN(parsedDate) ? -1 : parsedDate
+      }
+      default:
+        return ''
+    }
+  }
+
+  return [...rows].sort((a, b) => {
+    const valueA = getSortValue(a)
+    const valueB = getSortValue(b)
+
+    if (valueA < valueB) return -1 * direction
+    if (valueA > valueB) return 1 * direction
+    return 0
+  })
+})
+
+const toggleRequestSort = (key) => {
+  if (requestSortKey.value === key) {
+    requestSortDirection.value = requestSortDirection.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+
+  requestSortKey.value = key
+  requestSortDirection.value = 'asc'
+}
+
 const getStatusClass = (req) => {
   const status = req.status
 
@@ -798,6 +938,89 @@ const fetchRequests = async () => {
     console.error(err)
   } finally {
     loading.value = false
+  }
+}
+
+const getFrontdeskOfficeId = () => {
+  try {
+    const rawUser = localStorage.getItem('user')
+    if (!rawUser) return null
+
+    const parsedUser = JSON.parse(rawUser)
+    const officeId = Number(
+      parsedUser?.office_id
+      ?? parsedUser?.officeId
+      ?? parsedUser?.office?.id
+    )
+
+    return Number.isFinite(officeId) && officeId > 0 ? officeId : null
+  } catch (error) {
+    console.error('Failed to parse current user office_id for internal transactions:', error)
+    return null
+  }
+}
+
+const refreshInternalTransactionsRealtime = async () => {
+  if (isRealtimeSyncing.value) {
+    return
+  }
+
+  isRealtimeSyncing.value = true
+
+  try {
+    await Promise.all([
+      fetchDashboard(),
+      fetchRequests(),
+    ])
+  } finally {
+    isRealtimeSyncing.value = false
+  }
+}
+
+const scheduleRealtimeRefresh = () => {
+  if (realtimeRefreshTimeout.value) {
+    clearTimeout(realtimeRefreshTimeout.value)
+  }
+
+  realtimeRefreshTimeout.value = setTimeout(async () => {
+    realtimeRefreshTimeout.value = null
+    await refreshInternalTransactionsRealtime()
+  }, 200)
+}
+
+const handleInternalNotificationEvent = () => {
+  scheduleRealtimeRefresh()
+}
+
+const subscribeToInternalTransactionsRealtime = () => {
+  const officeId = getFrontdeskOfficeId()
+
+  if (!officeId || !window.Echo) {
+    console.warn('Internal transactions realtime unavailable (missing officeId or Echo).')
+    return
+  }
+
+  internalNotificationChannelName.value = `internal.notifications.office.${officeId}`
+
+  window.Echo
+    .channel(internalNotificationChannelName.value)
+    .listen('.internal.notifications.created', () => {
+      scheduleRealtimeRefresh()
+    })
+    .error((socketError) => {
+      console.error('Internal transactions websocket error:', socketError)
+    })
+}
+
+const unsubscribeFromInternalTransactionsRealtime = () => {
+  if (realtimeRefreshTimeout.value) {
+    clearTimeout(realtimeRefreshTimeout.value)
+    realtimeRefreshTimeout.value = null
+  }
+
+  if (internalNotificationChannelName.value && window.Echo) {
+    window.Echo.leave(internalNotificationChannelName.value)
+    internalNotificationChannelName.value = null
   }
 }
 
@@ -968,5 +1191,18 @@ const submitEvaluation = async (formData) => {
 onMounted(() => {
   fetchDashboard()
   fetchRequests()
+  subscribeToInternalTransactionsRealtime()
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('internal-notification-created', handleInternalNotificationEvent)
+  }
+})
+
+onBeforeUnmount(() => {
+  unsubscribeFromInternalTransactionsRealtime()
+
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('internal-notification-created', handleInternalNotificationEvent)
+  }
 })
 </script>

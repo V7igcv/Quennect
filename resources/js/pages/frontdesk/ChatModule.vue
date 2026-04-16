@@ -54,7 +54,13 @@
           >
             <div class="flex items-center gap-3">
               <div class="relative">
-                <div class="w-12 h-12 rounded-full bg-gradient-to-r from-[#0F5C5C] to-[#1F4E79] flex items-center justify-center text-white font-bold text-lg">
+                <img
+                  v-if="getOfficeLogoUrl(office)"
+                  :src="getOfficeLogoUrl(office)"
+                  :alt="`${office.name || 'Office'} logo`"
+                  class="w-12 h-12 rounded-full object-cover border border-gray-200"
+                >
+                <div v-else class="w-12 h-12 rounded-full bg-gradient-to-r from-[#0F5C5C] to-[#1F4E79] flex items-center justify-center text-white font-bold text-lg">
                   {{ getOfficeInitial(office) }}
                 </div>
               </div>
@@ -86,7 +92,13 @@
         <div class="bg-white border-b px-6 py-4 flex-shrink-0">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-gradient-to-r from-[#0F5C5C] to-[#1F4E79] flex items-center justify-center text-white font-bold">
+              <img
+                v-if="getOfficeLogoUrl(selectedOffice)"
+                :src="getOfficeLogoUrl(selectedOffice)"
+                :alt="`${selectedOffice.name || 'Office'} logo`"
+                class="w-10 h-10 rounded-full object-cover border border-gray-200"
+              >
+              <div v-else class="w-10 h-10 rounded-full bg-gradient-to-r from-[#0F5C5C] to-[#1F4E79] flex items-center justify-center text-white font-bold">
                 {{ getOfficeInitial(selectedOffice) }}
               </div>
               <div>
@@ -132,9 +144,26 @@
                 <div class="flex items-end gap-2 max-w-[70%]"
                      :class="Number(message.sender_id) === Number(currentOfficeId) ? 'flex-row-reverse' : 'flex-row'">
 
-                  <div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {{ Number(message.sender_id) === Number(currentOfficeId) ? 'Me' : getOfficeInitial(selectedOffice) }}
-                  </div>
+                  <template v-if="Number(message.sender_id) === Number(currentOfficeId)">
+                    <img
+                      v-if="currentOfficeLogoUrl"
+                      :src="currentOfficeLogoUrl"
+                      :alt="`${currentOfficeName || 'Current office'} logo`"
+                      class="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0"
+                    >
+                    <div v-else class="w-8 h-8 rounded-full bg-gray-200 border border-gray-300 flex-shrink-0"></div>
+                  </template>
+                  <template v-else>
+                    <img
+                      v-if="getOfficeLogoUrl(selectedOffice)"
+                      :src="getOfficeLogoUrl(selectedOffice)"
+                      :alt="`${selectedOffice.name || 'Office'} logo`"
+                      class="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0"
+                    >
+                    <div v-else class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      {{ getOfficeInitial(selectedOffice) }}
+                    </div>
+                  </template>
 
                   <div class="rounded-2xl px-4 py-2"
                        :class="Number(message.sender_id) === Number(currentOfficeId) 
@@ -274,12 +303,55 @@ export default {
     
     const offices = ref([])
     const messages = ref({})
+    const currentOfficeProfile = ref(null)
     
     const emojis = ['😀', '😂', '😍', '😎', '👍', '❤️', '🎉', '🔥', '👋', '🙏', '💪', '😊']
     
     const getOfficeInitial = (office) => {
       if (!office || !office.name) return '?'
       return office.name.charAt(0).toUpperCase()
+    }
+
+    const getOfficeLogoUrl = (office) => {
+      const rawUrl = office?.logo_url || office?.logoUrl || office?.logo || ''
+      if (!rawUrl) return ''
+
+      return String(rawUrl)
+    }
+
+    const currentOfficeName = computed(() => {
+      return (
+        currentOfficeProfile.value?.office_name
+        || currentOfficeProfile.value?.name
+        || currentOfficeProfile.value?.office_acronym
+        || ''
+      )
+    })
+
+    const currentOfficeLogoUrl = computed(() => {
+      return getOfficeLogoUrl(currentOfficeProfile.value)
+    })
+
+    const resolveCurrentOfficeProfile = async () => {
+      try {
+        const rawUser = localStorage.getItem('user')
+
+        if (rawUser) {
+          const parsedUser = JSON.parse(rawUser)
+          currentOfficeProfile.value = parsedUser?.office || null
+        }
+
+        // Refresh with latest server payload to ensure logo_url is present.
+        const response = await axios.get('/api/user')
+        const latestUser = response?.data?.data || null
+
+        if (latestUser?.office) {
+          currentOfficeProfile.value = latestUser.office
+          localStorage.setItem('user', JSON.stringify(latestUser))
+        }
+      } catch (error) {
+        console.error('Failed to resolve current office profile for chat avatar:', error)
+      }
     }
     
     const filteredOffices = computed(() => {
@@ -545,6 +617,7 @@ export default {
     }, { deep: true })
     
     onMounted(() => {
+      resolveCurrentOfficeProfile()
       fetchOffices()
       document.addEventListener('click', handleClickOutside)
     })
@@ -563,7 +636,10 @@ export default {
       sortedMessages,
       showEmojiPicker,
       emojis,
+      currentOfficeName,
+      currentOfficeLogoUrl,
       getOfficeInitial,
+      getOfficeLogoUrl,
       selectOffice,
       sendMessage,
       triggerFileUpload,
