@@ -1,18 +1,14 @@
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col">
-    <!-- Header -->
     <KioskHeader bgColor="#0F5C5C" textColor="#FFFFFF" />
 
-    <!-- Content -->
     <div class="flex-grow max-w-4xl mx-auto px-6 sm:px-8 py-4 sm:py-6 w-full">
       
-      <!-- Loading State -->
       <div v-if="loading" class="text-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0F5C5C] mx-auto mb-4"></div>
         <p class="text-gray-600">Kinukuha ang iyong queue number...</p>
       </div>
 
-      <!-- Error State -->
       <div v-else-if="error" class="text-center py-12">
         <p class="text-red-600 mb-4">{{ error }}</p>
         <button 
@@ -23,35 +19,31 @@
         </button>
       </div>
 
-      <!-- Success State -->
       <div v-else class="flex flex-col min-h-[80vh]">
         
-        <!-- Main Content - Queue Number and Details -->
         <div class="flex-grow">
-          <!-- Queue Number Display -->
+          
           <div class="text-center mb-8">
             <div class="text-7xl sm:text-8xl font-bold text-[#0F5C5C] mb-6 py-4">
               {{ queueNumber }}
             </div>
-            
-            <!-- Instruction Message - Simple and Clean -->
             <p class="text-gray-700 text-lg">
               Pakikuhanan ng litrato o isulat sa papel ang inyong queue number.
             </p>
           </div>
 
-          <!-- Client Details Summary -->
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden max-w-2xl mx-auto">
             <div class="px-6 py-4 border-b border-gray-100">
               <h3 class="font-medium text-gray-700">Mga Detalye ng Transaksyon</h3>
             </div>
+
             <div class="px-6 py-4">
               <table class="w-full text-sm">
                 <tr class="border-b border-gray-50">
                   <td class="text-gray-600 py-2 w-1/3">Opisina:</td>
                   <td class="text-gray-800 py-2">{{ selectedOffice?.name }} ({{ selectedOffice?.acronym }})</td>
                 </tr>
-                
+
                 <tr class="border-b border-gray-50">
                   <td class="text-gray-600 py-2 align-top">Serbisyo:</td>
                   <td class="text-gray-800 py-2">
@@ -60,27 +52,27 @@
                     </span>
                   </td>
                 </tr>
-                
+
                 <tr class="border-b border-gray-50">
                   <td class="text-gray-600 py-2">Pangalan:</td>
                   <td class="text-gray-800 py-2">{{ clientDetails?.full_name }}</td>
                 </tr>
-                
+
                 <tr class="border-b border-gray-50">
                   <td class="text-gray-600 py-2">Contact Number:</td>
                   <td class="text-gray-800 py-2">{{ clientDetails?.contact_number }}</td>
                 </tr>
-                
+
                 <tr class="border-b border-gray-50">
                   <td class="text-gray-600 py-2">Barangay:</td>
                   <td class="text-gray-800 py-2">{{ getBarangayName(clientDetails?.barangay_id) }}</td>
                 </tr>
-                
+
                 <tr class="border-b border-gray-50">
                   <td class="text-gray-600 py-2">Uri ng Lane:</td>
                   <td class="text-gray-800 py-2 capitalize">{{ clientDetails?.lane_type }}</td>
                 </tr>
-                
+
                 <tr v-if="clientDetails?.lane_type === 'priority' && clientDetails?.priority_sectors?.length > 0">
                   <td class="text-gray-600 py-2">Priority Sector:</td>
                   <td class="text-gray-800 py-2">
@@ -93,18 +85,26 @@
             </div>
           </div>
 
-          <!-- Tapos Button -->
-          <div class="flex justify-center mt-8">
+          <!-- Buttons - MAGKATABI NA SILA -->
+          <div class="flex flex-row items-center justify-center mt-8 gap-4">
+            <!-- Tapos -->
             <button 
               @click="finish"
-              class="px-8 py-3 rounded-lg bg-[#0F5C5C] text-white font-medium text-base hover:bg-[#0a4a4a] transition min-w-[180px]"
+              class="px-8 py-3 rounded-lg bg-[#0F5C5C] text-white font-medium text-base hover:bg-[#0a4a4a] transition min-w-[150px]"
             >
               Tapos
+            </button>
+
+            <!-- View Map -->
+            <button 
+              @click="openMap"
+              class="px-8 py-3 rounded-lg border border-[#0F5C5C] text-[#0F5C5C] font-medium text-base hover:bg-[#0F5C5C] hover:text-white transition min-w-[150px]"
+            >
+              Tingnan ang Mapa
             </button>
           </div>
         </div>
 
-        <!-- Countdown Timer at the Bottom - Minimalist -->
         <div class="text-center pt-8 pb-4 border-t border-gray-200 mt-8">
           <p class="text-gray-500 text-sm">
             Magbabalik sa home page sa {{ countdown }} segundo
@@ -112,11 +112,66 @@
         </div>
       </div>
     </div>
+
+    <!-- MAP MODAL -->
+    <div v-if="showMap" class="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4" @click.self="closeMap">
+      <div class="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-xl flex flex-col">
+        
+        <div class="flex justify-between items-center p-4 border-b">
+          <h3 class="text-lg font-semibold text-gray-700">
+            Mapa ng {{ selectedOffice?.name }} Office
+          </h3>
+          <button 
+            @click="closeMap"
+            class="text-gray-500 hover:text-gray-700 text-xl transition"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="flex-grow overflow-auto bg-gray-100 flex items-center justify-center p-4">
+          <!-- Loading Spinner -->
+          <div v-if="mapLoading" class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0F5C5C] mx-auto mb-4"></div>
+            <p class="text-gray-600">Naglo-load ng mapa...</p>
+          </div>
+          
+          <!-- Map Image with cache buster -->
+          <div v-else-if="mapImageUrl" class="flex flex-col items-center">
+            <img 
+              :src="mapImageUrlWithCache"
+              :alt="`Mapa ng ${selectedOffice?.name} Office`"
+              class="max-w-full max-h-[70vh] object-contain"
+              style="display: block;"
+              @load="onMapLoad"
+              @error="onMapError"
+            />
+            <!-- Direct link fallback -->
+            <p class="text-xs text-gray-400 mt-3">
+              Kung hindi lumalabas ang mapa, 
+              <a :href="mapImageUrl" target="_blank" class="text-[#0F5C5C] underline hover:text-[#0a4a4a]">
+                i-click dito para buksan sa bagong tab
+              </a>
+            </p>
+          </div>
+          
+          <!-- Fallback if no map image -->
+          <div v-else class="text-center p-8">
+            <svg class="w-24 h-24 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+            </svg>
+            <p class="text-gray-500">Walang available na mapa</p>
+            <p class="text-gray-400 text-sm mt-2">Para sa {{ selectedOffice?.name }}</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import KioskHeader from '../../components/kiosk/KioskHeader.vue'
 import kioskApi from '../../services/kioskApi'
@@ -130,20 +185,58 @@ const prioritySectors = ref([])
 const queueNumber = ref('')
 const loading = ref(true)
 const error = ref(null)
-const countdown = ref(30) // Changed from 15 to 30 seconds
-let countdownInterval = null
+const countdown = ref(30)
+const showMap = ref(false)
+const mapLoading = ref(false)
 
-// Get data from localStorage
+let countdownInterval = null
+let timeoutId = null
+
+// Map image URL handler
+const mapImageUrl = computed(() => {
+  if (!selectedOffice.value?.map_image) return null
+  
+  let imagePath = selectedOffice.value.map_image
+  
+  // If it's already a full URL with http
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath
+  }
+  
+  // If it's an absolute path starting with /
+  if (imagePath.startsWith('/')) {
+    return window.location.origin + imagePath
+  }
+  
+  // If it starts with storage/ (no leading slash)
+  if (imagePath.startsWith('storage/')) {
+    return window.location.origin + '/' + imagePath
+  }
+  
+  // Default: assume it's in storage/maps/
+  return window.location.origin + '/storage/maps/' + imagePath
+})
+
+// Add cache buster to prevent caching issues
+const mapImageUrlWithCache = computed(() => {
+  if (!mapImageUrl.value) return null
+  return mapImageUrl.value + '?t=' + Date.now()
+})
+
 onMounted(() => {
   const office = localStorage.getItem('selectedOffice')
   const services = localStorage.getItem('selectedServices')
   const client = localStorage.getItem('clientDetails')
   
-  if (office) selectedOffice.value = JSON.parse(office)
+  if (office) {
+    selectedOffice.value = JSON.parse(office)
+    console.log('Office loaded:', selectedOffice.value?.name)
+    console.log('Map image:', selectedOffice.value?.map_image)
+  }
+  
   if (services) selectedServices.value = JSON.parse(services)
   if (client) clientDetails.value = JSON.parse(client)
   
-  // Redirect if missing data
   if (!office || !services || !client) {
     router.push('/kiosk/welcome')
     return
@@ -154,139 +247,106 @@ onMounted(() => {
   generateQueueNumber()
 })
 
-// Fetch barangays
 const fetchBarangays = async () => {
   try {
     const response = await kioskApi.get('/barangays')
-    if (response.data && response.data.data) {
-      barangays.value = response.data.data
-    }
+    barangays.value = response.data.data || []
   } catch (error) {
-    console.error('Error fetching barangays:', error)
+    console.error(error)
   }
 }
 
-// Fetch priority sectors
 const fetchPrioritySectors = async () => {
   try {
     const response = await kioskApi.get('/priority-sectors')
-    if (response.data && response.data.data) {
-      prioritySectors.value = response.data.data
-    }
+    prioritySectors.value = response.data.data || []
   } catch (error) {
-    console.error('Error fetching priority sectors:', error)
+    console.error(error)
   }
 }
 
-// Start countdown timer
 const startCountdown = () => {
-  if (countdownInterval) clearInterval(countdownInterval)
-  
   countdownInterval = setInterval(() => {
     if (countdown.value > 1) {
       countdown.value--
     } else {
-      clearInterval(countdownInterval)
       finish()
     }
   }, 1000)
 }
 
-// Generate queue number by calling the API
 const generateQueueNumber = async () => {
   loading.value = true
-  error.value = null
-  
   try {
-    const payload = {
+    const response = await kioskApi.post('/queue', {
       office_id: selectedOffice.value.id,
       client_name: clientDetails.value.full_name,
       contact_number: clientDetails.value.contact_number,
       barangay_id: parseInt(clientDetails.value.barangay_id),
       lane_type: clientDetails.value.lane_type,
       service_ids: selectedServices.value.map(s => s.id)
-    }
-    
-    if (clientDetails.value.lane_type === 'priority' && clientDetails.value.priority_sectors?.length > 0) {
-      payload.priority_sector_ids = clientDetails.value.priority_sectors
-    }
-    
-    console.log('Sending queue generation request:', payload)
-    
-    const response = await kioskApi.post('/queue', payload)
-    
-    console.log('Queue generation response:', response.data)
-    
-    if (response.data && response.data.data) {
-      queueNumber.value = response.data.data.queue_number
-      startCountdown()
-    } else {
-      throw new Error('Invalid response format')
-    }
-    
+    })
+
+    queueNumber.value = response.data.data.queue_number
+    startCountdown()
   } catch (err) {
-    console.error('Error generating queue number:', err)
-    error.value = err.response?.data?.message || 'Hindi makakuha ng queue number. Pakisubukan muli.'
+    error.value = 'Hindi makakuha ng queue number.'
   } finally {
     loading.value = false
   }
 }
 
-// Retry generating queue number
-const retry = () => {
-  generateQueueNumber()
+const retry = () => generateQueueNumber()
+
+const getBarangayName = (id) => {
+  return barangays.value.find(b => b.id === id)?.barangay_name || 'Unknown'
 }
 
-// Helper: Get barangay name
-const getBarangayName = (barangayId) => {
-  if (!barangayId) return 'Unknown'
-  const barangay = barangays.value.find(b => b.id === barangayId)
-  return barangay ? (barangay.barangay_name || barangay.name) : 'Unknown'
+const getPrioritySectorNames = (ids) => {
+  return ids.map(id => prioritySectors.value.find(s => s.id === id)?.sector_name || 'Unknown')
 }
 
-// Helper: Get priority sector names
-const getPrioritySectorNames = (sectorIds) => {
-  if (!sectorIds) return []
-  return sectorIds.map(id => {
-    const sector = prioritySectors.value.find(s => s.id === id)
-    return sector ? (sector.sector_name || sector.name) : 'Unknown'
-  })
+const openMap = () => {
+  console.log('Opening map URL:', mapImageUrl.value)
+  showMap.value = true
+  mapLoading.value = true
+  
+  // Set timeout to hide loading if stuck
+  if (timeoutId) clearTimeout(timeoutId)
+  timeoutId = setTimeout(() => {
+    if (mapLoading.value === true) {
+      console.log('Loading timeout - forcing hide')
+      mapLoading.value = false
+    }
+  }, 8000)
 }
 
-// Finish button - clear data and go back to welcome
+const closeMap = () => {
+  showMap.value = false
+  mapLoading.value = false
+  if (timeoutId) clearTimeout(timeoutId)
+}
+
+const onMapLoad = () => {
+  console.log('Map loaded successfully')
+  mapLoading.value = false
+  if (timeoutId) clearTimeout(timeoutId)
+}
+
+const onMapError = () => {
+  console.error('Failed to load map:', mapImageUrl.value)
+  mapLoading.value = false
+  if (timeoutId) clearTimeout(timeoutId)
+}
+
 const finish = () => {
-  if (countdownInterval) {
-    clearInterval(countdownInterval)
-    countdownInterval = null
-  }
-  
-  localStorage.removeItem('selectedOffice')
-  localStorage.removeItem('selectedServices')
-  localStorage.removeItem('clientDetails')
-  
+  clearInterval(countdownInterval)
+  localStorage.clear()
   router.push('/kiosk/welcome')
 }
 
-// Clean up interval on component unmount
 onUnmounted(() => {
-  if (countdownInterval) {
-    clearInterval(countdownInterval)
-  }
+  clearInterval(countdownInterval)
+  if (timeoutId) clearTimeout(timeoutId)
 })
 </script>
-
-<style scoped>
-button {
-  transition: all 0.2s ease;
-}
-
-button:active {
-  transform: scale(0.98);
-}
-
-@media (max-width: 640px) {
-  .text-7xl {
-    font-size: 3.5rem;
-  }
-}
-</style>

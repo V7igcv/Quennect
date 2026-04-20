@@ -16,6 +16,7 @@ class Office extends Model
         'office_description',
         'office_acronym',
         'logo',
+        'map_image', // ✅ IDAGDAG ITO
         'is_active'
     ];
 
@@ -50,6 +51,34 @@ class Office extends Model
 
         // Stored as raw filename.
         return asset('storage/logos/' . $logo);
+    }
+
+    // ✅ Add accessor for map_image URL
+    public function getMapImageUrlAttribute()
+    {
+        if (!$this->map_image) {
+            return null;
+        }
+
+        $mapImage = ltrim(trim($this->map_image), '/');
+
+        // Accept full/absolute URLs as-is.
+        if (Str::startsWith($mapImage, ['http://', 'https://', '//'])) {
+            return $this->map_image;
+        }
+
+        // Stored as storage/... path.
+        if (Str::startsWith($mapImage, 'storage/')) {
+            return asset($mapImage);
+        }
+
+        // Stored as maps/... path
+        if (Str::startsWith($mapImage, 'maps/')) {
+            return asset('storage/' . $mapImage);
+        }
+
+        // Default: assume stored in storage/maps/
+        return asset('storage/' . $mapImage);
     }
 
     /**

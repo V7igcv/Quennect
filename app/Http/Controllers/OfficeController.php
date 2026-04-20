@@ -38,7 +38,8 @@ class OfficeController extends Controller
                         'display_name' => $office->office_name . ' (' . $office->office_acronym . ')',
                         'description' => $office->office_description,
                         'is_active' => $office->is_active,
-                        'logo' => $office->logo ? asset('storage/' . $office->logo) : null
+                        'logo' => $office->logo ? asset('storage/' . $office->logo) : null,
+                        'map_image' => $this->getMapImageUrl($office->map_image) // CHANGED - simplified
                     ];
                 })
             ], 200);
@@ -84,6 +85,7 @@ class OfficeController extends Controller
                     'description' => $office->office_description,
                     'is_active' => $office->is_active,
                     'logo' => $office->logo ? asset('storage/' . $office->logo) : null,
+                    'map_image' => $this->getMapImageUrl($office->map_image), // CHANGED - simplified
                     'services' => $office->services->map(function ($service) {
                         return [
                             'id' => $service->id,
@@ -103,5 +105,42 @@ class OfficeController extends Controller
                 'message' => 'Unable to fetch office details. Please try again.'
             ], 500);
         }
+    }
+
+    /**
+     * Helper function to get correct map image URL
+     * 
+     * @param string|null $path
+     * @return string|null
+     */
+    private function getMapImageUrl(?string $path): ?string
+    {
+        // If no path, return null
+        if (!$path) {
+            return null;
+        }
+        
+        // If it's already a full URL starting with http
+        if (str_starts_with($path, 'http')) {
+            return $path;
+        }
+        
+        // If it already starts with /storage/, return as is (no need to add another storage)
+        if (str_starts_with($path, '/storage/')) {
+            return asset($path);
+        }
+        
+        // If it starts with storage/ (no leading slash), add slash
+        if (str_starts_with($path, 'storage/')) {
+            return asset('/' . $path);
+        }
+        
+        // If it starts with maps/ or any other folder, add /storage/
+        if (str_starts_with($path, 'maps/')) {
+            return asset('storage/' . $path);
+        }
+        
+        // Default: assume it's a filename in maps folder
+        return asset('storage/maps/' . $path);
     }
 }
