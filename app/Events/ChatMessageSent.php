@@ -36,13 +36,25 @@ class ChatMessageSent implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
+        $content = $this->message->content;
+
+        if (
+            in_array($this->message->type, ['image', 'file'], true)
+            && !empty($this->message->file_path)
+        ) {
+            $content = asset('storage/' . ltrim($this->message->file_path, '/'));
+        }
+
         return [
             'id' => $this->message->id,
+            'sender_id' => $this->message->sender_office_id,
+            'receiver_id' => $this->message->receiver_office_id,
             'sender_office_id' => $this->message->sender_office_id,
             'receiver_office_id' => $this->message->receiver_office_id,
             'type' => $this->message->type,
-            'content' => $this->message->content,
+            'content' => $content,
             'file_name' => $this->message->file_name,
+            'file_path' => $this->message->file_path,
             'is_read' => (bool) $this->message->is_read,
             'created_at' => optional($this->message->created_at)->toISOString(),
         ];

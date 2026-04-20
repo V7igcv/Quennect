@@ -170,7 +170,7 @@
                          ? 'bg-[#0F5C5C] text-white' 
                          : 'bg-white text-gray-800 shadow'">
 
-                    <p class="text-sm whitespace-pre-wrap break-words">{{ message.content }}</p>
+                    <p v-if="message.type === 'text'" class="text-sm whitespace-pre-wrap break-words">{{ message.content }}</p>
 
                     <!-- Image preview -->
                     <img 
@@ -207,6 +207,17 @@
 
         <!-- IMPROVED: Sticky Input Area with better spacing -->
         <div class="bg-white border-t p-3 flex-shrink-0 relative">
+          <div v-if="pendingFile" class="mb-2 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <p class="text-xs text-gray-600 truncate pr-2">Selected file: {{ pendingFile.name }}</p>
+            <button
+              @click="clearPendingFile"
+              class="text-xs text-red-600 hover:text-red-700"
+              type="button"
+            >
+              Remove
+            </button>
+          </div>
+
           <div class="flex items-center gap-2 md:gap-3">
             <!-- Attachment Button -->
             <button 
@@ -245,7 +256,7 @@
             <!-- Send Button - improved sizing and spacing -->
             <button 
               @click="sendMessage" 
-              :disabled="sending || !newMessage.trim()"
+              :disabled="sending || (!newMessage.trim() && !pendingFile)"
               class="p-2.5 bg-[#0F5C5C] text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#0a4a4a] transition-colors flex-shrink-0 shadow-sm"
               title="Send message"
             >
@@ -279,7 +290,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import axios from 'axios'
 
 export default {
@@ -300,10 +311,12 @@ export default {
     const sending = ref(false)
     const error = ref(null)
     const showEmojiPicker = ref(false)
+    const pendingFile = ref(null)
     
     const offices = ref([])
     const messages = ref({})
     const currentOfficeProfile = ref(null)
+    const chatChannelName = ref(null)
     
     const emojis = ['😀', '😂', '😍', '😎', '👍', '❤️', '🎉', '🔥', '👋', '🙏', '💪', '😊']
     
@@ -379,6 +392,161 @@ export default {
         return new Date(a.created_at) - new Date(b.created_at)
       })
     })
+
+    const resolveCurrentOfficeId = () => {
+      const fromProps = Number(props.currentOfficeId)
+      if (Number.isFinite(fromProps) && fromProps > 0) {
+        return fromProps
+      }
+
+      try {
+        const rawUser = localStorage.getItem('user')
+        if (!rawUser) return null
+
+        const parsedUser = JSON.parse(rawUser)
+        const fromStorage = Number(
+          parsedUser?.office_id
+          ?? parsedUser?.officeId
+          ?? parsedUser?.office?.id
+        )
+
+        return Number.isFinite(fromStorage) && fromStorage > 0 ? fromStorage : null
+      } catch (error) {
+        console.error('Failed to resolve current office ID for chat realtime:', error)
+        return null
+      }
+    }
+
+    const normalizeMessagePayload = (payload) => {
+      const senderId = Number(payload?.sender_id ?? payload?.sender_office_id)
+      const receiverId = Number(payload?.receiver_id ?? payload?.receiver_office_id)
+      const messageType = payload?.type || 'text'
+      let content = payload?.content || ''
+
+      if ((messageType === 'image' || messageType === 'file') && payload?.file_path) {
+        if (String(payload.file_path).startsWith('http://') || String(payload.file_path).startsWith('https://')) {
+          content = payload.file_path
+        } else {
+          content = `/storage/${String(payload.file_path).replace(/^\/+/, '')}`
+        }
+      }
+
+      return {
+        id: Number(payload?.id),
+        sender_id: senderId,
+        receiver_id: receiverId,
+        type: messageType,
+        content,
+        file_name: payload?.file_name || null,
+        is_read: Boolean(payload?.is_read),
+        created_at: payload?.created_at || new Date().toISOString(),
+      }
+    }
+
+    const getMessagePreview = (message) => {
+      if (!message) return ''
+      if (message.type === 'image' || message.type === 'file') return 'sent an attachment'
+      return message.content || ''
+    }
+
+    const handleIncomingMessage = async (event) => {
+      const currentOfficeId = resolveCurrentOfficeId()
+      if (!currentOfficeId) return
+
+      const incomingMessage = normalizeMessagePayload(event)
+      const senderId = Number(incomingMessage.sender_id)
+      const receiverId = Number(incomingMessage.receiver_id)
+
+      if (!senderId || !receiverId) return
+      if (senderId !== currentOfficeId && receiverId !== currentOfficeId) return
+
+      // The sender already renders via optimistic update + API response,
+      // so skip self-echo events to avoid duplicate bubbles.
+      if (senderId === currentOfficeId) {
+        return
+      }
+
+      const otherOfficeId = senderId === currentOfficeId ? receiverId : senderId
+      if (!otherOfficeId) return
+
+      if (!messages.value[otherOfficeId]) {
+        messages.value[otherOfficeId] = []
+      }
+
+      const thread = messages.value[otherOfficeId]
+      const existingIndex = thread.findIndex((message) => Number(message.id) === Number(incomingMessage.id))
+
+      if (existingIndex === -1) {
+        const tempMatchIndex = thread.findIndex((message) => (
+          message.temp
+          && Number(message.sender_id) === senderId
+          && Number(message.receiver_id) === receiverId
+          && message.type === incomingMessage.type
+          && (message.content || '') === (incomingMessage.content || '')
+        ))
+
+        if (tempMatchIndex !== -1) {
+          thread[tempMatchIndex] = incomingMessage
+        } else {
+          thread.push(incomingMessage)
+        }
+      }
+
+      const officeIndex = offices.value.findIndex((office) => Number(office.id) === Number(otherOfficeId))
+      if (officeIndex !== -1) {
+        offices.value[officeIndex].lastMessage = getMessagePreview(incomingMessage)
+        offices.value[officeIndex].lastMessageTime = 'Just now'
+        offices.value[officeIndex].lastMessageTimestamp = Math.floor(Date.now() / 1000)
+
+        if (receiverId === currentOfficeId && Number(selectedOffice.value?.id) !== Number(otherOfficeId)) {
+          offices.value[officeIndex].unreadCount = Number(offices.value[officeIndex].unreadCount || 0) + 1
+        }
+      }
+
+      if (Number(selectedOffice.value?.id) === Number(otherOfficeId)) {
+        await scrollToBottom()
+
+        if (receiverId === currentOfficeId) {
+          await markMessagesAsRead(otherOfficeId)
+          window.dispatchEvent(new CustomEvent('reset-chat-unread'))
+        }
+      }
+    }
+
+    const unsubscribeFromRealtime = () => {
+      if (chatChannelName.value && window.Echo) {
+        window.Echo.leave(chatChannelName.value)
+        chatChannelName.value = null
+      }
+    }
+
+    const subscribeToRealtime = () => {
+      if (!window.Echo) {
+        return
+      }
+
+      const currentOfficeId = resolveCurrentOfficeId()
+      if (!currentOfficeId) {
+        return
+      }
+
+      const nextChannel = `chat.office.${currentOfficeId}`
+
+      if (chatChannelName.value === nextChannel) {
+        return
+      }
+
+      unsubscribeFromRealtime()
+      chatChannelName.value = nextChannel
+
+      window.Echo
+        .channel(chatChannelName.value)
+        .listen('.chat.message.sent', handleIncomingMessage)
+        .listen('chat.message.sent', handleIncomingMessage)
+        .error((socketError) => {
+          console.error('Chat websocket error:', socketError)
+        })
+    }
     
     const fetchOffices = async () => {
       loading.value = true
@@ -432,19 +600,30 @@ export default {
     const selectOffice = async (office) => {
       if (!office || !office.id) return
       selectedOffice.value = office
+      pendingFile.value = null
       await fetchMessages(office.id)
     }
     
     const sendMessage = async () => {
-      if (!newMessage.value.trim() || !selectedOffice.value || !selectedOffice.value.id || sending.value) return
+      if (!selectedOffice.value || !selectedOffice.value.id || sending.value) return
+
+      if (pendingFile.value) {
+        const fileToUpload = pendingFile.value
+        pendingFile.value = null
+        await uploadFile(fileToUpload)
+        return
+      }
+
+      if (!newMessage.value.trim()) return
       
       sending.value = true
       const messageContent = newMessage.value
       const tempId = Date.now()
+      const currentOfficeId = resolveCurrentOfficeId()
       
       const tempMessage = {
         id: tempId,
-        sender_id: props.currentOfficeId,
+        sender_id: currentOfficeId,
         receiver_id: selectedOffice.value.id,
         type: 'text',
         content: messageContent,
@@ -499,13 +678,17 @@ export default {
       const input = document.createElement('input')
       input.type = 'file'
       input.accept = 'image/*, .pdf, .doc, .docx, .xls, .xlsx'
-      input.onchange = async (e) => {
+      input.onchange = (e) => {
         const file = e.target.files[0]
         if (file && selectedOffice.value) {
-          await uploadFile(file)
+          pendingFile.value = file
         }
       }
       input.click()
+    }
+
+    const clearPendingFile = () => {
+      pendingFile.value = null
     }
     
     const uploadFile = async (file) => {
@@ -517,10 +700,11 @@ export default {
       
       sending.value = true
       const tempId = Date.now()
+      const currentOfficeId = resolveCurrentOfficeId()
       
       const tempMessage = {
         id: tempId,
-        sender_id: props.currentOfficeId,
+        sender_id: currentOfficeId,
         receiver_id: selectedOffice.value.id,
         type: file.type.startsWith('image/') ? 'image' : 'file',
         content: 'Uploading...',
@@ -615,11 +799,24 @@ export default {
     watch(sortedMessages, () => {
       scrollToBottom()
     }, { deep: true })
+
+    watch(
+      () => props.currentOfficeId,
+      () => {
+        subscribeToRealtime()
+      }
+    )
     
     onMounted(() => {
       resolveCurrentOfficeProfile()
       fetchOffices()
+      subscribeToRealtime()
       document.addEventListener('click', handleClickOutside)
+    })
+
+    onUnmounted(() => {
+      unsubscribeFromRealtime()
+      document.removeEventListener('click', handleClickOutside)
     })
     
     return {
@@ -635,6 +832,7 @@ export default {
       sortedOffices,
       sortedMessages,
       showEmojiPicker,
+      pendingFile,
       emojis,
       currentOfficeName,
       currentOfficeLogoUrl,
@@ -643,6 +841,7 @@ export default {
       selectOffice,
       sendMessage,
       triggerFileUpload,
+      clearPendingFile,
       refreshMessages,
       formatTime,
       previewImage,

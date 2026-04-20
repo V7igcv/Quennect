@@ -51,7 +51,11 @@ class ChatController extends Controller
                         'acronym' => $office->office_acronym,
                         'logo_url' => $office->logo ? $office->logo_url : null,
                         'isOnline' => $office->is_active,
-                        'lastMessage' => $lastMessage?->content ?? null,
+                        'lastMessage' => $lastMessage
+                            ? (in_array($lastMessage->type, ['image', 'file'], true)
+                                ? 'sent an attachment'
+                                : $lastMessage->content)
+                            : null,
                         'lastMessageTime' => $lastMessage?->created_at?->diffForHumans() ?? null,
                         'lastMessageTimestamp' => $lastMessage?->created_at?->timestamp ?? 0, // Add this for sorting
                         'unreadCount' => $unreadCount
@@ -113,8 +117,8 @@ class ChatController extends Controller
                         'sender_id' => $message->sender_office_id,
                         'receiver_id' => $message->receiver_office_id,
                         'type' => $message->type,
-                        'content' => $message->type === 'file' && $message->file_path 
-                            ? asset('storage/' . $message->file_path) 
+                        'content' => in_array($message->type, ['image', 'file'], true) && $message->file_path
+                            ? asset('storage/' . ltrim($message->file_path, '/'))
                             : $message->content,
                         'file_name' => $message->file_name,
                         'file_size' => $message->file_size,
