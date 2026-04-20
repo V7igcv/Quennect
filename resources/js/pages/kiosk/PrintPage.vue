@@ -96,7 +96,8 @@
             </button>
 
             <!-- View Map -->
-            <button 
+            <button
+              v-if="mapImageUrl"
               @click="openMap"
               class="px-8 py-3 rounded-lg border border-[#0F5C5C] text-[#0F5C5C] font-medium text-base hover:bg-[#0F5C5C] hover:text-white transition min-w-[150px]"
             >
@@ -130,22 +131,23 @@
         </div>
 
         <div class="flex-grow overflow-auto bg-gray-100 flex items-center justify-center p-4">
-          <!-- Loading Spinner -->
-          <div v-if="mapLoading" class="text-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0F5C5C] mx-auto mb-4"></div>
-            <p class="text-gray-600">Naglo-load ng mapa...</p>
-          </div>
-          
-          <!-- Map Image with cache buster -->
-          <div v-else-if="mapImageUrl" class="flex flex-col items-center">
+          <!-- Map image is always mounted so loading starts immediately -->
+          <div v-if="mapImageUrl" class="relative flex flex-col items-center w-full">
             <img 
               :src="mapImageUrlWithCache"
               :alt="`Mapa ng ${selectedOffice?.name} Office`"
               class="max-w-full max-h-[70vh] object-contain"
               style="display: block;"
+              :class="{ 'opacity-0': mapLoading, 'opacity-100': !mapLoading }"
               @load="onMapLoad"
               @error="onMapError"
             />
+
+            <div v-if="mapLoading" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/85">
+              <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0F5C5C] mx-auto mb-4"></div>
+              <p class="text-gray-600">Naglo-load ng mapa...</p>
+            </div>
+
             <!-- Direct link fallback -->
             <p class="text-xs text-gray-400 mt-3">
               Kung hindi lumalabas ang mapa, 
