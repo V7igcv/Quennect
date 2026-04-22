@@ -617,7 +617,7 @@
     <div v-if="canExportCsm && showGenerateGraphsModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg shadow-lg p-6 max-w-xl w-full mx-4">
         <div class="mb-4 flex items-center justify-between gap-2">
-          <h3 class="text-lg font-semibold">Generate Graph PDF</h3>
+          <h3 class="text-lg font-semibold">Generate Graph Report</h3>
           <button
             type="button"
             @click="closeGenerateGraphsModal"
@@ -629,7 +629,7 @@
         </div>
 
         <p class="text-gray-600 text-sm leading-relaxed mb-3">
-          This will generate a PDF containing the overview cards, Citizen's Charter graphs, SQD graphs (SQD0–SQD8), demographic profile pies, and the Overall Score Per Service graph for the selected
+          This will generate an HTML report containing the overview cards, Citizen's Charter graphs, SQD graphs (SQD0–SQD8), demographic profile pies, and the Overall Score Per Service graph for the selected
           <span class="font-semibold">{{ getServiceTypeLabel }}</span>
           services and
           <span class="font-semibold">{{ dateFilterLabel }}</span>
@@ -637,7 +637,7 @@
         </p>
 
         <div class="rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm text-[#0F5C5C] mb-4">
-          The PDF will be downloaded as
+          A report tab will open and you can save the PDF from that page as
           <span class="font-semibold">{{ exportGraphsFileNamePreview }}</span>.
         </div>
 
@@ -656,7 +656,7 @@
             @click="handleGenerateGraphs"
           >
             <Loader2 v-if="isGeneratingGraphs" class="h-4 w-4 animate-spin" />
-            <span>{{ isGeneratingGraphs ? 'Generating PDF...' : 'Generate PDF' }}</span>
+            <span>{{ isGeneratingGraphs ? 'Generating report...' : 'Generate PDF' }}</span>
           </button>
         </div>
       </div>
@@ -1321,14 +1321,25 @@ const handleGenerateGraphs = async () => {
       },
     )
 
-    const contentDisposition = response?.headers?.['content-disposition']
-    const fileName = parseContentDispositionFileName(contentDisposition) || exportGraphsFileNamePreview.value
+    const blob = new Blob([response.data], { type: 'text/html;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
 
-    triggerBlobDownload(response.data, fileName)
+    const link = document.createElement('a')
+    link.href = url
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    window.setTimeout(() => {
+      window.URL.revokeObjectURL(url)
+    }, 60000)
+
     closeGenerateGraphsModal()
   } catch (error) {
     console.error('Error exporting CSM analytics graphs:', error)
-    window.alert('Unable to generate graph PDF right now. Please try again.')
+    window.alert('Unable to generate graph report right now. Please try again.')
   } finally {
     isGeneratingGraphs.value = false
   }

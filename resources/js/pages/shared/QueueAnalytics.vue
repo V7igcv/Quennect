@@ -181,11 +181,12 @@
 
             <h2 class="text-xl font-semibold text-gray-900 mb-3">Export Analytics Graphs</h2>
             <p class="text-sm text-gray-600 mb-6">
-              This will generate a PDF report containing the current queue analytics stat cards and graphs
+              This will generate an HTML report containing the current queue analytics stat cards and graphs
               for
               <span class="font-semibold">{{ selectedOfficeDisplayName }}</span>
               for
               <span class="font-semibold">{{ dateFilterLabel }}</span>.
+              You can save it as PDF from the report page.
             </p>
 
             <div class="flex justify-end gap-3">
@@ -204,7 +205,7 @@
                 @click="confirmExportGraphs"
               >
                 <span v-if="!isExportingGraphs">Generate PDF</span>
-                <span v-else>Generating PDF...</span>
+                <span v-else>Generating report...</span>
               </Button>
             </div>
           </div>
@@ -1499,24 +1500,25 @@ const confirmExportGraphs = async () => {
       responseType: 'blob',
     })
 
-    const blob = new Blob([response.data], { type: 'application/pdf' })
-
-    const safeOfficeName = selectedOfficeDisplayName.value.replace(/[\\/]/g, '-')
-    const fileName = `${safeOfficeName} Queue Analytics Graph - ${dateFilterLabel.value}.pdf`
-
+    const blob = new Blob([response.data], { type: 'text/html;charset=utf-8' })
     const url = window.URL.createObjectURL(blob)
+
     const link = document.createElement('a')
     link.href = url
-    link.download = fileName
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+
+    window.setTimeout(() => {
+      window.URL.revokeObjectURL(url)
+    }, 60000)
 
     showExportModal.value = false
   } catch (error) {
     console.error('Error exporting queue analytics graphs:', error)
-    window.alert('Failed to generate PDF report. Please try again.')
+    window.alert('Failed to generate report. Please try again.')
   } finally {
     isExportingGraphs.value = false
   }

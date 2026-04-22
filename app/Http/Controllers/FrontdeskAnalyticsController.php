@@ -8,7 +8,6 @@ use App\Models\Office;
 use App\Models\QueueTransaction;
 use App\Models\Service;
 use App\Services\Analytics\ChartImageService;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -778,7 +777,7 @@ class FrontdeskAnalyticsController extends Controller
     }
 
     /**
-     * Export queue analytics graphs (stat cards + distributions) as a PDF file.
+     * Export queue analytics graphs as an HTML report for browser print-to-PDF.
      *
      * This endpoint is shared by both SUPERADMIN (via office_id) and FRONTDESK
      * users (via their assigned office_id).
@@ -858,17 +857,31 @@ class FrontdeskAnalyticsController extends Controller
             $laneTypeChartPath = null;
             $assistanceGraphs = [];
 
-            if (!empty($barangayStats['distribution'] ?? [])) {
+            $barangayDistribution = $barangayStats['distribution'] ?? [];
+            $barangayTotalClients = (int) ($barangayStats['total_clients'] ?? 0);
+            $hasBarangayData = $barangayTotalClients > 0
+                && collect($barangayDistribution)->sum(function (array $segment) {
+                    return (int) ($segment['value'] ?? 0);
+                }) > 0;
+
+            $laneDistribution = $laneTypeStats['distribution'] ?? [];
+            $laneTotalClients = (int) ($laneTypeStats['total_clients'] ?? 0);
+            $hasLaneTypeData = $laneTotalClients > 0
+                && collect($laneDistribution)->sum(function (array $segment) {
+                    return (int) ($segment['value'] ?? 0);
+                }) > 0;
+
+            if ($hasBarangayData) {
                 $barangayChartPath = $this->chartImageService->generateBarangayBarChart(
-                    $barangayStats['distribution'],
+                    $barangayDistribution,
                     $officeDisplayName,
                     $periodLabel
                 );
             }
 
-            if (!empty($laneTypeStats['distribution'] ?? [])) {
+            if ($hasLaneTypeData) {
                 $laneTypeChartPath = $this->chartImageService->generateLaneTypeDonutChart(
-                    $laneTypeStats['distribution'],
+                    $laneDistribution,
                     $officeDisplayName,
                     $periodLabel
                 );
@@ -931,7 +944,7 @@ class FrontdeskAnalyticsController extends Controller
                 ];
             }
 
-            $pdf = Pdf::loadView('analytics.queue-graphs-report', [
+            return response()->view('analytics.queue-graphs-report', [
                 'officeName' => $officeName,
                 'officeAcronym' => $officeAcronym,
                 'officeDisplayName' => $officeDisplayName,
@@ -947,12 +960,9 @@ class FrontdeskAnalyticsController extends Controller
                 'laneTypeChartPath' => $laneTypeChartPath,
                 'assistanceGraphs' => $assistanceGraphs,
                 'hasAssistanceServices' => $hasAssistanceServices,
-            ])->setPaper('a4', 'portrait');
-
-            $safeOfficeName = str_replace(['/', '\\'], '-', $officeDisplayName);
-            $fileName = sprintf('%s Queue Analytics Graph - %s.pdf', $safeOfficeName, $periodLabel);
-
-            return $pdf->download($fileName);
+            ], 200, [
+                'Content-Type' => 'text/html; charset=UTF-8',
+            ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
         } catch (\Exception $e) {

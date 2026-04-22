@@ -2,555 +2,658 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Queue Analytics Graphs</title>
     <style>
+        :root {
+            --brand: #0F5C5C;
+            --brand-700: #0D4A4A;
+            --brand-soft: #E8F4F4;
+            --bg: #F5F7FA;
+            --surface: #FFFFFF;
+            --text: #111827;
+            --muted: #6B7280;
+            --border: #E5E7EB;
+            --shadow: 0 10px 30px rgba(15, 92, 92, 0.10);
+        }
+
         * {
             box-sizing: border-box;
         }
 
         body {
-            font-family: DejaVu Sans, Arial, sans-serif;
-            font-size: 12px;
-            color: #111827;
-            margin: 24px;
-        }
-
-        h1, h2, h3, h4 {
             margin: 0;
-            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        .text-muted {
-            color: #6B7280;
+        .page {
+            max-width: 1120px;
+            margin: 24px auto;
+            padding: 0 16px 24px;
         }
 
-        .text-sm {
-            font-size: 11px;
+        .toolbar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 12px;
+            position: sticky;
+            top: 12px;
+            z-index: 5;
         }
 
-        .text-xs {
-            font-size: 10px;
+        .print-btn {
+            border: 0;
+            border-radius: 10px;
+            background: var(--brand);
+            color: #fff;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 10px 16px;
+            cursor: pointer;
+            box-shadow: var(--shadow);
         }
 
-        .mb-1 { margin-bottom: 4px; }
-        .mb-2 { margin-bottom: 8px; }
-        .mb-3 { margin-bottom: 12px; }
-        .mb-4 { margin-bottom: 16px; }
-        .mb-5 { margin-bottom: 20px; }
-        .mb-6 { margin-bottom: 24px; }
-        .mt-2 { margin-top: 8px; }
-        .mt-3 { margin-top: 12px; }
-        .mt-4 { margin-top: 16px; }
+        .print-btn[disabled] {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .print-btn:hover {
+            background: var(--brand-700);
+        }
+
+        .report {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
 
         .header {
-            display: table;
-            width: 100%;
-        }
-
-        .header-left,
-        .header-right {
-            display: table-cell;
-            vertical-align: middle;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 14px;
+            margin-bottom: 18px;
         }
 
         .header-left {
-            width: 72px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
         }
 
         .header-logo {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
+            width: 72px;
+            height: 72px;
+            border-radius: 999px;
+            border: 1px solid #CBD5E1;
             object-fit: cover;
+            background: #fff;
+            flex-shrink: 0;
         }
 
-        .header-right {
-            padding-left: 12px;
+        .header-text {
+            min-width: 0;
         }
 
-        .app-name {
-            font-size: 18px;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-        }
-
-        .app-subtitle {
-            font-size: 11px;
-            color: #4B5563;
-        }
-
-        hr {
-            border: none;
-            border-top: 1px solid #D1D5DB;
-            margin: 16px 0;
-        }
-
-        .title-block {
-            text-align: center;
-        }
-
-        .report-title {
-            font-size: 16px;
+        .header-kicker {
+            margin: 0;
+            color: #334155;
+            font-size: 12px;
             font-weight: 700;
             letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
-        .office-name {
+        .header-subkicker {
+            margin: 4px 0 8px;
+            color: #475569;
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .title {
+            margin: 0;
+            color: var(--brand);
+            font-size: 26px;
+            line-height: 1.1;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .meta {
+            text-align: right;
+            min-width: 280px;
+            background: #F8FAFC;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+
+        .meta-line {
             font-size: 13px;
-            font-weight: 600;
-            margin-top: 4px;
+            margin-bottom: 6px;
         }
 
-        .period-label {
+        .meta-label {
+            color: var(--muted);
+            display: inline-block;
+            min-width: 82px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            background: #FCFDFD;
+            break-inside: avoid;
+        }
+
+        .card-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--brand);
+            line-height: 1;
+        }
+
+        .card-sub {
+            margin-top: 6px;
             font-size: 11px;
-            color: #4B5563;
-            margin-top: 2px;
+            color: var(--muted);
+        }
+
+        .section {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 14px;
+            background: #fff;
+            break-inside: avoid;
+        }
+
+        .section.no-container-border {
+            border: 0;
+        }
+
+        .assistance-card {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            break-inside: avoid;
         }
 
         .section-title {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 6px;
+            margin: 0;
+            font-size: 18px;
+            color: #0F172A;
         }
 
-        .section-subtitle {
-            font-size: 10px;
-            color: #6B7280;
-            margin-bottom: 6px;
-        }
-
-        .cards-grid {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .cards-grid td {
-            width: 33.33%;
-            padding: 4px;
-        }
-
-        .stat-card {
-            border: 1px solid #E5E7EB;
-            border-left-width: 4px;
-            border-radius: 4px;
-            padding: 8px 10px;
-            background-color: #F9FAFB;
-        }
-
-        .stat-card-title {
-            font-size: 11px;
-            color: #6B7280;
-            margin-bottom: 4px;
-        }
-
-        .stat-card-value {
-            font-size: 15px;
-            font-weight: 700;
-        }
-
-        .stat-card-caption {
-            font-size: 10px;
-            color: #6B7280;
-            margin-top: 2px;
-        }
-
-        .border-orange { border-left-color: #FDBA74; }
-        .border-green { border-left-color: #4ADE80; }
-        .border-red { border-left-color: #F87171; }
-        .border-blue { border-left-color: #60A5FA; }
-        .border-purple { border-left-color: #C4B5FD; }
-
-        table.generic-table {
-            width: 100%;
-            border-collapse: collapse;
+        .section-sub {
             margin-top: 4px;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-size: 13px;
         }
 
-        table.generic-table th,
-        table.generic-table td {
-            border: 1px solid #E5E7EB;
-            padding: 4px 6px;
+        .chart {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: #fff;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .chart img {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            font-size: 13px;
+        }
+
+        .table th,
+        .table td {
+            border-bottom: 1px solid var(--border);
+            padding: 9px 10px;
             text-align: left;
         }
 
-        table.generic-table th {
-            background-color: #F3F4F6;
-            font-size: 11px;
+        .table th {
+            background: var(--brand-soft);
+            color: #134E4A;
+            font-size: 12px;
+            font-weight: 700;
         }
 
-        table.generic-table td {
-            font-size: 10px;
-        }
-
-        .nowrap {
-            white-space: nowrap;
-        }
-
-        .bar-row {
-            display: table;
-            width: 100%;
-        }
-
-        .bar-label,
-        .bar-value {
-            display: table-cell;
-            vertical-align: middle;
-            font-size: 10px;
-        }
-
-        .bar-label {
-            width: 30%;
-        }
-
-        .bar-track {
-            display: table-cell;
-            width: 50%;
-            padding: 0 6px;
-        }
-
-        .bar-track-inner {
-            width: 100%;
-            height: 8px;
-            background-color: #E5E7EB;
-            border-radius: 999px;
-            overflow: hidden;
-        }
-
-        .bar-fill {
-            height: 8px;
-            background-color: #0F5C5C;
-        }
-
-        .bar-value {
-            width: 20%;
-            text-align: right;
+        .table tr:last-child td {
+            border-bottom: 0;
         }
 
         .legend {
-            margin-top: 6px;
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
-        .legend-item {
-            display: inline-block;
-            margin-right: 12px;
-            margin-bottom: 4px;
-            font-size: 10px;
+        .badge {
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            padding: 5px 10px;
+            font-size: 12px;
+            color: #374151;
+            background: #fff;
         }
 
-        .legend-color-box {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 2px;
-            margin-right: 4px;
+        .muted {
+            color: var(--muted);
+            font-size: 13px;
         }
 
-        .color-blue { background-color: #2563EB; }
-        .color-green { background-color: #16A34A; }
-        .color-amber { background-color: #F59E0B; }
-        .color-red { background-color: #DC2626; }
-        .color-purple { background-color: #7C3AED; }
-
-        .small-note {
-            font-size: 9px;
-            color: #9CA3AF;
-            margin-top: 2px;
+        .spacer {
+            height: 4px;
         }
 
-        .total-clients-highlight {
-            font-size: 11px;
-            font-weight: 600;
-            color: #111827;
+        @media (max-width: 980px) {
+            .cards {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .meta {
+                min-width: 0;
+                text-align: left;
+            }
+
+            .header {
+                flex-direction: column;
+            }
         }
 
-        .chart-image-wrapper {
+        @page {
+            size: A4 portrait;
+            margin: 12mm;
+        }
+
+        @media print {
+            body {
+                background: #fff;
+            }
+
+            .page {
+                max-width: none;
+                margin: 0;
+                padding: 0;
+            }
+
+            .toolbar {
+                display: none !important;
+            }
+
+            .report {
+                border: 0;
+                border-radius: 0;
+                padding: 0;
+                box-shadow: none;
+            }
+
+            .section,
+            .card,
+            .chart {
+                break-inside: avoid;
+            }
+        }
+
+        .is-pdf-export .report {
+            border: 0;
+            box-shadow: none;
+            border-radius: 0;
+            padding: 0;
             width: 100%;
-            text-align: center;
-            margin-top: 6px;
-            margin-bottom: 6px;
+            overflow: hidden;
         }
 
-        .chart-image {
-            max-width: 100%;
-            height: auto;
+        .is-pdf-export {
+            background: #ffffff !important;
+        }
+
+        .is-pdf-export .page {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 0;
+            overflow: hidden;
+            background: #ffffff;
+        }
+
+        .is-pdf-export .cards {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .is-pdf-export .header {
+            gap: 10px;
+        }
+
+        .is-pdf-export .meta {
+            min-width: 220px;
+        }
+
+        .is-pdf-export .section,
+        .is-pdf-export .card,
+        .is-pdf-export .meta,
+        .is-pdf-export .chart {
+            border-radius: 0;
+            background: #ffffff;
+        }
+
+        .is-pdf-export .section,
+        .is-pdf-export .card,
+        .is-pdf-export .meta {
+            box-shadow: none;
+            border: 1px solid var(--border);
+        }
+
+        .is-pdf-export .section.no-container-border {
+            border: 0;
+            box-shadow: none;
+        }
+
+        .is-pdf-export .section,
+        .is-pdf-export .card,
+        .is-pdf-export .assistance-card {
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
     </style>
 </head>
 <body>
-    {{-- Header --}}
-    <div class="header">
-        <div class="header-left">
-            <img
-                src="{{ public_path('storage/logos/Ligao City Seal.png') }}"
-                alt="Quennect Logo"
-                class="header-logo"
-            >
-        </div>
-        <div class="header-right">
-            <div class="app-name">Quennect</div>
-            <div class="app-subtitle">LGU Ligao General Queuing System</div>
-        </div>
-    </div>
-
-    <hr>
-
-    {{-- Title block --}}
-    <div class="title-block">
-        <div class="report-title">QUEUE ANALYTICS GRAPHS</div>
-        <div class="office-name">{{ $officeDisplayName }}</div>
-        <div class="period-label">{{ $periodLabel }}</div>
-    </div>
-
-    <hr>
-
-    {{-- Stat cards --}}
     @php
         $totalClients = $cardStats['total_clients'] ?? 0;
         $totalServed = $cardStats['total_served'] ?? 0;
         $totalSkipped = $cardStats['total_skipped'] ?? 0;
         $avgWaiting = $cardStats['average_waiting_time'] ?? 0;
         $avgService = $cardStats['average_service_time'] ?? 0;
-    @endphp
 
-    <div class="mb-3">
-        <div class="section-title">Key Metrics</div>
-        <div class="section-subtitle">Overview of queue performance for the selected period.</div>
-
-        <table class="cards-grid">
-            <tr>
-                <td>
-                    <div class="stat-card border-orange">
-                        <div class="stat-card-title">Total Clients</div>
-                        <div class="stat-card-value">{{ number_format($totalClients) }}</div>
-                    </div>
-                </td>
-                <td>
-                    <div class="stat-card border-green">
-                        <div class="stat-card-title">Total Served</div>
-                        <div class="stat-card-value">{{ number_format($totalServed) }}</div>
-                    </div>
-                </td>
-                <td>
-                    <div class="stat-card border-red">
-                        <div class="stat-card-title">Total Skipped</div>
-                        <div class="stat-card-value">{{ number_format($totalSkipped) }}</div>
-                    </div>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <div class="stat-card border-blue">
-                        <div class="stat-card-title">Average Waiting Time</div>
-                        <div class="stat-card-value">{{ number_format($avgWaiting, 2) }} min</div>
-                        <div class="stat-card-caption">Average time clients spent waiting before service.</div>
-                    </div>
-                </td>
-                <td>
-                    <div class="stat-card border-purple">
-                        <div class="stat-card-title">Average Service Time</div>
-                        <div class="stat-card-value">{{ number_format($avgService, 2) }} min</div>
-                        <div class="stat-card-caption">Average duration spent serving each client.</div>
-                    </div>
-                </td>
-                <td></td>
-            </tr>
-        </table>
-    </div>
-
-    {{-- Barangay Distribution --}}
-    @php
-        $barangayTotalClients = $barangayStats['total_clients'] ?? 0;
         $barangayDistribution = $barangayStats['distribution'] ?? [];
-    @endphp
+        $barangayTotalClients = $barangayStats['total_clients'] ?? 0;
 
-    <div class="mb-4">
-        <div class="section-title">Barangay Distribution</div>
-        <div class="section-subtitle">
-            Number of clients served per barangay for the selected period.
-        </div>
-
-        @if (!empty($barangayDistribution) && !empty($barangayChartPath))
-            <div class="chart-image-wrapper">
-                <img
-                    src="{{ public_path('storage/' . $barangayChartPath) }}"
-                    alt="Barangay Distribution Chart"
-                    class="chart-image"
-                >
-            </div>
-
-            <div class="small-note">
-                <span class="total-clients-highlight">
-                    Total clients: {{ number_format($barangayTotalClients) }}
-                </span>
-                &nbsp;– Chart generated from completed, evaluated transactions for the selected period.
-            </div>
-        @elseif (!empty($barangayDistribution))
-            <table class="generic-table">
-                <thead>
-                    <tr>
-                        <th>Barangay</th>
-                        <th class="nowrap">Clients</th>
-                        <th class="nowrap">Percentage</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($barangayDistribution as $segment)
-                        <tr>
-                            <td>{{ $segment['name'] ?? '-' }}</td>
-                            <td class="nowrap">{{ number_format($segment['value'] ?? 0) }}</td>
-                            <td class="nowrap">{{ number_format($segment['percentage'] ?? 0, 2) }}%</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-
-            <div class="small-note">
-                <span class="total-clients-highlight">
-                    Total clients: {{ number_format($barangayTotalClients) }}
-                </span>
-                &nbsp;– Percentages are based on total completed, evaluated transactions for the selected period.
-            </div>
-        @else
-            <div class="text-sm text-muted">No barangay distribution data available for the selected period.</div>
-        @endif
-    </div>
-
-    {{-- Lane Type Distribution --}}
-    @php
-        $laneTotalClients = $laneTypeStats['total_clients'] ?? 0;
         $laneDistribution = $laneTypeStats['distribution'] ?? [];
-        $laneColors = ['color-blue', 'color-green', 'color-amber', 'color-red', 'color-purple'];
+        $laneTotalClients = $laneTypeStats['total_clients'] ?? 0;
+        $laneTotalValue = collect($laneDistribution)->sum(function ($segment) {
+            return (int) ($segment['value'] ?? 0);
+        });
+        $hasLaneData = (int) $laneTotalClients > 0 && $laneTotalValue > 0;
+
+        $barangayTotalValue = collect($barangayDistribution)->sum(function ($segment) {
+            return (int) ($segment['value'] ?? 0);
+        });
+        $hasBarangayData = (int) $barangayTotalClients > 0 && $barangayTotalValue > 0;
+
+        $assistanceGraphsData = $assistanceGraphs ?? [];
+        $showAssistance = $hasAssistanceServices ?? false;
     @endphp
 
-    <div class="mb-4">
-        <div class="section-title">Lane Type Distribution</div>
-        <div class="section-subtitle">
-            Distribution of clients across lane types (Regular, Senior Citizen, Pregnant, PWD, and IP).
+    <div
+        class="page"
+        id="reportPage"
+        data-office-name="{{ $officeDisplayName }}"
+        data-period-label="{{ $periodLabel }}"
+    >
+        <div class="toolbar no-print">
+            <button type="button" class="print-btn" id="savePdfBtn">Save PDF</button>
         </div>
 
-        @if (!empty($laneDistribution) && !empty($laneTypeChartPath))
-            <div class="chart-image-wrapper">
-                <img
-                    src="{{ public_path('storage/' . $laneTypeChartPath) }}"
-                    alt="Lane Type Distribution Chart"
-                    class="chart-image"
-                >
+        <div class="report">
+            <div class="header">
+                <div class="header-left">
+                    <img
+                        src="{{ asset('storage/logos/Ligao City Seal.png') }}"
+                        alt="Ligao City Seal"
+                        class="header-logo"
+                    >
+                    <div class="header-text">
+                        <p class="header-kicker">Republic of the Philippines</p>
+                        <p class="header-subkicker">City Government of Ligao</p>
+                        <h1 class="title">Queue Analytics Graphs</h1>
+                    </div>
+                </div>
+                <div class="meta">
+                    <div class="meta-line"><span class="meta-label">Office:</span> {{ $officeDisplayName }}</div>
+                    <div class="meta-line"><span class="meta-label">Date Filter:</span> {{ $periodLabel }}</div>
+                </div>
             </div>
 
-            <div class="legend">
-                @foreach ($laneDistribution as $index => $segment)
-                    @php $colorClass = $laneColors[$index % count($laneColors)]; @endphp
-                    <span class="legend-item">
-                        <span class="legend-color-box {{ $colorClass }}"></span>
-                        {{ $segment['name'] ?? '-' }}
-                        &mdash;
-                        {{ number_format($segment['value'] ?? 0) }}
-                        ({{ number_format($segment['percentage'] ?? 0, 1) }}%)
-                    </span>
-                @endforeach
-            </div>
+            <section class="cards">
+                <article class="card">
+                    <div class="card-label">Total Clients</div>
+                    <div class="card-value">{{ number_format($totalClients) }}</div>
+                </article>
+                <article class="card">
+                    <div class="card-label">Total Served</div>
+                    <div class="card-value">{{ number_format($totalServed) }}</div>
+                </article>
+                <article class="card">
+                    <div class="card-label">Total Skipped</div>
+                    <div class="card-value">{{ number_format($totalSkipped) }}</div>
+                </article>
+                <article class="card">
+                    <div class="card-label">Average Waiting Time</div>
+                    <div class="card-value">{{ number_format((float) $avgWaiting, 2) }}</div>
+                    <div class="card-sub">Minutes</div>
+                </article>
+                <article class="card">
+                    <div class="card-label">Average Service Time</div>
+                    <div class="card-value">{{ number_format((float) $avgService, 2) }}</div>
+                    <div class="card-sub">Minutes</div>
+                </article>
+            </section>
 
-            <div class="small-note">
-                <span class="total-clients-highlight">
-                    Total clients: {{ number_format($laneTotalClients) }}
-                </span>
-                &nbsp;– Each lane type shows its share of total completed, evaluated transactions.
-            </div>
-        @elseif (!empty($laneDistribution))
-            <table class="generic-table">
-                <thead>
-                    <tr>
-                        <th>Lane Type</th>
-                        <th class="nowrap">Clients</th>
-                        <th class="nowrap">Percentage</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($laneDistribution as $index => $segment)
-                        <tr>
-                            <td>{{ $segment['name'] ?? '-' }}</td>
-                            <td class="nowrap">{{ number_format($segment['value'] ?? 0) }}</td>
-                            <td class="nowrap">{{ number_format($segment['percentage'] ?? 0, 2) }}%</td>
-                        </tr>
+            <section class="section no-container-border">
+                <h2 class="section-title">Barangay Distribution</h2>
+                <div class="section-sub">Completed, evaluated transactions grouped by barangay.</div>
+
+                @if ($hasBarangayData && !empty($barangayChartPath))
+                    <div class="chart">
+                        <img src="{{ asset('storage/' . $barangayChartPath) }}" alt="Barangay Distribution Chart">
+                    </div>
+                @elseif ($hasBarangayData)
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Barangay</th>
+                                <th>Clients</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($barangayDistribution as $segment)
+                                <tr>
+                                    <td>{{ $segment['name'] ?? '-' }}</td>
+                                    <td>{{ number_format($segment['value'] ?? 0) }}</td>
+                                    <td>{{ number_format((float) ($segment['percentage'] ?? 0), 2) }}%</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @else
+                    <div class="muted">No barangay distribution data available for the selected filter.</div>
+                @endif
+
+                <div class="spacer"></div>
+                <div class="muted">Total clients: {{ number_format($barangayTotalClients) }}</div>
+            </section>
+
+            <section class="section no-container-border">
+                <h2 class="section-title">Lane Type Distribution</h2>
+                <div class="section-sub">Lane utilization for the selected office and filter.</div>
+
+                @if ($hasLaneData && !empty($laneTypeChartPath))
+                    <div class="chart">
+                        <img src="{{ asset('storage/' . $laneTypeChartPath) }}" alt="Lane Type Distribution Chart">
+                    </div>
+                @elseif ($hasLaneData)
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Lane Type</th>
+                                <th>Clients</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($laneDistribution as $segment)
+                                <tr>
+                                    <td>{{ $segment['name'] ?? '-' }}</td>
+                                    <td>{{ number_format($segment['value'] ?? 0) }}</td>
+                                    <td>{{ number_format((float) ($segment['percentage'] ?? 0), 2) }}%</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @else
+                    <div class="muted">No lane type distribution data available for the selected filter.</div>
+                @endif
+
+                @if ($hasLaneData)
+                    <div class="legend">
+                        @foreach ($laneDistribution as $segment)
+                            <span class="badge">
+                                {{ $segment['name'] ?? '-' }}: {{ number_format($segment['value'] ?? 0) }} ({{ number_format((float) ($segment['percentage'] ?? 0), 1) }}%)
+                            </span>
+                        @endforeach
+                    </div>
+                @endif
+
+                <div class="spacer"></div>
+                <div class="muted">Total clients: {{ number_format($laneTotalClients) }}</div>
+            </section>
+
+            <section class="section no-container-border">
+                <h2 class="section-title">Assistance Distribution</h2>
+                <div class="section-sub">Total assistance by service, including all-barangay and per-barangay breakdowns.</div>
+
+                @if ($showAssistance && !empty($assistanceGraphsData))
+                    @foreach ($assistanceGraphsData as $graph)
+                        @php
+                            $graphLabel = $graph['label'] ?? 'All Barangay';
+                            $graphChartPath = $graph['chart_path'] ?? null;
+                            $graphSummary = $graph['summary'] ?? [];
+                            $graphTotalClients = $graphSummary['total_clients'] ?? 0;
+                            $graphTotalAssistance = $graphSummary['total_assistance'] ?? 0;
+                        @endphp
+
+                        <div class="section assistance-card">
+                            <h3 class="section-title" style="font-size: 15px;">{{ $graphLabel }}</h3>
+
+                            @if (!empty($graphChartPath))
+                                <div class="chart" style="margin-top: 8px;">
+                                    <img src="{{ asset('storage/' . $graphChartPath) }}" alt="Assistance Distribution Chart - {{ $graphLabel }}">
+                                </div>
+                            @else
+                                <div class="muted">No assistance distribution data available for the selected filter.</div>
+                            @endif
+
+                            <div class="legend" style="margin-top: 8px;">
+                                <span class="badge">Total clients: {{ number_format($graphTotalClients) }}</span>
+                                <span class="badge">Total assistance: Php {{ number_format((float) $graphTotalAssistance, 2) }}</span>
+                            </div>
+                        </div>
                     @endforeach
-                </tbody>
-            </table>
-
-            <div class="legend">
-                @foreach ($laneDistribution as $index => $segment)
-                    @php $colorClass = $laneColors[$index % count($laneColors)]; @endphp
-                    <span class="legend-item">
-                        <span class="legend-color-box {{ $colorClass }}"></span>
-                        {{ $segment['name'] ?? '-' }}
-                        &mdash;
-                        {{ number_format($segment['value'] ?? 0) }}
-                        ({{ number_format($segment['percentage'] ?? 0, 1) }}%)
-                    </span>
-                @endforeach
-            </div>
-
-            <div class="small-note">
-                <span class="total-clients-highlight">
-                    Total clients: {{ number_format($laneTotalClients) }}
-                </span>
-                &nbsp;– Each lane type shows its share of total completed, evaluated transactions.
-            </div>
-        @else
-            <div class="text-sm text-muted">No lane type distribution data available for the selected period.</div>
-        @endif
+                @else
+                    <div class="muted">No assistance distribution data available for the selected filter.</div>
+                @endif
+            </section>
+        </div>
     </div>
 
-    {{-- Assistance Distribution --}}
-    @php
-        $assistanceGraphsData = $assistanceGraphs ?? [];
-        $hasAssistanceServices = $hasAssistanceServices ?? false;
-    @endphp
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        (function () {
+            const saveButton = document.getElementById('savePdfBtn');
+            const reportPage = document.getElementById('reportPage');
+            const reportElement = document.querySelector('.report');
 
-    @if ($hasAssistanceServices)
-        <div class="mb-4">
-            <div class="section-title">Assistance Distribution</div>
-            <div class="section-subtitle">
-                Distribution of total assistance provided per service for All Barangay and each barangay with assistance data.
-            </div>
+            if (!saveButton || !reportElement || !reportPage) return;
 
-            @if (!empty($assistanceGraphsData))
-                @foreach ($assistanceGraphsData as $graph)
-                    @php
-                        $graphLabel = $graph['label'] ?? 'All Barangay';
-                        $graphChartPath = $graph['chart_path'] ?? null;
-                        $graphSummary = $graph['summary'] ?? [];
-                        $graphTotalClients = $graphSummary['total_clients'] ?? 0;
-                        $graphTotalAssistance = $graphSummary['total_assistance'] ?? 0;
-                    @endphp
+            const officeName = reportPage.dataset.officeName || 'Office';
+            const periodLabel = reportPage.dataset.periodLabel || 'Report';
 
-                    <div class="mt-3">
-                        <div class="text-sm" style="font-weight: 700;">{{ $graphLabel }}</div>
+            const sanitize = (value) => String(value || '')
+                .replace(/[\\/:*?"<>|]/g, '-')
+                .replace(/\s+/g, ' ')
+                .trim();
 
-                        @if (!empty($graphChartPath))
-                            <div class="chart-image-wrapper">
-                                <img
-                                    src="{{ public_path('storage/' . $graphChartPath) }}"
-                                    alt="Assistance Distribution Chart - {{ $graphLabel }}"
-                                    class="chart-image"
-                                >
-                            </div>
-                        @endif
+            const fileName = `${sanitize(officeName)} Queue Analytics Graph - ${sanitize(periodLabel)}.pdf`;
 
-                        <div class="small-note">
-                            <span class="total-clients-highlight">
-                                Total clients: {{ number_format($graphTotalClients) }}
-                            </span>
-                            &nbsp;|&nbsp;
-                            <span class="total-clients-highlight">
-                                Total Amount of Assistance Provided: Php {{ number_format((float) $graphTotalAssistance, 2) }}
-                            </span>
-                        </div>
-                    </div>
-                @endforeach
-            @else
-                <div class="text-sm text-muted">No assistance distribution data available for the selected period.</div>
-            @endif
-        </div>
-    @endif
+            saveButton.addEventListener('click', async function () {
+                if (typeof window.html2pdf === 'undefined') {
+                    window.alert('PDF generator failed to load. Falling back to print dialog.');
+                    window.print();
+                    return;
+                }
+
+                const originalLabel = saveButton.textContent;
+                saveButton.disabled = true;
+                saveButton.textContent = 'Downloading PDF...';
+
+                try {
+                    document.body.classList.add('is-pdf-export');
+                    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+                    const options = {
+                        margin: [12, 12, 12, 12],
+                        filename: fileName,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: {
+                            scale: 1.35,
+                            useCORS: true,
+                            backgroundColor: '#ffffff'
+                        },
+                        jsPDF: {
+                            unit: 'mm',
+                            format: 'a4',
+                            orientation: 'portrait'
+                        },
+                        pagebreak: { mode: ['css', 'legacy'], avoid: ['.section', '.assistance-card'] }
+                    };
+
+                    await window.html2pdf().set(options).from(reportElement).save();
+                } catch (error) {
+                    console.error('Direct PDF download failed:', error);
+                    window.alert('Unable to download PDF directly. Falling back to print dialog.');
+                    window.print();
+                } finally {
+                    document.body.classList.remove('is-pdf-export');
+                    saveButton.disabled = false;
+                    saveButton.textContent = originalLabel;
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

@@ -8,7 +8,6 @@ use App\Models\InternalTransaction;
 use App\Models\Office;
 use App\Models\QueueTransaction;
 use App\Services\Analytics\ChartImageService;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -919,14 +918,7 @@ class CsmAnalyticsController extends Controller
     }
 
     /**
-     * Export CSM analytics graphs as a PDF file.
-     *
-     * Includes:
-     * - Overview stat cards
-     * - Citizen's Charter graphs (CC1, CC2, CC3)
-     * - SQD graphs (SQD0-SQD8)
-     * - Demographic profile pies (Age, Sex, Client Type)
-     * - Overall Score Per Service graph
+     * Export CSM analytics graphs as an HTML report for browser Save PDF flow.
      */
     public function exportGraphs(Request $request)
     {
@@ -1237,7 +1229,7 @@ class CsmAnalyticsController extends Controller
                 );
             }
 
-            $pdf = Pdf::loadView('analytics.csm-graphs-report', [
+            return response()->view('analytics.csm-graphs-report', [
                 'officeName' => $officeName,
                 'officeAcronym' => $officeAcronym,
                 'officeDisplayName' => $officeDisplayName,
@@ -1258,12 +1250,9 @@ class CsmAnalyticsController extends Controller
                 'sqdChartPaths' => $sqdChartPaths,
                 'demographicChartPaths' => $demographicChartPaths,
                 'overallScoreChartPath' => $overallScoreChartPath,
-            ])->setPaper('a4', 'portrait');
-
-            $safeOfficeName = str_replace(['/', '\\'], '-', $officeDisplayName);
-            $fileName = sprintf('%s Client Satisfaction Measurement Graph - %s.pdf', $safeOfficeName, $periodLabel);
-
-            return $pdf->download($fileName);
+            ], 200, [
+                'Content-Type' => 'text/html; charset=UTF-8',
+            ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
         } catch (\Exception $e) {
