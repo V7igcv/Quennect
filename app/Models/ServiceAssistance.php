@@ -15,11 +15,13 @@ class ServiceAssistance extends Model
         'queue_transaction_service_id',
         'assistance_type_id',
         'assistance_provided',
+        'indicator',
         'assistance_provided_at',
     ];
 
     protected $casts = [
         'assistance_provided' => 'decimal:2',
+        'indicator' => 'integer',
         'assistance_provided_at' => 'datetime',
     ];
 

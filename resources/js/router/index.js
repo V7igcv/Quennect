@@ -144,9 +144,9 @@ const routes = [
         component: () => import('../pages/shared/QueueAnalytics.vue')
       },
       {
-        path: 'csm-analytics',
-        name: 'city-mayor.csm-analytics',
-        component: () => import('../pages/shared/CSMAnalytics.vue')
+        path: 'office-service-efficiency',
+        name: 'city-mayor.office-service-efficiency',
+        component: () => import('../pages/citymayor/OfficeServiceEfficiency.vue')
       }
     ]
   },

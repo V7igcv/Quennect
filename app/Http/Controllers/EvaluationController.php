@@ -180,7 +180,8 @@ class EvaluationController extends Controller
             'assistance_per_queue_transaction_service' => 'nullable|array',
             'assistance_per_queue_transaction_service.*.queue_transaction_service_id' => 'required_with:assistance_per_queue_transaction_service|integer|exists:queue_transaction_services,id',
             'assistance_per_queue_transaction_service.*.assistance_type_id' => 'nullable|integer|exists:assistance_types,id',
-            'assistance_per_queue_transaction_service.*.amount' => 'required_with:assistance_per_queue_transaction_service|numeric|min:0'
+            'assistance_per_queue_transaction_service.*.amount' => 'required_with:assistance_per_queue_transaction_service|numeric|min:0',
+            'assistance_per_queue_transaction_service.*.indicator' => 'nullable|integer|in:1,2'
         ]);
 
         try {
@@ -320,6 +321,8 @@ class EvaluationController extends Controller
                     $queueTransactionServiceId = $serviceAssistance['queue_transaction_service_id'] ?? null;
                     $assistanceTypeId = $serviceAssistance['assistance_type_id'] ?? null;
                     $amount = $serviceAssistance['amount'] ?? null;
+                    $indicator = $serviceAssistance['indicator'] ?? null;
+                    $normalizedIndicator = $indicator !== null ? (int) $indicator : null;
                     
                     if ($queueTransactionServiceId && $amount !== null) {
                         // Create or update service assistance record
@@ -329,6 +332,7 @@ class EvaluationController extends Controller
                             [
                                 'assistance_type_id' => $assistanceTypeId,
                                 'assistance_provided' => $amount,
+                                'indicator' => in_array($normalizedIndicator, [1, 2], true) ? $normalizedIndicator : null,
                                 'assistance_provided_at' => now()
                             ]
                         );

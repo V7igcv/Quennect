@@ -118,6 +118,38 @@
               class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
               placeholder="Enter assistance amount"
             >
+
+            <div class="mt-2">
+              <label class="block text-sm font-medium text-[#2E2E2E] mb-1">Indicator (Optional)</label>
+              <div class="flex items-center gap-4">
+                <button
+                  type="button"
+                  @click="toggleAssistanceIndicator(service.id, 1)"
+                  class="inline-flex items-center gap-2 text-sm text-[#474C55] cursor-pointer"
+                >
+                  <span
+                    class="h-4 w-4 border border-gray-400 rounded-sm flex items-center justify-center text-[10px] leading-none"
+                    :class="isAssistanceIndicatorSelected(service.id, 1) ? 'bg-[#0F5C5C] border-[#0F5C5C] text-white' : 'bg-white text-transparent'"
+                  >
+                    ✓
+                  </span>
+                  <span>1</span>
+                </button>
+                <button
+                  type="button"
+                  @click="toggleAssistanceIndicator(service.id, 2)"
+                  class="inline-flex items-center gap-2 text-sm text-[#474C55] cursor-pointer"
+                >
+                  <span
+                    class="h-4 w-4 border border-gray-400 rounded-sm flex items-center justify-center text-[10px] leading-none"
+                    :class="isAssistanceIndicatorSelected(service.id, 2) ? 'bg-[#0F5C5C] border-[#0F5C5C] text-white' : 'bg-white text-transparent'"
+                  >
+                    ✓
+                  </span>
+                  <span>2</span>
+                </button>
+              </div>
+            </div>
           </template>
 
           <!-- Categorized Service (AICS-like) - Show dropdown + input field -->
@@ -155,6 +187,38 @@
                 class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#0F5C5C] focus:border-[#0F5C5C]"
                 placeholder="Enter assistance amount"
               >
+
+              <div class="mt-2">
+                <label class="block text-sm font-medium text-[#2E2E2E] mb-1">Indicator (Optional)</label>
+                <div class="flex items-center gap-4">
+                  <button
+                    type="button"
+                    @click="toggleAssistanceIndicator(service.id, 1)"
+                    class="inline-flex items-center gap-2 text-sm text-[#474C55] cursor-pointer"
+                  >
+                    <span
+                      class="h-4 w-4 border border-gray-400 rounded-sm flex items-center justify-center text-[10px] leading-none"
+                      :class="isAssistanceIndicatorSelected(service.id, 1) ? 'bg-[#0F5C5C] border-[#0F5C5C] text-white' : 'bg-white text-transparent'"
+                    >
+                      ✓
+                    </span>
+                    <span>1</span>
+                  </button>
+                  <button
+                    type="button"
+                    @click="toggleAssistanceIndicator(service.id, 2)"
+                    class="inline-flex items-center gap-2 text-sm text-[#474C55] cursor-pointer"
+                  >
+                    <span
+                      class="h-4 w-4 border border-gray-400 rounded-sm flex items-center justify-center text-[10px] leading-none"
+                      :class="isAssistanceIndicatorSelected(service.id, 2) ? 'bg-[#0F5C5C] border-[#0F5C5C] text-white' : 'bg-white text-transparent'"
+                    >
+                      ✓
+                    </span>
+                    <span>2</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </template>
 
@@ -403,6 +467,9 @@ const likertRatings = ref({})
 // Form data for assistance - keyed by service id
 const assistanceAmounts = ref({})
 
+// Optional assistance indicator - keyed by service id (values: 1 or 2)
+const assistanceIndicators = ref({})
+
 // Assistance types - keyed by service id
 const assistanceTypes = ref({})
 
@@ -505,10 +572,13 @@ watch(likertQuestions, (questions) => {
 
 watch(servicesWithAssistance, (services) => {
   const newAmounts = {}
+  const newIndicators = {}
   services.forEach((service) => {
     newAmounts[service.id] = assistanceAmounts.value[service.id] ?? ''
+    newIndicators[service.id] = assistanceIndicators.value[service.id] ?? ''
   })
   assistanceAmounts.value = newAmounts
+  assistanceIndicators.value = newIndicators
 }, { immediate: true })
 
 // Extract assistance types from services response
@@ -569,6 +639,7 @@ const resetForm = () => {
   sex.value = ''
   age.value = ''
   assistanceAmounts.value = {}
+  assistanceIndicators.value = {}
   selectedAssistanceTypes.value = {}
   multipleChoiceAnswers.value = Object.fromEntries(
     multipleChoiceQuestions.value.map((question) => [question.id, ''])
@@ -605,6 +676,19 @@ const goToNextPage = () => {
 
 const goToPreviousPage = () => {
   currentPage.value = 1
+}
+
+const isAssistanceIndicatorSelected = (serviceId, value) => {
+  return Number(assistanceIndicators.value[serviceId]) === value
+}
+
+const toggleAssistanceIndicator = (serviceId, value) => {
+  if (isAssistanceIndicatorSelected(serviceId, value)) {
+    assistanceIndicators.value[serviceId] = ''
+    return
+  }
+
+  assistanceIndicators.value[serviceId] = value
 }
 
 const handleSubmit = () => {
@@ -705,11 +789,13 @@ const handleSubmit = () => {
   const assistancePerQueueTxService = servicesWithAssistance.value.map((service) => {
     const queueTxServiceId = getQueueTransactionServiceId(service.id)
     const assistanceTypeId = selectedAssistanceTypes.value[queueTxServiceId] || null
+    const indicatorValue = Number(assistanceIndicators.value[service.id])
     
     return {
       queue_transaction_service_id: queueTxServiceId,
       assistance_type_id: assistanceTypeId,  // null for traditional, id for categorized
-      amount: Number(assistanceAmounts.value[service.id])
+      amount: Number(assistanceAmounts.value[service.id]),
+      indicator: [1, 2].includes(indicatorValue) ? indicatorValue : null
     }
   })
 
