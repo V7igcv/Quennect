@@ -251,12 +251,65 @@
     <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
       <div>
         <div class="mb-3 flex items-center gap-1">
-          <h2 class="text-lg font-semibold">Graph 2</h2>
+          <h2 class="text-lg font-semibold">Client Service Satisfaction</h2>
+          <CsmMetricExplanation
+            :title="efficiencyMetricExplanations.clientServiceSatisfaction.title"
+            :meaning="efficiencyMetricExplanations.clientServiceSatisfaction.meaning"
+            :computation="efficiencyMetricExplanations.clientServiceSatisfaction.computation"
+            :formula="efficiencyMetricExplanations.clientServiceSatisfaction.formula"
+            :interpretation="efficiencyMetricExplanations.clientServiceSatisfaction.interpretation"
+          />
         </div>
         <Card class="w-full">
           <CardContent class="pt-6">
-            <div class="h-[220px] rounded-lg border border-gray-100 bg-gray-50 p-4 flex items-center justify-center">
-              <p class="text-sm text-gray-500">Second graph will be added next.</p>
+            <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <div>
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div>
+                    <h3 class="text-lg font-semibold">{{ selectedSqdForSatisfaction }}</h3>
+                    <p class="text-sm text-gray-500 mt-1">{{ getSqdDescription(selectedSqdForSatisfaction) }}</p>
+                  </div>
+
+                  <Select v-model="selectedSqdForSatisfaction">
+                    <SelectTrigger class="bg-white shrink-0" style="width: 180px; min-width: 180px; max-width: 180px;">
+                      <SelectValue placeholder="Select SQD" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="sqd in sqdOptions" :key="sqd" :value="sqd">
+                        {{ sqd }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div class="mt-5">
+                  <div class="h-5 w-full rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all duration-300"
+                      :class="getExperienceBarClass(selectedSqdPercentage)"
+                      :style="{ width: `${clampPercentage(selectedSqdPercentage)}%` }"
+                    ></div>
+                  </div>
+                  <div class="mt-2 flex items-center justify-between text-sm">
+                    <span class="text-gray-600">Percentage: <span class="font-semibold text-gray-900">{{ formatPercentage(selectedSqdPercentage) }}%</span></span>
+                    <span class="font-semibold" :class="getExperienceTextClass(selectedSqdPercentage)">
+                      Average: {{ getExperienceRating(selectedSqdPercentage) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="my-5 border-t border-gray-200"></div>
+
+              <div>
+                <div class="text-sm font-medium text-gray-500">Overall Percentage</div>
+                <div class="mt-1 text-3xl font-bold" :class="getExperienceTextClass(overallSqdAveragePercentage)">
+                  {{ formatPercentage(overallSqdAveragePercentage) }}%
+                </div>
+                <p class="mt-2 text-sm text-gray-600">
+                  {{ overallSqdExperienceDescription }}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -300,6 +353,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
 import {
   Tooltip,
@@ -317,6 +371,22 @@ const isLoadingAnalytics = ref(false)
 const isInitializing = ref(true)
 
 const officeEfficiencyMonthlyScores = ref([])
+const selectedSqdForSatisfaction = ref('SQD0')
+const selectedSqdPercentage = ref(0)
+const overallSqdAveragePercentage = ref(0)
+
+const sqdOptions = ['SQD0', 'SQD1', 'SQD2', 'SQD3', 'SQD4', 'SQD5', 'SQD6', 'SQD7', 'SQD8']
+const sqdDescriptions = {
+  SQD0: 'I am satisfied with the service that I availed.',
+  SQD1: 'I spent a reasonable amount of time for my transaction.',
+  SQD2: 'The office followed the transactions requirements and steps based on the information provided',
+  SQD3: 'The steps (including payment) I needed to do for my transaction were easy and simple.',
+  SQD4: 'I easily found information about my transaction from the office or its website.',
+  SQD5: 'I paid a reasonable amount of fees for my transaction.',
+  SQD6: 'I feel the office was fair to everyone, or "walang palakasan", during my transaction.',
+  SQD7: 'I was treated courteously by the staff, and (if asked for help) the staff was helpful.',
+  SQD8: 'I got what I needed from the government office, or (if denied) denial of request was sufficiently explained to me.',
+}
 
 const efficiencyMetricExplanations = {
   officeEfficiency: {
@@ -328,6 +398,17 @@ const efficiencyMetricExplanations = {
       'Higher points indicate stronger overall service efficiency in that month.',
       'Changing office updates the monthly line for the currently active year.',
       'Year changes in Daily, Monthly, or Yearly date filters update this graph.',
+    ],
+  },
+  clientServiceSatisfaction: {
+    title: 'Client Service Satisfaction',
+    meaning: 'This section shows satisfaction levels from SQD responses for the selected office and date filter.',
+    computation: 'Top section shows the selected SQD percentage using Agree + Strongly Agree among valid responses (excluding N/A) for all services (external + internal). Bottom section shows the average of SQD0 to SQD8 percentages.',
+    formula: 'Selected SQD (%) = ((Agree + Strongly Agree) / (Total Responses - N/A)) * 100\nOverall Percentage (%) = (Sum of SQD0 to SQD8 Percentages) / 9',
+    interpretation: [
+      'Higher values indicate better client-reported service experience.',
+      'Rating bands are: Poor, Bad, Fair, Good, and Great.',
+      'Top section changes with SQD dropdown; bottom section always reflects all SQDs.',
     ],
   },
 }
@@ -466,6 +547,116 @@ const officeEfficiencyLinePoints = computed(() => {
 })
 
 const formatPercentage = (value) => Number(value || 0).toFixed(2)
+const clampPercentage = (value) => Math.max(0, Math.min(100, Number(value || 0)))
+
+const getSqdDescription = (sqdCode) => sqdDescriptions[sqdCode] || 'No description available'
+
+const getExperienceRating = (percentage) => {
+  const value = Number(percentage || 0)
+  if (value >= 81) return 'Great'
+  if (value >= 61) return 'Good'
+  if (value >= 41) return 'Fair'
+  if (value >= 21) return 'Bad'
+  return 'Poor'
+}
+
+const getExperienceTextClass = (percentage) => {
+  const value = Number(percentage || 0)
+  if (value >= 81) return 'text-green-600'
+  if (value >= 61) return 'text-blue-600'
+  if (value >= 41) return 'text-yellow-600'
+  if (value >= 21) return 'text-orange-600'
+  return 'text-red-600'
+}
+
+const getExperienceBarClass = (percentage) => {
+  const value = Number(percentage || 0)
+  if (value >= 81) return 'bg-green-500'
+  if (value >= 61) return 'bg-blue-500'
+  if (value >= 41) return 'bg-yellow-500'
+  if (value >= 21) return 'bg-orange-500'
+  return 'bg-red-500'
+}
+
+const overallSqdExperienceDescription = computed(() => {
+  const rating = getExperienceRating(overallSqdAveragePercentage.value)
+  if (rating === 'Great') return 'Clients generally report a great experience with this office\'s services.'
+  if (rating === 'Good') return 'Clients generally report a good experience with this office\'s services.'
+  if (rating === 'Fair') return 'Clients generally report a fair experience with this office\'s services.'
+  if (rating === 'Bad') return 'Clients generally report a bad experience with this office\'s services.'
+  return 'Clients generally report a poor experience with this office\'s services.'
+})
+
+const buildSqdFilterParams = () => {
+  const params = {
+    office_id: Number(selectedOffice.value),
+    service_type: 'all',
+  }
+
+  if (selectedDateRange.value === 'monthly') {
+    return {
+      ...params,
+      period: 'monthly',
+      month: selectedMonthIndex.value + 1,
+      year: Number(selectedMonthYear.value),
+    }
+  }
+
+  if (selectedDateRange.value === 'yearly') {
+    return {
+      ...params,
+      period: 'yearly',
+      year: Number(selectedYear.value),
+    }
+  }
+
+  const y = selectedDate.value.getFullYear()
+  const m = String(selectedDate.value.getMonth() + 1).padStart(2, '0')
+  const d = String(selectedDate.value.getDate()).padStart(2, '0')
+
+  return {
+    ...params,
+    period: 'daily',
+    date: `${y}-${m}-${d}`,
+  }
+}
+
+const fetchSqdPercentage = async (sqdCode) => {
+  const response = await api.get('/city-mayor/analytics/csm/sqd-results', {
+    params: {
+      ...buildSqdFilterParams(),
+      sqd: sqdCode,
+    },
+  })
+
+  const payload = response?.data?.data || {}
+  return Number(payload.overall_percentage ?? 0)
+}
+
+const fetchSelectedSqdForSecondGraph = async () => {
+  if (!selectedOffice.value) {
+    selectedSqdPercentage.value = 0
+    return
+  }
+
+  selectedSqdPercentage.value = await fetchSqdPercentage(selectedSqdForSatisfaction.value)
+}
+
+const fetchOverallSqdAverageForSecondGraph = async () => {
+  if (!selectedOffice.value) {
+    overallSqdAveragePercentage.value = 0
+    return
+  }
+
+  const percentages = await Promise.all(sqdOptions.map((code) => fetchSqdPercentage(code)))
+  if (!percentages.length) {
+    overallSqdAveragePercentage.value = 0
+    return
+  }
+
+  const total = percentages.reduce((sum, value) => sum + Number(value || 0), 0)
+  overallSqdAveragePercentage.value = Number((total / percentages.length).toFixed(2))
+}
 
 const fetchOfficeEfficiencyGraph = async () => {
   if (!selectedOffice.value) {
@@ -496,7 +687,10 @@ const fetchOfficeEfficiencyGraph = async () => {
 }
 
 const fetchSecondGraph = async () => {
-  return Promise.resolve()
+  await Promise.all([
+    fetchSelectedSqdForSecondGraph(),
+    fetchOverallSqdAverageForSecondGraph(),
+  ])
 }
 
 const fetchThirdGraph = async () => {
@@ -587,9 +781,32 @@ watch(selectedOffice, () => {
   loadAllGraphs()
 })
 
-watch(activeYearForOfficeEfficiency, () => {
+watch(selectedDateRange, () => {
   if (isInitializing.value) return
   loadAllGraphs()
+})
+
+watch(selectedDate, () => {
+  if (isInitializing.value) return
+  if (selectedDateRange.value !== 'daily') return
+  loadAllGraphs()
+})
+
+watch([selectedMonthIndex, selectedMonthYear], () => {
+  if (isInitializing.value) return
+  if (selectedDateRange.value !== 'monthly') return
+  loadAllGraphs()
+})
+
+watch(selectedYear, () => {
+  if (isInitializing.value) return
+  if (selectedDateRange.value !== 'yearly') return
+  loadAllGraphs()
+})
+
+watch(selectedSqdForSatisfaction, () => {
+  if (isInitializing.value) return
+  fetchSelectedSqdForSecondGraph()
 })
 
 onMounted(async () => {
