@@ -494,6 +494,68 @@ class ChartImageService
     }
 
     /**
+     * Generate a line chart for Office Efficiency monthly all-service totals.
+     *
+     * @param array $monthlyScores Numeric values for Jan..Dec
+     */
+    public function generateOfficeEfficiencyLineChart(
+        array $monthlyScores,
+        string $officeDisplayName,
+        int $year
+    ): ?string {
+        if (empty($monthlyScores)) {
+            return null;
+        }
+
+        $labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        $values = array_map(static function ($value) {
+            return (float) $value;
+        }, array_slice(array_pad($monthlyScores, 12, 0), 0, 12));
+
+        $config = [
+            'type' => 'line',
+            'data' => [
+                'labels' => $labels,
+                'datasets' => [[
+                    'label' => 'All Service Total (%)',
+                    'data' => $values,
+                    'borderColor' => '#0F5C5C',
+                    'backgroundColor' => 'rgba(15, 92, 92, 0.12)',
+                    'fill' => false,
+                    'tension' => 0.25,
+                    'pointRadius' => 3,
+                    'pointBackgroundColor' => '#0F5C5C',
+                ]],
+            ],
+            'options' => [
+                'responsive' => true,
+                'plugins' => [
+                    'title' => [
+                        'display' => true,
+                        'text' => sprintf('Office Efficiency - %s (%s)', $officeDisplayName, $year),
+                        'font' => [
+                            'size' => 14,
+                        ],
+                    ],
+                    'legend' => [
+                        'display' => false,
+                    ],
+                ],
+                'scales' => [
+                    'yAxes' => [[
+                        'ticks' => [
+                            'beginAtZero' => true,
+                            'max' => 100,
+                        ],
+                    ]],
+                ],
+            ],
+        ];
+
+        return $this->requestAndStoreChart($config, 'office-efficiency');
+    }
+
+    /**
      * Call QuickChart and store the resulting PNG into the public disk.
      *
      * @param array $config

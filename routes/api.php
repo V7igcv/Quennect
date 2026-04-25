@@ -124,6 +124,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
         Route::get('/analytics/assistance-distribution', [FrontdeskAnalyticsController::class, 'getAssistanceDistribution']);
+        Route::get('/analytics/assistance-indicator-graph', [FrontdeskAnalyticsController::class, 'getAssistanceIndicatorGraph']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
         Route::get('/analytics/queue-summary/export', [FrontdeskAnalyticsController::class, 'exportQueueSummary']);
         Route::get('/analytics/export-graphs', [FrontdeskAnalyticsController::class, 'exportGraphs']);
@@ -181,6 +182,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
         Route::get('/analytics/assistance-distribution', [FrontdeskAnalyticsController::class, 'getAssistanceDistribution']);
+        Route::get('/analytics/assistance-indicator-graph', [FrontdeskAnalyticsController::class, 'getAssistanceIndicatorGraph']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
         Route::get('/analytics/export-graphs', [FrontdeskAnalyticsController::class, 'exportGraphs']);
 
@@ -227,6 +229,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/barangay-distribution', [FrontdeskAnalyticsController::class, 'getBarangayDistribution']);
         Route::get('/analytics/lane-type', [FrontdeskAnalyticsController::class, 'getLaneTypeDistribution']);
         Route::get('/analytics/assistance-distribution', [FrontdeskAnalyticsController::class, 'getAssistanceDistribution']);
+        Route::get('/analytics/assistance-indicator-graph', [FrontdeskAnalyticsController::class, 'getAssistanceIndicatorGraph']);
         Route::get('/analytics/queue-summary', [FrontdeskAnalyticsController::class, 'getQueueSummary']);
 
         // CSM Analytics (read-only)
@@ -235,6 +238,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/csm/sqd-results', [CsmAnalyticsController::class, 'getSqdResults']);
         Route::get('/analytics/csm/demographic-profile', [CsmAnalyticsController::class, 'getDemographicProfile']);
         Route::get('/analytics/csm/overall-score-per-service', [CsmAnalyticsController::class, 'getOverallScorePerService']);
+        Route::get('/analytics/office-efficiency/export-graphs', [FrontdeskAnalyticsController::class, 'exportOfficeEfficiencyGraphs']);
+        Route::get('/analytics/office-efficiency/export-graphs-pdf', [FrontdeskAnalyticsController::class, 'exportOfficeEfficiencyGraphsPdf']);
     });
 
 });

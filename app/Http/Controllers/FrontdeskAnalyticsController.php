@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Enums\TransactionStatus;
 use App\Models\EvaluationResponse;
 use App\Models\Office;
@@ -581,6 +582,114 @@ class FrontdeskAnalyticsController extends Controller
     }
 
     /**
+     * Get assistance indicator graph (indicator 1 and 2) counts.
+     *
+     * Supported filters:
+     * - period=daily&date=YYYY-MM-DD (default)
+     * - period=monthly&month=1-12&year=YYYY
+     * - period=yearly&year=YYYY
+     * - barangay_id=<id> (optional)
+     */
+    public function getAssistanceIndicatorGraph(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+                'barangay_id' => 'nullable|integer|exists:barangays,id',
+            ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
+
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+            $barangayId = isset($validated['barangay_id']) ? (int) $validated['barangay_id'] : null;
+
+            $baseQuery = DB::table('service_assistance as sa')
+                ->join('queue_transaction_services as qts', 'qts.id', '=', 'sa.queue_transaction_service_id')
+                ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
+                ->whereNotNull('qts.queue_transaction_id')
+                ->where('qt.office_id', $officeId)
+                ->whereIn('sa.indicator', [1, 2]);
+
+            $this->applyAssistanceDateFilter($baseQuery, $period, $date, $month, $year);
+
+            if ($barangayId !== null) {
+                $baseQuery->where('qt.barangay_id', $barangayId);
+            }
+
+            $indicatorRows = (clone $baseQuery)
+                ->selectRaw('sa.indicator as indicator')
+                ->selectRaw('COUNT(DISTINCT qt.id) as total_clients')
+                ->groupBy('sa.indicator')
+                ->get()
+                ->keyBy('indicator');
+
+            $distribution = [
+                [
+                    'indicator' => 1,
+                    'label' => '1',
+                    'total_clients' => (int) ($indicatorRows->get(1)->total_clients ?? 0),
+                ],
+                [
+                    'indicator' => 2,
+                    'label' => '2',
+                    'total_clients' => (int) ($indicatorRows->get(2)->total_clients ?? 0),
+                ],
+            ];
+
+            $availableBarangays = $this->getAssistanceIndicatorBarangayOptions(
+                $officeId,
+                $period,
+                $date,
+                $month,
+                $year
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'distribution' => $distribution,
+                    'available_barangays' => $availableBarangays,
+                ],
+                'filter' => [
+                    ...$this->buildFilterPayload($period, $date, $month, $year),
+                    'barangay_id' => $barangayId,
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Frontdesk analytics assistance indicator graph error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching assistance indicator graph',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Get queue summary table data with pagination.
      *
      * Supported filters:
@@ -971,6 +1080,251 @@ class FrontdeskAnalyticsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error exporting analytics graphs',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Export Office Efficiency graphs as an HTML report for browser print-to-PDF.
+     */
+    public function exportOfficeEfficiencyGraphs(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+            ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
+
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+            $forPdf = filter_var($request->input('for_pdf', false), FILTER_VALIDATE_BOOLEAN);
+
+            $periodLabel = $this->buildPeriodLabel($period, $date, $month, $year);
+
+            $office = Office::find($officeId);
+            $officeName = $office?->office_name ?? 'Unknown Office';
+            $officeAcronym = $office?->office_acronym;
+            $officeDisplayName = $officeAcronym
+                ? sprintf('%s (%s)', $officeName, $officeAcronym)
+                : $officeName;
+
+            $baseDateParams = $this->buildFilterPayload($period, $date, $month, $year);
+            $csmController = app(CsmAnalyticsController::class);
+
+            $targetYear = $period === 'yearly'
+                ? $year
+                : ($period === 'monthly' ? $year : (int) $date->year);
+
+            $monthlyScores = [];
+            for ($monthNumber = 1; $monthNumber <= 12; $monthNumber++) {
+                $monthlyRequest = $this->makeInternalAnalyticsRequest([
+                    'office_id' => $officeId,
+                    'service_type' => 'all',
+                    'period' => 'monthly',
+                    'month' => $monthNumber,
+                    'year' => $targetYear,
+                ], $user);
+
+                $monthlyResponse = $csmController->getOverallScorePerService($monthlyRequest);
+                $monthlyPayload = $monthlyResponse->getData(true);
+                $monthlyScores[] = round((float) ($monthlyPayload['data']['service_total_percentage'] ?? 0), 2);
+            }
+
+            $officeEfficiencyLineChartPath = $this->chartImageService->generateOfficeEfficiencyLineChart(
+                $monthlyScores,
+                $officeDisplayName,
+                $targetYear
+            );
+
+            $sqdCodes = ['SQD0', 'SQD1', 'SQD2', 'SQD3', 'SQD4', 'SQD5', 'SQD6', 'SQD7', 'SQD8'];
+            $sqdPercentages = [];
+
+            foreach ($sqdCodes as $sqdCode) {
+                $sqdRequest = $this->makeInternalAnalyticsRequest([
+                    ...$baseDateParams,
+                    'office_id' => $officeId,
+                    'service_type' => 'all',
+                    'sqd' => $sqdCode,
+                ], $user);
+
+                $sqdResponse = $csmController->getSqdResults($sqdRequest);
+                $sqdPayload = $sqdResponse->getData(true);
+
+                $sqdPercentages[] = [
+                    'sqd' => $sqdCode,
+                    'percentage' => round((float) ($sqdPayload['data']['overall_percentage'] ?? 0), 2),
+                ];
+            }
+
+            $overallSqdAverage = empty($sqdPercentages)
+                ? 0
+                : round(collect($sqdPercentages)->avg('percentage'), 2);
+
+            $allAssistanceRequest = $this->makeInternalAnalyticsRequest([
+                ...$baseDateParams,
+                'office_id' => $officeId,
+            ], $user);
+            $allAssistanceResponse = $this->getAssistanceIndicatorGraph($allAssistanceRequest);
+            $allAssistancePayload = $allAssistanceResponse->getData(true);
+            $allData = $allAssistancePayload['data'] ?? [];
+
+            $assistanceIndicatorGraphs = [];
+            $allDistribution = $allData['distribution'] ?? [];
+            $allCounts = $this->formatAssistanceIndicatorCounts($allDistribution);
+
+            $assistanceIndicatorGraphs[] = [
+                'label' => 'All Barangay',
+                'indicator_1' => $allCounts['indicator_1'],
+                'indicator_2' => $allCounts['indicator_2'],
+                'total_clients' => $allCounts['total_clients'],
+            ];
+
+            $availableBarangays = collect($allData['available_barangays'] ?? []);
+            foreach ($availableBarangays as $barangay) {
+                $barangayId = (int) ($barangay['barangay_id'] ?? 0);
+                if ($barangayId <= 0) {
+                    continue;
+                }
+
+                $barangayRequest = $this->makeInternalAnalyticsRequest([
+                    ...$baseDateParams,
+                    'office_id' => $officeId,
+                    'barangay_id' => $barangayId,
+                ], $user);
+                $barangayResponse = $this->getAssistanceIndicatorGraph($barangayRequest);
+                $barangayPayload = $barangayResponse->getData(true);
+                $barangayDistribution = $barangayPayload['data']['distribution'] ?? [];
+                $barangayCounts = $this->formatAssistanceIndicatorCounts($barangayDistribution);
+
+                if ($barangayCounts['total_clients'] <= 0) {
+                    continue;
+                }
+
+                $assistanceIndicatorGraphs[] = [
+                    'label' => (string) ($barangay['barangay_name'] ?? 'Unknown Barangay'),
+                    'indicator_1' => $barangayCounts['indicator_1'],
+                    'indicator_2' => $barangayCounts['indicator_2'],
+                    'total_clients' => $barangayCounts['total_clients'],
+                ];
+            }
+
+            return response()->view('analytics.office-efficiency-graphs-report', [
+                'officeName' => $officeName,
+                'officeAcronym' => $officeAcronym,
+                'officeDisplayName' => $officeDisplayName,
+                'periodLabel' => $periodLabel,
+                'period' => $period,
+                'date' => $date,
+                'month' => $month,
+                'year' => $year,
+                'monthlyScores' => $monthlyScores,
+                'monthlyYear' => $targetYear,
+                'sqdPercentages' => $sqdPercentages,
+                'overallSqdAverage' => $overallSqdAverage,
+                'assistanceIndicatorGraphs' => $assistanceIndicatorGraphs,
+                'officeEfficiencyLineChartPath' => $officeEfficiencyLineChartPath,
+                'exportPdfUrl' => url('/api/city-mayor/analytics/office-efficiency/export-graphs-pdf')
+                    . '?' . http_build_query([
+                        'office_id' => $officeId,
+                        ...$baseDateParams,
+                        'for_pdf' => 1,
+                    ]),
+                'forPdf' => $forPdf,
+            ], 200, [
+                'Content-Type' => 'text/html; charset=UTF-8',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Office efficiency export graphs error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error exporting office efficiency graphs',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Export Office Efficiency graphs directly as a downloadable PDF file.
+     */
+    public function exportOfficeEfficiencyGraphsPdf(Request $request)
+    {
+        try {
+            $request->merge(['for_pdf' => 1]);
+            $htmlResponse = $this->exportOfficeEfficiencyGraphs($request);
+
+            if (!method_exists($htmlResponse, 'getContent')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to prepare report content for PDF.',
+                ], 500);
+            }
+
+            $contentType = (string) ($htmlResponse->headers->get('Content-Type') ?? '');
+            if (!str_contains($contentType, 'text/html')) {
+                return $htmlResponse;
+            }
+
+            $html = (string) $htmlResponse->getContent();
+            $html = $this->injectBarWidthsForPdf($html);
+
+            $validated = $request->validate([
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+            ]);
+
+            $officeName = 'Office Efficiency';
+            if (!empty($validated['office_id'])) {
+                $office = Office::find((int) $validated['office_id']);
+                if ($office) {
+                    $officeName = $office->office_acronym
+                        ? sprintf('%s (%s)', $office->office_name, $office->office_acronym)
+                        : $office->office_name;
+                }
+            }
+
+            $safeOfficeName = trim(preg_replace('/[\\\\\/:*?"<>|]+/', '-', $officeName));
+            $safeOfficeName = preg_replace('/\s+/', ' ', $safeOfficeName);
+            $fileName = sprintf('%s - Office Efficiency Graph Report.pdf', $safeOfficeName ?: 'Office Efficiency');
+
+            return Pdf::loadHTML($html)
+                ->setPaper('a4', 'portrait')
+                ->download($fileName);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Office efficiency export graphs PDF error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error exporting office efficiency graphs PDF',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -1429,6 +1783,46 @@ class FrontdeskAnalyticsController extends Controller
             ->all();
     }
 
+    /**
+     * Get barangay options that have assistance indicator records (1 or 2)
+     * for the selected office/date filters.
+     */
+    private function getAssistanceIndicatorBarangayOptions(
+        int $officeId,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year
+    ): array {
+        $query = DB::table('service_assistance as sa')
+            ->join('queue_transaction_services as qts', 'qts.id', '=', 'sa.queue_transaction_service_id')
+            ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
+            ->join('barangays as b', 'b.id', '=', 'qt.barangay_id')
+            ->whereNotNull('qts.queue_transaction_id')
+            ->where('qt.office_id', $officeId)
+            ->whereIn('sa.indicator', [1, 2])
+            ->whereNotNull('qt.barangay_id');
+
+        $this->applyAssistanceDateFilter($query, $period, $date, $month, $year);
+
+        return $query
+            ->selectRaw('qt.barangay_id as barangay_id')
+            ->selectRaw('b.barangay_name as barangay_name')
+            ->selectRaw('COUNT(DISTINCT qt.id) as total_clients')
+            ->groupBy('qt.barangay_id', 'b.barangay_name')
+            ->orderBy('b.barangay_name')
+            ->get()
+            ->map(static function ($row) {
+                return [
+                    'barangay_id' => (int) $row->barangay_id,
+                    'barangay_name' => (string) $row->barangay_name,
+                    'total_clients' => (int) $row->total_clients,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     private function mapAverageSatisfactionLabel($averageRating): string
     {
         if ($averageRating === null) {
@@ -1507,6 +1901,101 @@ class FrontdeskAnalyticsController extends Controller
             default => $query
                 ->whereDate($dateColumn, $date->toDateString()),
         };
+    }
+
+    /**
+     * Apply date filter for assistance analytics using either queue date or
+     * assistance provided timestamp to avoid excluding valid assistance rows.
+     */
+    private function applyAssistanceDateFilter(
+        $query,
+        string $period,
+        Carbon $date,
+        int $month,
+        int $year
+    ) {
+        return match ($period) {
+            'monthly' => $query->where(function ($subQuery) use ($year, $month) {
+                $subQuery
+                    ->where(function ($q) use ($year, $month) {
+                        $q->whereYear('qt.queue_date', $year)
+                            ->whereMonth('qt.queue_date', $month);
+                    })
+                    ->orWhere(function ($q) use ($year, $month) {
+                        $q->whereYear('sa.assistance_provided_at', $year)
+                            ->whereMonth('sa.assistance_provided_at', $month);
+                    });
+            }),
+            'yearly' => $query->where(function ($subQuery) use ($year) {
+                $subQuery
+                    ->whereYear('qt.queue_date', $year)
+                    ->orWhereYear('sa.assistance_provided_at', $year);
+            }),
+            default => $query->where(function ($subQuery) use ($date) {
+                $subQuery
+                    ->whereDate('qt.queue_date', $date->toDateString())
+                    ->orWhereDate('sa.assistance_provided_at', $date->toDateString());
+            }),
+        };
+    }
+
+    private function makeInternalAnalyticsRequest(array $params, $user): Request
+    {
+        $request = Request::create('/', 'GET', $params);
+        $request->setUserResolver(static fn () => $user);
+
+        return $request;
+    }
+
+    private function formatAssistanceIndicatorCounts(array $distribution): array
+    {
+        $indicator1 = 0;
+        $indicator2 = 0;
+
+        foreach ($distribution as $row) {
+            $indicator = (int) ($row['indicator'] ?? 0);
+            $count = (int) ($row['total_clients'] ?? 0);
+
+            if ($indicator === 1) {
+                $indicator1 = $count;
+            }
+
+            if ($indicator === 2) {
+                $indicator2 = $count;
+            }
+        }
+
+        return [
+            'indicator_1' => $indicator1,
+            'indicator_2' => $indicator2,
+            'total_clients' => $indicator1 + $indicator2,
+        ];
+    }
+
+    private function injectBarWidthsForPdf(string $html): string
+    {
+        return (string) preg_replace_callback(
+            '/(<div[^>]*class="[^"]*bar-fill[^"]*"[^>]*data-width="([^"]+)"[^>]*)(>)/i',
+            static function (array $matches): string {
+                $openTag = $matches[1];
+                $width = max(0, min(100, (float) ($matches[2] ?? 0)));
+                $widthStyle = sprintf('width:%s%%;', rtrim(rtrim(number_format($width, 2, '.', ''), '0'), '.'));
+
+                if (preg_match('/style="([^"]*)"/i', $openTag, $styleMatches)) {
+                    $style = trim($styleMatches[1]);
+                    if ($style !== '' && !str_ends_with($style, ';')) {
+                        $style .= ';';
+                    }
+                    $style .= $widthStyle;
+                    $openTag = preg_replace('/style="[^"]*"/i', 'style="' . $style . '"', $openTag, 1);
+                } else {
+                    $openTag .= ' style="' . $widthStyle . '"';
+                }
+
+                return $openTag . $matches[3];
+            },
+            $html
+        );
     }
 
     /**

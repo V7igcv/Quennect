@@ -154,8 +154,66 @@
             </div>
           </PopoverContent>
         </Popover>
+
+        <Button
+          class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white whitespace-nowrap flex items-center gap-2"
+          type="button"
+          :disabled="!selectedOffice"
+          @click="openExportModal"
+        >
+          <BarChart3 class="h-4 w-4" />
+          Generate Graph
+        </Button>
       </div>
     </div>
+
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showExportModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60" @click="closeExportModal"></div>
+          <div class="relative bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 z-10 mx-4">
+            <button
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+              type="button"
+              @click="closeExportModal"
+            >
+              <span class="sr-only">Close</span>
+              ×
+            </button>
+
+            <h2 class="text-xl font-semibold text-gray-900 mb-3">Export Analytics Graphs</h2>
+            <p class="text-sm text-gray-600 mb-6">
+              This will generate an HTML report containing the current Office Efficiency graphs
+              for
+              <span class="font-semibold">{{ selectedOfficeDisplayName }}</span>
+              for
+              <span class="font-semibold">{{ dateFilterLabel }}</span>.
+              You can save it as PDF from the report page.
+            </p>
+
+            <div class="flex justify-end gap-3">
+              <button
+                class="px-4 py-2 rounded-sm border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium cursor-pointer"
+                type="button"
+                :disabled="isExportingGraphs"
+                @click="closeExportModal"
+              >
+                Cancel
+              </button>
+              <Button
+                class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white text-sm font-medium"
+                type="button"
+                :disabled="isExportingGraphs || !selectedOffice"
+                @click="confirmExportGraphs"
+              >
+                <span v-if="!isExportingGraphs">Generate PDF</span>
+                <span v-else>Generating report...</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <div
       v-if="isLoadingAnalytics"
@@ -317,12 +375,65 @@
 
       <div>
         <div class="mb-3 flex items-center gap-1">
-          <h2 class="text-lg font-semibold">Graph 3</h2>
+          <h2 class="text-lg font-semibold">Assistance Indicator Graph</h2>
         </div>
         <Card class="w-full">
-          <CardContent class="pt-6">
-            <div class="h-[220px] rounded-lg border border-gray-100 bg-gray-50 p-4 flex items-center justify-center">
-              <p class="text-sm text-gray-500">Third graph will be added next.</p>
+          <CardHeader class="flex flex-row items-start justify-end space-y-0 pt-4 px-4">
+            <Select v-model="selectedBarangayIdForIndicator">
+              <SelectTrigger class="w-[180px] bg-white">
+                <SelectValue placeholder="All Barangay" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Barangay</SelectItem>
+                <SelectItem
+                  v-for="barangay in availableBarangaysForIndicator"
+                  :key="`indicator-barangay-${barangay.id}`"
+                  :value="barangay.id"
+                >
+                  {{ barangay.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent>
+            <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <div class="space-y-4">
+                <div
+                  v-for="item in assistanceIndicatorChartData"
+                  :key="`indicator-row-${item.indicator}`"
+                  class="grid grid-cols-[24px_1fr_auto] items-center gap-3"
+                >
+                  <span class="text-sm font-semibold text-gray-700">{{ item.label }}</span>
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <div class="h-6 w-full rounded-md bg-gray-200 overflow-hidden cursor-help">
+                          <div
+                            class="h-full rounded-md bg-[#0F5C5C] transition-all duration-300"
+                            :style="{ width: `${getAssistanceIndicatorBarWidth(item.totalClients)}%` }"
+                          ></div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent class="min-w-32 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
+                        <p class="font-semibold text-gray-900">Indicator {{ item.label }}</p>
+                        <p class="text-gray-600">Number of clients: <span class="font-semibold">{{ item.totalClients }}</span></p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  <span class="text-sm font-semibold text-gray-900">{{ item.totalClients }}</span>
+                </div>
+              </div>
+
+              <div class="mt-4 ml-[27px] border-t border-gray-200 pt-2">
+                <div class="flex items-center justify-between text-[11px] text-gray-500">
+                  <span>0</span>
+                  <span>{{ Math.ceil(maxAssistanceIndicatorCount / 2) }}</span>
+                  <span>{{ maxAssistanceIndicatorCount }}</span>
+                </div>
+                <p class="mt-1 text-[11px] font-medium text-gray-500">X-axis: Number of Clients</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -341,8 +452,9 @@ import {
   ChevronRight,
   Building2,
   Loader2,
+  BarChart3,
 } from 'lucide-vue-next'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
   Popover,
   PopoverContent,
@@ -369,11 +481,19 @@ const selectedDateRange = ref('daily')
 const isDateFilterOpen = ref(false)
 const isLoadingAnalytics = ref(false)
 const isInitializing = ref(true)
+const showExportModal = ref(false)
+const isExportingGraphs = ref(false)
 
 const officeEfficiencyMonthlyScores = ref([])
 const selectedSqdForSatisfaction = ref('SQD0')
 const selectedSqdPercentage = ref(0)
 const overallSqdAveragePercentage = ref(0)
+const sqdPercentagesByCode = ref({})
+const selectedBarangayIdForIndicator = ref('all')
+const availableBarangaysForIndicator = ref([])
+const assistanceIndicatorCounts = ref({ 1: 0, 2: 0 })
+const latestLoadRequestId = ref(0)
+const latestThirdGraphRequestId = ref(0)
 
 const sqdOptions = ['SQD0', 'SQD1', 'SQD2', 'SQD3', 'SQD4', 'SQD5', 'SQD6', 'SQD7', 'SQD8']
 const sqdDescriptions = {
@@ -431,6 +551,11 @@ const weekDayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 const selectedOfficeAcronym = computed(() => {
   const selected = officeOptions.value.find((office) => office.value === selectedOffice.value)
   return selected?.acronym || ''
+})
+
+const selectedOfficeDisplayName = computed(() => {
+  const selected = officeOptions.value.find((office) => office.value === selectedOffice.value)
+  return selected?.label || 'Selected Office'
 })
 
 const dateFilterLabel = computed(() => {
@@ -518,6 +643,79 @@ const isSelectedDay = (day) => {
     && selectedDate.value.getDate() === day
 }
 
+const openExportModal = () => {
+  if (!selectedOffice.value) return
+  showExportModal.value = true
+}
+
+const closeExportModal = () => {
+  if (isExportingGraphs.value) return
+  showExportModal.value = false
+}
+
+const getExportFilterParams = () => {
+  const params = {
+    office_id: Number(selectedOffice.value),
+  }
+
+  if (selectedDateRange.value === 'monthly') {
+    params.period = 'monthly'
+    params.month = selectedMonthIndex.value + 1
+    params.year = Number(selectedMonthYear.value)
+    return params
+  }
+
+  if (selectedDateRange.value === 'yearly') {
+    params.period = 'yearly'
+    params.year = Number(selectedYear.value)
+    return params
+  }
+
+  const y = selectedDate.value.getFullYear()
+  const m = String(selectedDate.value.getMonth() + 1).padStart(2, '0')
+  const d = String(selectedDate.value.getDate()).padStart(2, '0')
+
+  params.period = 'daily'
+  params.date = `${y}-${m}-${d}`
+
+  return params
+}
+
+const confirmExportGraphs = async () => {
+  if (isExportingGraphs.value || !selectedOffice.value) return
+
+  isExportingGraphs.value = true
+
+  try {
+    const response = await api.get('/city-mayor/analytics/office-efficiency/export-graphs', {
+      params: getExportFilterParams(),
+      responseType: 'blob',
+    })
+
+    const blob = new Blob([response.data], { type: 'text/html;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+
+    const link = document.createElement('a')
+    link.href = url
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    window.setTimeout(() => {
+      window.URL.revokeObjectURL(url)
+    }, 60000)
+
+    showExportModal.value = false
+  } catch (error) {
+    console.error('Error exporting office efficiency graphs:', error)
+    window.alert('Failed to generate report. Please try again.')
+  } finally {
+    isExportingGraphs.value = false
+  }
+}
+
 const officeEfficiencyChartData = computed(() => {
   return monthShortNames.map((month, index) => {
     const monthValue = officeEfficiencyMonthlyScores.value[index] ?? 0
@@ -587,6 +785,33 @@ const overallSqdExperienceDescription = computed(() => {
   return 'Clients generally report a poor experience with this office\'s services.'
 })
 
+const assistanceIndicatorChartData = computed(() => {
+  return [
+    {
+      indicator: 1,
+      label: '1',
+      totalClients: Number(assistanceIndicatorCounts.value?.[1] ?? 0),
+    },
+    {
+      indicator: 2,
+      label: '2',
+      totalClients: Number(assistanceIndicatorCounts.value?.[2] ?? 0),
+    },
+  ]
+})
+
+const maxAssistanceIndicatorCount = computed(() => {
+  const values = assistanceIndicatorChartData.value.map((item) => item.totalClients)
+  const max = values.length ? Math.max(...values) : 0
+  return Math.max(max, 1)
+})
+
+const getAssistanceIndicatorBarWidth = (value) => {
+  const numeric = Number(value || 0)
+  if (numeric <= 0) return 0
+  return Math.max((numeric / maxAssistanceIndicatorCount.value) * 100, 3)
+}
+
 const buildSqdFilterParams = () => {
   const params = {
     office_id: Number(selectedOffice.value),
@@ -642,26 +867,17 @@ const fetchSelectedSqdForSecondGraph = async () => {
   selectedSqdPercentage.value = await fetchSqdPercentage(selectedSqdForSatisfaction.value)
 }
 
-const fetchOverallSqdAverageForSecondGraph = async () => {
-  if (!selectedOffice.value) {
-    overallSqdAveragePercentage.value = 0
-    return
-  }
-
-  const percentages = await Promise.all(sqdOptions.map((code) => fetchSqdPercentage(code)))
-  if (!percentages.length) {
-    overallSqdAveragePercentage.value = 0
-    return
-  }
-
-  const total = percentages.reduce((sum, value) => sum + Number(value || 0), 0)
-  overallSqdAveragePercentage.value = Number((total / percentages.length).toFixed(2))
+const fetchAllSqdPercentages = async () => {
+  const values = await Promise.all(sqdOptions.map((code) => fetchSqdPercentage(code)))
+  return sqdOptions.reduce((accumulator, code, index) => {
+    accumulator[code] = Number(values[index] ?? 0)
+    return accumulator
+  }, {})
 }
 
-const fetchOfficeEfficiencyGraph = async () => {
+const fetchOfficeEfficiencyGraphData = async () => {
   if (!selectedOffice.value) {
-    officeEfficiencyMonthlyScores.value = Array.from({ length: 12 }, () => 0)
-    return
+    return Array.from({ length: 12 }, () => 0)
   }
 
   const targetYear = activeYearForOfficeEfficiency.value
@@ -680,42 +896,174 @@ const fetchOfficeEfficiencyGraph = async () => {
   })
 
   const responses = await Promise.all(requests)
-  officeEfficiencyMonthlyScores.value = responses.map((response) => {
+  return responses.map((response) => {
     const payload = response?.data?.data || {}
     return Number(payload.service_total_percentage ?? 0)
   })
 }
 
-const fetchSecondGraph = async () => {
-  await Promise.all([
-    fetchSelectedSqdForSecondGraph(),
-    fetchOverallSqdAverageForSecondGraph(),
-  ])
+const fetchSecondGraphData = async () => {
+  if (!selectedOffice.value) {
+    return {
+      sqdMap: {},
+      selectedPercentage: 0,
+      overallAverage: 0,
+    }
+  }
+
+  const sqdMap = await fetchAllSqdPercentages()
+  const percentages = Object.values(sqdMap)
+  const total = percentages.reduce((sum, value) => sum + Number(value || 0), 0)
+  const overallAverage = percentages.length ? Number((total / percentages.length).toFixed(2)) : 0
+  const selectedPercentage = Number(sqdMap[selectedSqdForSatisfaction.value] ?? 0)
+
+  return {
+    sqdMap,
+    selectedPercentage,
+    overallAverage,
+  }
 }
 
-const fetchThirdGraph = async () => {
-  return Promise.resolve()
+const fetchThirdGraphData = async () => {
+  if (!selectedOffice.value) {
+    return {
+      counts: { 1: 0, 2: 0 },
+      barangays: [],
+      selectedStillAvailable: true,
+    }
+  }
+
+  const params = {
+    office_id: Number(selectedOffice.value),
+  }
+
+  if (selectedDateRange.value === 'monthly') {
+    params.period = 'monthly'
+    params.month = selectedMonthIndex.value + 1
+    params.year = Number(selectedMonthYear.value)
+  } else if (selectedDateRange.value === 'yearly') {
+    params.period = 'yearly'
+    params.year = Number(selectedYear.value)
+  } else {
+    params.period = 'daily'
+    const y = selectedDate.value.getFullYear()
+    const m = String(selectedDate.value.getMonth() + 1).padStart(2, '0')
+    const d = String(selectedDate.value.getDate()).padStart(2, '0')
+    params.date = `${y}-${m}-${d}`
+  }
+
+  if (selectedBarangayIdForIndicator.value !== 'all') {
+    params.barangay_id = Number(selectedBarangayIdForIndicator.value)
+  }
+
+  const response = await api.get('/city-mayor/analytics/assistance-indicator-graph', { params })
+  const payload = response?.data?.data || {}
+  const distribution = Array.isArray(payload.distribution) ? payload.distribution : []
+
+  const indicator1 = distribution.find((item) => Number(item.indicator) === 1)
+  const indicator2 = distribution.find((item) => Number(item.indicator) === 2)
+
+  const counts = {
+    1: Number(indicator1?.total_clients ?? 0),
+    2: Number(indicator2?.total_clients ?? 0),
+  }
+
+  const barangays = Array.isArray(payload.available_barangays)
+    ? payload.available_barangays.map((item) => ({
+        id: String(item.barangay_id),
+        name: item.barangay_name,
+      }))
+    : []
+
+  const selectedStillAvailable = selectedBarangayIdForIndicator.value === 'all'
+    || barangays.some((item) => item.id === selectedBarangayIdForIndicator.value)
+
+  return {
+    counts,
+    barangays,
+    selectedStillAvailable,
+  }
+}
+
+const loadThirdGraphOnly = async () => {
+  const requestId = ++latestThirdGraphRequestId.value
+
+  try {
+    const thirdData = await fetchThirdGraphData()
+
+    if (requestId !== latestThirdGraphRequestId.value) {
+      return
+    }
+
+    assistanceIndicatorCounts.value = thirdData.counts
+    availableBarangaysForIndicator.value = thirdData.barangays
+
+    if (!thirdData.selectedStillAvailable) {
+      selectedBarangayIdForIndicator.value = 'all'
+    }
+  } catch (error) {
+    console.error('Error loading assistance indicator graph:', error)
+    if (requestId !== latestThirdGraphRequestId.value) {
+      return
+    }
+    assistanceIndicatorCounts.value = { 1: 0, 2: 0 }
+    availableBarangaysForIndicator.value = []
+  }
 }
 
 const loadAllGraphs = async () => {
+  const requestId = ++latestLoadRequestId.value
+  latestThirdGraphRequestId.value += 1
+
   if (!selectedOffice.value) {
     officeEfficiencyMonthlyScores.value = Array.from({ length: 12 }, () => 0)
+    sqdPercentagesByCode.value = {}
+    selectedSqdPercentage.value = 0
+    overallSqdAveragePercentage.value = 0
+    selectedBarangayIdForIndicator.value = 'all'
+    availableBarangaysForIndicator.value = []
+    assistanceIndicatorCounts.value = { 1: 0, 2: 0 }
     return
   }
 
   isLoadingAnalytics.value = true
 
   try {
-    await Promise.all([
-      fetchOfficeEfficiencyGraph(),
-      fetchSecondGraph(),
-      fetchThirdGraph(),
+    const [monthlyScores, secondGraphData, thirdData] = await Promise.all([
+      fetchOfficeEfficiencyGraphData(),
+      fetchSecondGraphData(),
+      fetchThirdGraphData(),
     ])
+
+    if (requestId !== latestLoadRequestId.value) {
+      return
+    }
+
+    officeEfficiencyMonthlyScores.value = monthlyScores
+    sqdPercentagesByCode.value = secondGraphData.sqdMap
+    selectedSqdPercentage.value = secondGraphData.selectedPercentage
+    overallSqdAveragePercentage.value = secondGraphData.overallAverage
+    assistanceIndicatorCounts.value = thirdData.counts
+    availableBarangaysForIndicator.value = thirdData.barangays
+
+    if (!thirdData.selectedStillAvailable) {
+      selectedBarangayIdForIndicator.value = 'all'
+    }
   } catch (error) {
     console.error('Error loading office efficiency analytics:', error)
+    if (requestId !== latestLoadRequestId.value) {
+      return
+    }
     officeEfficiencyMonthlyScores.value = Array.from({ length: 12 }, () => 0)
+    sqdPercentagesByCode.value = {}
+    selectedSqdPercentage.value = 0
+    overallSqdAveragePercentage.value = 0
+    assistanceIndicatorCounts.value = { 1: 0, 2: 0 }
+    availableBarangaysForIndicator.value = []
   } finally {
-    isLoadingAnalytics.value = false
+    if (requestId === latestLoadRequestId.value) {
+      isLoadingAnalytics.value = false
+    }
   }
 }
 
@@ -806,7 +1154,17 @@ watch(selectedYear, () => {
 
 watch(selectedSqdForSatisfaction, () => {
   if (isInitializing.value) return
+  const cached = sqdPercentagesByCode.value[selectedSqdForSatisfaction.value]
+  if (cached !== undefined) {
+    selectedSqdPercentage.value = Number(cached || 0)
+    return
+  }
   fetchSelectedSqdForSecondGraph()
+})
+
+watch(selectedBarangayIdForIndicator, () => {
+  if (isInitializing.value) return
+  loadThirdGraphOnly()
 })
 
 onMounted(async () => {
