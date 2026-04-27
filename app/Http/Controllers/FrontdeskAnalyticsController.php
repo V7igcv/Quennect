@@ -1086,6 +1086,326 @@ class FrontdeskAnalyticsController extends Controller
     }
 
     /**
+     * Get aggregated Office Efficiency dashboard data in a single request.
+     */
+    public function getOfficeEfficiencyDashboardData(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+                'office_id' => 'nullable|integer|exists:offices,id',
+                'barangay_id' => 'nullable|integer|exists:barangays,id',
+            ]);
+
+            $officeId = $this->resolveOfficeId($user, $validated);
+
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+            $barangayId = isset($validated['barangay_id']) ? (int) $validated['barangay_id'] : null;
+
+            $baseDateParams = $this->buildFilterPayload($period, $date, $month, $year);
+            $csmController = app(CsmAnalyticsController::class);
+
+            $targetYear = $period === 'yearly'
+                ? $year
+                : ($period === 'monthly' ? $year : (int) $date->year);
+
+            $monthlyScores = [];
+            for ($monthNumber = 1; $monthNumber <= 12; $monthNumber++) {
+                $monthlyRequest = $this->makeInternalAnalyticsRequest([
+                    'office_id' => $officeId,
+                    'service_type' => 'all',
+                    'period' => 'monthly',
+                    'month' => $monthNumber,
+                    'year' => $targetYear,
+                ], $user);
+
+                $monthlyResponse = $csmController->getOverallScorePerService($monthlyRequest);
+                $monthlyPayload = $monthlyResponse->getData(true);
+                $monthlyScores[] = round((float) ($monthlyPayload['data']['service_total_percentage'] ?? 0), 2);
+            }
+
+            $sqdCodes = ['SQD0', 'SQD1', 'SQD2', 'SQD3', 'SQD4', 'SQD5', 'SQD6', 'SQD7', 'SQD8'];
+            $sqdMap = [];
+
+            foreach ($sqdCodes as $sqdCode) {
+                $sqdRequest = $this->makeInternalAnalyticsRequest([
+                    ...$baseDateParams,
+                    'office_id' => $officeId,
+                    'service_type' => 'all',
+                    'sqd' => $sqdCode,
+                ], $user);
+
+                $sqdResponse = $csmController->getSqdResults($sqdRequest);
+                $sqdPayload = $sqdResponse->getData(true);
+                $sqdMap[$sqdCode] = round((float) ($sqdPayload['data']['overall_percentage'] ?? 0), 2);
+            }
+
+            $overallSqdAverage = empty($sqdMap)
+                ? 0
+                : round((float) collect($sqdMap)->avg(), 2);
+
+            $assistanceParams = [
+                ...$baseDateParams,
+                'office_id' => $officeId,
+            ];
+
+            if ($barangayId !== null) {
+                $assistanceParams['barangay_id'] = $barangayId;
+            }
+
+            $assistanceRequest = $this->makeInternalAnalyticsRequest($assistanceParams, $user);
+            $assistanceResponse = $this->getAssistanceIndicatorGraph($assistanceRequest);
+            $assistancePayload = $assistanceResponse->getData(true);
+            $assistanceData = $assistancePayload['data'] ?? [];
+
+            $distribution = is_array($assistanceData['distribution'] ?? null)
+                ? $assistanceData['distribution']
+                : [];
+
+            $counts = [
+                1 => 0,
+                2 => 0,
+            ];
+
+            foreach ($distribution as $row) {
+                $indicator = (int) ($row['indicator'] ?? 0);
+                if (in_array($indicator, [1, 2], true)) {
+                    $counts[$indicator] = (int) ($row['total_clients'] ?? 0);
+                }
+            }
+
+            $availableBarangays = is_array($assistanceData['available_barangays'] ?? null)
+                ? $assistanceData['available_barangays']
+                : [];
+
+            $selectedStillAvailable = $barangayId === null
+                || collect($availableBarangays)->contains(fn ($row) => (int) ($row['barangay_id'] ?? 0) === $barangayId);
+
+            $hasAssistanceServices = Service::query()
+                ->where('office_id', $officeId)
+                ->where('service_type', 'External')
+                ->where('provides_assistance', true)
+                ->exists();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'monthly_scores' => $monthlyScores,
+                    'monthly_year' => $targetYear,
+                    'sqd_percentages' => $sqdMap,
+                    'overall_sqd_average' => $overallSqdAverage,
+                    'assistance_indicator' => [
+                        'counts' => $counts,
+                        'available_barangays' => $availableBarangays,
+                        'selected_still_available' => $selectedStillAvailable,
+                    ],
+                    'has_assistance_services' => $hasAssistanceServices,
+                ],
+                'filter' => [
+                    ...$baseDateParams,
+                    'office_id' => $officeId,
+                    'barangay_id' => $barangayId,
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Office efficiency dashboard data error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching office efficiency dashboard data',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get the office performance ranking across all offices for the selected date filter.
+     */
+    public function getOfficePerformanceRanking(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'period' => 'nullable|in:daily,monthly,yearly',
+                'date' => 'nullable|date_format:Y-m-d',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100',
+            ]);
+
+            $period = $validated['period'] ?? 'daily';
+            $today = now();
+
+            $date = isset($validated['date'])
+                ? Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay()
+                : $today->copy()->startOfDay();
+
+            $month = (int) ($validated['month'] ?? $today->month);
+            $year = (int) ($validated['year'] ?? $today->year);
+
+            $baseDateParams = $this->buildFilterPayload($period, $date, $month, $year);
+            $csmController = app(CsmAnalyticsController::class);
+            $rankingRows = $this->getOfficePerformanceRankingRows($baseDateParams, $user, $csmController);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'ranking' => $rankingRows,
+                    'office_count' => count($rankingRows),
+                ],
+                'filter' => [
+                    ...$baseDateParams,
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Office performance ranking analytics error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching office performance ranking analytics',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Resolve the Office Performance ranking band for a percentage.
+     *
+     * @return array{label: string, color: string}
+     */
+    private function resolveOfficePerformanceScale(float $percentage): array
+    {
+        if ($percentage >= 95.0) {
+            return ['label' => 'Outstanding', 'color' => '#22C55E'];
+        }
+
+        if ($percentage >= 90.0) {
+            return ['label' => 'Very Satisfactory', 'color' => '#3B82F6'];
+        }
+
+        if ($percentage >= 80.0) {
+            return ['label' => 'Satisfactory', 'color' => '#EAB308'];
+        }
+
+        if ($percentage >= 60.0) {
+            return ['label' => 'Fair', 'color' => '#F97316'];
+        }
+
+        return ['label' => 'Poor', 'color' => '#EF4444'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $baseDateParams
+     * @return array<int, array<string, mixed>>
+     */
+    private function getOfficePerformanceRankingRows(array $baseDateParams, $user, CsmAnalyticsController $csmController): array
+    {
+        $offices = Office::query()
+            ->select(['id', 'office_name', 'office_acronym'])
+            ->orderBy('office_name')
+            ->get();
+
+        $rankingRows = [];
+
+        foreach ($offices as $office) {
+            $officeId = (int) ($office->id ?? 0);
+            if ($officeId <= 0) {
+                continue;
+            }
+
+            $overallScoreRequest = $this->makeInternalAnalyticsRequest([
+                ...$baseDateParams,
+                'office_id' => $officeId,
+                'service_type' => 'all',
+            ], $user);
+
+            $overallScoreResponse = $csmController->getOverallScorePerService($overallScoreRequest);
+            $overallScorePayload = $overallScoreResponse->getData(true);
+            $percentage = round((float) ($overallScorePayload['data']['service_total_percentage'] ?? 0), 2);
+            $scale = $this->resolveOfficePerformanceScale($percentage);
+
+            $officeName = (string) ($office->office_name ?? 'Unknown Office');
+            $officeAcronym = trim((string) ($office->office_acronym ?? ''));
+
+            $rankingRows[] = [
+                'office_id' => $officeId,
+                'office_name' => $officeName,
+                'office_acronym' => $officeAcronym !== '' ? $officeAcronym : null,
+                'display_name' => $officeAcronym !== ''
+                    ? sprintf('%s (%s)', $officeName, $officeAcronym)
+                    : $officeName,
+                'percentage' => $percentage,
+                'rating' => $scale['label'],
+                'color' => $scale['color'],
+            ];
+        }
+
+        usort($rankingRows, function (array $left, array $right): int {
+            $percentageComparison = $right['percentage'] <=> $left['percentage'];
+            if ($percentageComparison !== 0) {
+                return $percentageComparison;
+            }
+
+            return strcasecmp((string) ($left['office_name'] ?? ''), (string) ($right['office_name'] ?? ''));
+        });
+
+        foreach ($rankingRows as $index => $row) {
+            $rankingRows[$index]['rank'] = $index + 1;
+        }
+
+        return $rankingRows;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function getSqdDescriptions(): array
+    {
+        return [
+            'SQD0' => 'I am satisfied with the service that I availed.',
+            'SQD1' => 'I spent a reasonable amount of time for my transaction.',
+            'SQD2' => 'The office followed the transaction requirements and steps based on the information provided.',
+            'SQD3' => 'The steps, including payment, needed for my transaction were easy and simple.',
+            'SQD4' => 'I easily found information about my transaction from the office or its website.',
+            'SQD5' => 'I paid a reasonable amount of fees for my transaction.',
+            'SQD6' => 'I feel the office was fair to everyone, or "walang palakasan", during my transaction.',
+            'SQD7' => 'I was treated courteously by the staff, and the staff was helpful when I asked for help.',
+            'SQD8' => 'I got what I needed from the office, or if denied, the reason was sufficiently explained to me.',
+        ];
+    }
+
+    /**
      * Export Office Efficiency graphs as an HTML report for browser print-to-PDF.
      */
     public function exportOfficeEfficiencyGraphs(Request $request)
@@ -1132,6 +1452,7 @@ class FrontdeskAnalyticsController extends Controller
 
             $baseDateParams = $this->buildFilterPayload($period, $date, $month, $year);
             $csmController = app(CsmAnalyticsController::class);
+            $sqdDescriptions = $this->getSqdDescriptions();
 
             $targetYear = $period === 'yearly'
                 ? $year
@@ -1174,6 +1495,7 @@ class FrontdeskAnalyticsController extends Controller
 
                 $sqdPercentages[] = [
                     'sqd' => $sqdCode,
+                    'description' => $sqdDescriptions[$sqdCode] ?? '',
                     'percentage' => round((float) ($sqdPayload['data']['overall_percentage'] ?? 0), 2),
                 ];
             }
@@ -1182,52 +1504,62 @@ class FrontdeskAnalyticsController extends Controller
                 ? 0
                 : round(collect($sqdPercentages)->avg('percentage'), 2);
 
-            $allAssistanceRequest = $this->makeInternalAnalyticsRequest([
-                ...$baseDateParams,
-                'office_id' => $officeId,
-            ], $user);
-            $allAssistanceResponse = $this->getAssistanceIndicatorGraph($allAssistanceRequest);
-            $allAssistancePayload = $allAssistanceResponse->getData(true);
-            $allData = $allAssistancePayload['data'] ?? [];
+            $officePerformanceRanking = $this->getOfficePerformanceRankingRows($baseDateParams, $user, $csmController);
+
+            $hasAssistanceServices = Service::query()
+                ->where('office_id', $officeId)
+                ->where('service_type', 'External')
+                ->where('provides_assistance', true)
+                ->exists();
 
             $assistanceIndicatorGraphs = [];
-            $allDistribution = $allData['distribution'] ?? [];
-            $allCounts = $this->formatAssistanceIndicatorCounts($allDistribution);
-
-            $assistanceIndicatorGraphs[] = [
-                'label' => 'All Barangay',
-                'indicator_1' => $allCounts['indicator_1'],
-                'indicator_2' => $allCounts['indicator_2'],
-                'total_clients' => $allCounts['total_clients'],
-            ];
-
-            $availableBarangays = collect($allData['available_barangays'] ?? []);
-            foreach ($availableBarangays as $barangay) {
-                $barangayId = (int) ($barangay['barangay_id'] ?? 0);
-                if ($barangayId <= 0) {
-                    continue;
-                }
-
-                $barangayRequest = $this->makeInternalAnalyticsRequest([
+            if ($hasAssistanceServices) {
+                $allAssistanceRequest = $this->makeInternalAnalyticsRequest([
                     ...$baseDateParams,
                     'office_id' => $officeId,
-                    'barangay_id' => $barangayId,
                 ], $user);
-                $barangayResponse = $this->getAssistanceIndicatorGraph($barangayRequest);
-                $barangayPayload = $barangayResponse->getData(true);
-                $barangayDistribution = $barangayPayload['data']['distribution'] ?? [];
-                $barangayCounts = $this->formatAssistanceIndicatorCounts($barangayDistribution);
+                $allAssistanceResponse = $this->getAssistanceIndicatorGraph($allAssistanceRequest);
+                $allAssistancePayload = $allAssistanceResponse->getData(true);
+                $allData = $allAssistancePayload['data'] ?? [];
 
-                if ($barangayCounts['total_clients'] <= 0) {
-                    continue;
-                }
+                $allDistribution = $allData['distribution'] ?? [];
+                $allCounts = $this->formatAssistanceIndicatorCounts($allDistribution);
 
                 $assistanceIndicatorGraphs[] = [
-                    'label' => (string) ($barangay['barangay_name'] ?? 'Unknown Barangay'),
-                    'indicator_1' => $barangayCounts['indicator_1'],
-                    'indicator_2' => $barangayCounts['indicator_2'],
-                    'total_clients' => $barangayCounts['total_clients'],
+                    'label' => 'All Barangay',
+                    'indicator_1' => $allCounts['indicator_1'],
+                    'indicator_2' => $allCounts['indicator_2'],
+                    'total_clients' => $allCounts['total_clients'],
                 ];
+
+                $availableBarangays = collect($allData['available_barangays'] ?? []);
+                foreach ($availableBarangays as $barangay) {
+                    $barangayId = (int) ($barangay['barangay_id'] ?? 0);
+                    if ($barangayId <= 0) {
+                        continue;
+                    }
+
+                    $barangayRequest = $this->makeInternalAnalyticsRequest([
+                        ...$baseDateParams,
+                        'office_id' => $officeId,
+                        'barangay_id' => $barangayId,
+                    ], $user);
+                    $barangayResponse = $this->getAssistanceIndicatorGraph($barangayRequest);
+                    $barangayPayload = $barangayResponse->getData(true);
+                    $barangayDistribution = $barangayPayload['data']['distribution'] ?? [];
+                    $barangayCounts = $this->formatAssistanceIndicatorCounts($barangayDistribution);
+
+                    if ($barangayCounts['total_clients'] <= 0) {
+                        continue;
+                    }
+
+                    $assistanceIndicatorGraphs[] = [
+                        'label' => (string) ($barangay['barangay_name'] ?? 'Unknown Barangay'),
+                        'indicator_1' => $barangayCounts['indicator_1'],
+                        'indicator_2' => $barangayCounts['indicator_2'],
+                        'total_clients' => $barangayCounts['total_clients'],
+                    ];
+                }
             }
 
             return response()->view('analytics.office-efficiency-graphs-report', [
@@ -1241,8 +1573,10 @@ class FrontdeskAnalyticsController extends Controller
                 'year' => $year,
                 'monthlyScores' => $monthlyScores,
                 'monthlyYear' => $targetYear,
+                'officePerformanceRanking' => $officePerformanceRanking,
                 'sqdPercentages' => $sqdPercentages,
                 'overallSqdAverage' => $overallSqdAverage,
+                'hasAssistanceServices' => $hasAssistanceServices,
                 'assistanceIndicatorGraphs' => $assistanceIndicatorGraphs,
                 'officeEfficiencyLineChartPath' => $officeEfficiencyLineChartPath,
                 'exportPdfUrl' => url('/api/city-mayor/analytics/office-efficiency/export-graphs-pdf')

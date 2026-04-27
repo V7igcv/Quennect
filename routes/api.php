@@ -238,6 +238,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/csm/sqd-results', [CsmAnalyticsController::class, 'getSqdResults']);
         Route::get('/analytics/csm/demographic-profile', [CsmAnalyticsController::class, 'getDemographicProfile']);
         Route::get('/analytics/csm/overall-score-per-service', [CsmAnalyticsController::class, 'getOverallScorePerService']);
+        Route::get('/analytics/office-efficiency/dashboard-data', [FrontdeskAnalyticsController::class, 'getOfficeEfficiencyDashboardData']);
+        Route::get('/analytics/office-efficiency/performance-ranking', [FrontdeskAnalyticsController::class, 'getOfficePerformanceRanking']);
         Route::get('/analytics/office-efficiency/export-graphs', [FrontdeskAnalyticsController::class, 'exportOfficeEfficiencyGraphs']);
         Route::get('/analytics/office-efficiency/export-graphs-pdf', [FrontdeskAnalyticsController::class, 'exportOfficeEfficiencyGraphsPdf']);
     });

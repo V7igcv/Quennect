@@ -1,22 +1,16 @@
 <template>
   <div class="max-w-7xl mx-auto px-2 sm:px-2 lg:px-2 py-2">
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <!-- Page Header: Office Efficiency -->
+    <div class="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex items-center gap-1">
         <h1 class="text-2xl font-semibold">Office Efficiency</h1>
-        <CsmMetricExplanation
-          :title="efficiencyMetricExplanations.officeEfficiency.title"
-          :meaning="efficiencyMetricExplanations.officeEfficiency.meaning"
-          :computation="efficiencyMetricExplanations.officeEfficiency.computation"
-          :formula="efficiencyMetricExplanations.officeEfficiency.formula"
-          :interpretation="efficiencyMetricExplanations.officeEfficiency.interpretation"
-        />
       </div>
 
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <Select v-model="selectedOffice">
-          <SelectTrigger class="w-full sm:w-[220px] bg-white cursor-pointer">
+          <SelectTrigger class="w-full cursor-pointer bg-white sm:w-55">
             <span class="flex items-center gap-2">
-              <Building2 class="h-4 w-4 text-gray-500 shrink-0" />
+              <Building2 class="h-4 w-4 shrink-0 text-gray-500" />
               <span class="truncate">{{ selectedOfficeAcronym || 'Select Office' }}</span>
             </span>
           </SelectTrigger>
@@ -33,9 +27,9 @@
 
         <Popover v-model:open="isDateFilterOpen">
           <PopoverTrigger as-child>
-            <Button variant="outline" class="w-full sm:w-[220px] justify-start bg-white">
+            <Button variant="outline" class="w-full justify-start bg-white sm:w-55">
               <span class="flex items-center gap-2">
-                <Calendar class="h-4 w-4 text-gray-500 shrink-0" />
+                <Calendar class="h-4 w-4 shrink-0 text-gray-500" />
                 <span class="truncate">{{ dateFilterLabel }}</span>
               </span>
             </Button>
@@ -156,7 +150,7 @@
         </Popover>
 
         <Button
-          class="px-4 py-2 bg-[#0F5C5C] hover:bg-[#0D4A4A] text-white whitespace-nowrap flex items-center gap-2"
+          class="flex items-center gap-2 whitespace-nowrap bg-[#0F5C5C] px-4 py-2 text-white hover:bg-[#0D4A4A]"
           type="button"
           :disabled="!selectedOffice"
           @click="openExportModal"
@@ -167,6 +161,83 @@
       </div>
     </div>
 
+    <div v-if="isLoadingAnalytics" class="mb-4 flex items-center gap-2 rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm font-medium text-[#0F5C5C]">
+      <Loader2 class="h-4 w-4 animate-spin" />
+      Loading analytics data...
+    </div>
+
+    <!-- Office Performance Ranking Card -->
+    <div class="mt-6">
+      <div class="mb-3 flex items-center gap-1">
+        <h2 class="text-lg font-semibold text-slate-900">Office Performance Ranking</h2>
+        <CsmMetricExplanation
+          :title="efficiencyMetricExplanations.officePerformanceRanking.title"
+          :meaning="efficiencyMetricExplanations.officePerformanceRanking.meaning"
+          :computation="efficiencyMetricExplanations.officePerformanceRanking.computation"
+          :formula="efficiencyMetricExplanations.officePerformanceRanking.formula"
+          :interpretation="efficiencyMetricExplanations.officePerformanceRanking.interpretation"
+        />
+      </div>
+
+      <Card class="w-full overflow-hidden border border-slate-200 shadow-sm">
+        <CardContent class="pt-6">
+          <div class="rounded-2xl border border-slate-100 bg-linear-to-b from-slate-50 to-white p-5">
+            <div v-if="officePerformanceRankingData.length === 0" class="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-6 py-10 text-sm text-slate-500">
+              No ranking data available for the selected date filter.
+            </div>
+
+            <div v-else class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div
+                v-for="office in officePerformanceRankingData"
+                :key="`ranking-office-${office.officeId}`"
+                class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
+              >
+                <div class="flex items-start gap-3">
+                  <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#0F5C5C] text-sm font-semibold text-white shadow-sm">
+                    {{ office.rank }}
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Rank {{ office.rank }}</p>
+                    <h3 class="mt-1 text-sm font-semibold leading-snug text-slate-900">
+                      {{ office.displayName }}
+                    </h3>
+                  </div>
+                </div>
+
+                <div class="mt-4">
+                  <div class="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      class="h-full rounded-full transition-all duration-500"
+                      :style="{
+                        width: `${clampPercentage(office.percentage)}%`,
+                        backgroundColor: office.color,
+                      }"
+                    ></div>
+                  </div>
+
+                  <div class="mt-2 flex items-center justify-between gap-3 text-xs">
+                    <span class="text-slate-500">
+                      Percentage:
+                      <span class="font-semibold text-slate-900">{{ formatPercentage(office.percentage) }}%</span>
+                    </span>
+
+                    <span
+                      class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                      :style="{ color: office.color, backgroundColor: `${office.color}14` }"
+                    >
+                      {{ office.rating }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+
+    <!-- Export Modal -->
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="showExportModal" class="fixed inset-0 z-50 flex items-center justify-center">
@@ -181,9 +252,9 @@
               ×
             </button>
 
-            <h2 class="text-xl font-semibold text-gray-900 mb-3">Export Analytics Graphs</h2>
+            <h2 class="text-xl font-semibold text-gray-900 mb-3">Export Office Performance Analytics</h2>
             <p class="text-sm text-gray-600 mb-6">
-              This will generate an HTML report containing the current Office Efficiency graphs
+              This will generate an HTML report containing the current Office Performance analytics
               for
               <span class="font-semibold">{{ selectedOfficeDisplayName }}</span>
               for
@@ -215,20 +286,23 @@
       </Transition>
     </Teleport>
 
-    <div
-      v-if="isLoadingAnalytics"
-      class="mb-4 flex items-center gap-2 rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm font-medium text-[#0F5C5C]"
-    >
-      <Loader2 class="h-4 w-4 animate-spin" />
-      Loading analytics data...
-    </div>
-
-    <div class="mt-2">
+    <!-- Office Performance Graph Section -->
+    <div class="mt-6">
+      <div class="mb-3 flex items-center gap-1">
+        <h2 class="text-lg font-semibold">Office Performance</h2>
+        <CsmMetricExplanation
+          :title="efficiencyMetricExplanations.officeEfficiency.title"
+          :meaning="efficiencyMetricExplanations.officeEfficiency.meaning"
+          :computation="efficiencyMetricExplanations.officeEfficiency.computation"
+          :formula="efficiencyMetricExplanations.officeEfficiency.formula"
+          :interpretation="efficiencyMetricExplanations.officeEfficiency.interpretation"
+        />
+      </div>
       <Card class="w-full">
         <CardContent class="pt-6">
-          <div class="h-[320px] w-full">
+          <div class="h-80 w-full">
             <div class="h-full rounded-lg border border-gray-100 bg-gray-50 p-4">
-              <div class="h-[230px] grid grid-cols-[40px_1fr] gap-3">
+              <div class="grid h-57.5 grid-cols-[40px_1fr] gap-3">
                 <div class="relative">
                   <span
                     v-for="gridLabel in [100, 80, 60, 40, 20, 0]"
@@ -292,7 +366,7 @@
                 </div>
               </div>
 
-              <div class="mt-2 ml-[43px] relative h-5">
+              <div class="relative mt-2 ml-10.75 h-5">
                 <span
                   v-for="(point, index) in officeEfficiencyChartData"
                   :key="`month-label-${point.month}`"
@@ -306,7 +380,9 @@
       </Card>
     </div>
 
-    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+    <!-- Client Service Satisfaction and Assistance Indicator sections -->
+    <div class="mt-6 space-y-6">
+      <!-- Client Service Satisfaction - Full Width -->
       <div>
         <div class="mb-3 flex items-center gap-1">
           <h2 class="text-lg font-semibold">Client Service Satisfaction</h2>
@@ -320,45 +396,56 @@
         </div>
         <Card class="w-full">
           <CardContent class="pt-6">
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 space-y-6">
+              <!-- SQD0 - Single Row -->
               <div>
-                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <div>
-                    <h3 class="text-lg font-semibold">{{ selectedSqdForSatisfaction }}</h3>
-                    <p class="text-sm text-gray-500 mt-1">{{ getSqdDescription(selectedSqdForSatisfaction) }}</p>
-                  </div>
-
-                  <Select v-model="selectedSqdForSatisfaction">
-                    <SelectTrigger class="bg-white shrink-0" style="width: 180px; min-width: 180px; max-width: 180px;">
-                      <SelectValue placeholder="Select SQD" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem v-for="sqd in sqdOptions" :key="sqd" :value="sqd">
-                        {{ sqd }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div class="mb-3">
+                  <h3 class="text-sm font-semibold text-gray-900">SQD0</h3>
+                  <p class="text-xs text-gray-500 mt-1">{{ getSqdDescription('SQD0') }}</p>
                 </div>
+                <div class="h-5 w-full rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    class="h-full rounded-full transition-all duration-300"
+                    :class="getExperienceBarClass(sqdPercentagesByCode['SQD0'])"
+                    :style="{ width: `${clampPercentage(sqdPercentagesByCode['SQD0'])}%` }"
+                  ></div>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-xs">
+                  <span class="text-gray-600">Percentage: <span class="font-semibold text-gray-900">{{ formatPercentage(sqdPercentagesByCode['SQD0']) }}%</span></span>
+                  <span class="font-semibold" :class="getExperienceTextClass(sqdPercentagesByCode['SQD0'])">
+                    {{ getExperienceRating(sqdPercentagesByCode['SQD0']) }}
+                  </span>
+                </div>
+              </div>
 
-                <div class="mt-5">
-                  <div class="h-5 w-full rounded-full bg-gray-200 overflow-hidden">
+              <div class="border-t border-gray-200"></div>
+
+              <!-- SQD1 to SQD8 - 2 Column Grid with Better Alignment -->
+              <div class="grid grid-cols-2 gap-6">
+                <div v-for="sqdCode in ['SQD1', 'SQD2', 'SQD3', 'SQD4', 'SQD5', 'SQD6', 'SQD7', 'SQD8']" :key="sqdCode" class="flex flex-col">
+                  <div class="mb-2">
+                    <h3 class="text-sm font-semibold text-gray-900">{{ sqdCode }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ getSqdDescription(sqdCode) }}</p>
+                  </div>
+                  <div class="h-4 w-full rounded-full bg-gray-200 overflow-hidden">
                     <div
                       class="h-full rounded-full transition-all duration-300"
-                      :class="getExperienceBarClass(selectedSqdPercentage)"
-                      :style="{ width: `${clampPercentage(selectedSqdPercentage)}%` }"
+                      :class="getExperienceBarClass(sqdPercentagesByCode[sqdCode])"
+                      :style="{ width: `${clampPercentage(sqdPercentagesByCode[sqdCode])}%` }"
                     ></div>
                   </div>
-                  <div class="mt-2 flex items-center justify-between text-sm">
-                    <span class="text-gray-600">Percentage: <span class="font-semibold text-gray-900">{{ formatPercentage(selectedSqdPercentage) }}%</span></span>
-                    <span class="font-semibold" :class="getExperienceTextClass(selectedSqdPercentage)">
-                      Average: {{ getExperienceRating(selectedSqdPercentage) }}
+                  <div class="mt-1 flex items-center justify-between text-xs">
+                    <span class="text-gray-600">{{ formatPercentage(sqdPercentagesByCode[sqdCode]) }}%</span>
+                    <span class="font-semibold" :class="getExperienceTextClass(sqdPercentagesByCode[sqdCode])">
+                      {{ getExperienceRating(sqdPercentagesByCode[sqdCode]) }}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div class="my-5 border-t border-gray-200"></div>
+              <div class="border-t border-gray-200"></div>
 
+              <!-- Overall Summary -->
               <div>
                 <div class="text-sm font-medium text-gray-500">Overall Percentage</div>
                 <div class="mt-1 text-3xl font-bold" :class="getExperienceTextClass(overallSqdAveragePercentage)">
@@ -373,14 +460,15 @@
         </Card>
       </div>
 
-      <div>
+      <!-- Assistance Indicator - Full Width (Conditional) -->
+      <div v-if="officeHasAssistanceServices">
         <div class="mb-3 flex items-center gap-1">
-          <h2 class="text-lg font-semibold">Assistance Indicator Graph</h2>
+          <h2 class="text-lg font-semibold">Assistance Indicator</h2>
         </div>
         <Card class="w-full">
           <CardHeader class="flex flex-row items-start justify-end space-y-0 pt-4 px-4">
             <Select v-model="selectedBarangayIdForIndicator">
-              <SelectTrigger class="w-[180px] bg-white">
+              <SelectTrigger class="w-45 bg-white">
                 <SelectValue placeholder="All Barangay" />
               </SelectTrigger>
               <SelectContent>
@@ -426,7 +514,7 @@
                 </div>
               </div>
 
-              <div class="mt-4 ml-[27px] border-t border-gray-200 pt-2">
+              <div class="mt-4 ml-6.75 border-t border-gray-200 pt-2">
                 <div class="flex items-center justify-between text-[11px] text-gray-500">
                   <span>0</span>
                   <span>{{ Math.ceil(maxAssistanceIndicatorCount / 2) }}</span>
@@ -480,19 +568,21 @@ const officeOptions = ref([])
 const selectedDateRange = ref('daily')
 const isDateFilterOpen = ref(false)
 const isLoadingAnalytics = ref(false)
+const isLoadingPerformanceRanking = ref(false)
 const isInitializing = ref(true)
 const showExportModal = ref(false)
 const isExportingGraphs = ref(false)
 
 const officeEfficiencyMonthlyScores = ref([])
-const selectedSqdForSatisfaction = ref('SQD0')
-const selectedSqdPercentage = ref(0)
 const overallSqdAveragePercentage = ref(0)
 const sqdPercentagesByCode = ref({})
+const officePerformanceRankingData = ref([])
 const selectedBarangayIdForIndicator = ref('all')
 const availableBarangaysForIndicator = ref([])
 const assistanceIndicatorCounts = ref({ 1: 0, 2: 0 })
+const officeHasAssistanceServices = ref(false)
 const latestLoadRequestId = ref(0)
+const latestRankingRequestId = ref(0)
 const latestThirdGraphRequestId = ref(0)
 
 const sqdOptions = ['SQD0', 'SQD1', 'SQD2', 'SQD3', 'SQD4', 'SQD5', 'SQD6', 'SQD7', 'SQD8']
@@ -510,14 +600,25 @@ const sqdDescriptions = {
 
 const efficiencyMetricExplanations = {
   officeEfficiency: {
-    title: 'Office Efficiency',
-    meaning: 'This line graph shows the monthly All Service Total percentage for the selected office within the active year.',
-    computation: 'Each monthly value uses the same computation as CSM Overall Score Per Service using service type All (external + internal). The month value corresponds to the Service Total Percentage for that month.',
-    formula: 'Monthly All Service Total (%) = ((Agree + Strongly Agree) / (Total SQD Answers - N/A)) * 100, averaged per service by the existing CSM service-total logic.',
+    title: 'Office Performance',
+    meaning: 'This line graph shows the monthly Overall Service Total percentage for the selected office within the active date filter.',
+    computation: 'Each monthly value uses the same computation as CSM Overall Score Per Service with service type All (external + internal). The month value corresponds to the Service Total Percentage for that month.',
+    formula: 'Monthly Overall Service Total (%) = the service_total_percentage returned by the CSM Overall Score Per Service graph for service type All.',
     interpretation: [
-      'Higher points indicate stronger overall service efficiency in that month.',
-      'Changing office updates the monthly line for the currently active year.',
-      'Year changes in Daily, Monthly, or Yearly date filters update this graph.',
+      'Higher points indicate stronger overall service performance in that month.',
+      'Changing office updates the monthly line for the selected date context.',
+      'Date filter changes update this graph.',
+    ],
+  },
+  officePerformanceRanking: {
+    title: 'Office Performance Ranking',
+    meaning: 'This ranking compares all offices by their Overall Service Total percentage for the selected date filter.',
+    computation: 'Each office uses the same Overall Score Per Service computation with service type All. Offices are sorted from the highest service_total_percentage to the lowest.',
+    formula: 'Ranking (%) = service_total_percentage from the CSM Overall Score Per Service graph for each office.',
+    interpretation: [
+      'This ranking is not affected by the Office filter.',
+      'Only the selected date filter changes the order and values.',
+      'The performance label and bar color reflect the percentage band.',
     ],
   },
   clientServiceSatisfaction: {
@@ -657,6 +758,32 @@ const getExportFilterParams = () => {
   const params = {
     office_id: Number(selectedOffice.value),
   }
+
+  if (selectedDateRange.value === 'monthly') {
+    params.period = 'monthly'
+    params.month = selectedMonthIndex.value + 1
+    params.year = Number(selectedMonthYear.value)
+    return params
+  }
+
+  if (selectedDateRange.value === 'yearly') {
+    params.period = 'yearly'
+    params.year = Number(selectedYear.value)
+    return params
+  }
+
+  const y = selectedDate.value.getFullYear()
+  const m = String(selectedDate.value.getMonth() + 1).padStart(2, '0')
+  const d = String(selectedDate.value.getDate()).padStart(2, '0')
+
+  params.period = 'daily'
+  params.date = `${y}-${m}-${d}`
+
+  return params
+}
+
+const buildOfficePerformanceRankingParams = () => {
+  const params = {}
 
   if (selectedDateRange.value === 'monthly') {
     params.period = 'monthly'
@@ -846,29 +973,59 @@ const buildSqdFilterParams = () => {
   }
 }
 
+const sleep = (ms) => new Promise((resolve) => {
+  window.setTimeout(resolve, ms)
+})
+
+const requestWithRateLimitRetry = async (requestFactory, retries = 2) => {
+  let attempt = 0
+
+  while (attempt <= retries) {
+    try {
+      return await requestFactory()
+    } catch (error) {
+      const status = error?.response?.status
+      const shouldRetry = status === 429 && attempt < retries
+
+      if (!shouldRetry) {
+        throw error
+      }
+
+      const backoff = 300 * (attempt + 1)
+      await sleep(backoff)
+      attempt += 1
+    }
+  }
+
+  return requestFactory()
+}
+
 const fetchSqdPercentage = async (sqdCode) => {
-  const response = await api.get('/city-mayor/analytics/csm/sqd-results', {
+  const response = await requestWithRateLimitRetry(() => api.get('/city-mayor/analytics/csm/sqd-results', {
     params: {
       ...buildSqdFilterParams(),
       sqd: sqdCode,
     },
-  })
+  }))
 
   const payload = response?.data?.data || {}
   return Number(payload.overall_percentage ?? 0)
 }
 
-const fetchSelectedSqdForSecondGraph = async () => {
-  if (!selectedOffice.value) {
-    selectedSqdPercentage.value = 0
-    return
+const mapInChunks = async (items, chunkSize, mapper) => {
+  const results = []
+
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize)
+    const chunkResults = await Promise.all(chunk.map((item, chunkIndex) => mapper(item, i + chunkIndex)))
+    results.push(...chunkResults)
   }
 
-  selectedSqdPercentage.value = await fetchSqdPercentage(selectedSqdForSatisfaction.value)
+  return results
 }
 
 const fetchAllSqdPercentages = async () => {
-  const values = await Promise.all(sqdOptions.map((code) => fetchSqdPercentage(code)))
+  const values = await mapInChunks(sqdOptions, 2, (code) => fetchSqdPercentage(code))
   return sqdOptions.reduce((accumulator, code, index) => {
     accumulator[code] = Number(values[index] ?? 0)
     return accumulator
@@ -883,8 +1040,9 @@ const fetchOfficeEfficiencyGraphData = async () => {
   const targetYear = activeYearForOfficeEfficiency.value
   const officeId = Number(selectedOffice.value)
 
-  const requests = monthShortNames.map((_, monthIndex) => {
-    return api.get('/city-mayor/analytics/csm/overall-score-per-service', {
+  const monthIndexes = monthShortNames.map((_, monthIndex) => monthIndex)
+  const responses = await mapInChunks(monthIndexes, 3, (monthIndex) => {
+    return requestWithRateLimitRetry(() => api.get('/city-mayor/analytics/csm/overall-score-per-service', {
       params: {
         office_id: officeId,
         service_type: 'all',
@@ -892,10 +1050,9 @@ const fetchOfficeEfficiencyGraphData = async () => {
         month: monthIndex + 1,
         year: targetYear,
       },
-    })
+    }))
   })
 
-  const responses = await Promise.all(requests)
   return responses.map((response) => {
     const payload = response?.data?.data || {}
     return Number(payload.service_total_percentage ?? 0)
@@ -906,7 +1063,6 @@ const fetchSecondGraphData = async () => {
   if (!selectedOffice.value) {
     return {
       sqdMap: {},
-      selectedPercentage: 0,
       overallAverage: 0,
     }
   }
@@ -915,11 +1071,9 @@ const fetchSecondGraphData = async () => {
   const percentages = Object.values(sqdMap)
   const total = percentages.reduce((sum, value) => sum + Number(value || 0), 0)
   const overallAverage = percentages.length ? Number((total / percentages.length).toFixed(2)) : 0
-  const selectedPercentage = Number(sqdMap[selectedSqdForSatisfaction.value] ?? 0)
 
   return {
     sqdMap,
-    selectedPercentage,
     overallAverage,
   }
 }
@@ -956,7 +1110,7 @@ const fetchThirdGraphData = async () => {
     params.barangay_id = Number(selectedBarangayIdForIndicator.value)
   }
 
-  const response = await api.get('/city-mayor/analytics/assistance-indicator-graph', { params })
+  const response = await requestWithRateLimitRetry(() => api.get('/city-mayor/analytics/assistance-indicator-graph', { params }))
   const payload = response?.data?.data || {}
   const distribution = Array.isArray(payload.distribution) ? payload.distribution : []
 
@@ -982,6 +1136,121 @@ const fetchThirdGraphData = async () => {
     counts,
     barangays,
     selectedStillAvailable,
+  }
+}
+
+const buildOfficeEfficiencyDashboardParams = () => {
+  const params = {
+    office_id: Number(selectedOffice.value),
+  }
+
+  if (selectedDateRange.value === 'monthly') {
+    params.period = 'monthly'
+    params.month = selectedMonthIndex.value + 1
+    params.year = Number(selectedMonthYear.value)
+  } else if (selectedDateRange.value === 'yearly') {
+    params.period = 'yearly'
+    params.year = Number(selectedYear.value)
+  } else {
+    params.period = 'daily'
+    const y = selectedDate.value.getFullYear()
+    const m = String(selectedDate.value.getMonth() + 1).padStart(2, '0')
+    const d = String(selectedDate.value.getDate()).padStart(2, '0')
+    params.date = `${y}-${m}-${d}`
+  }
+
+  if (selectedBarangayIdForIndicator.value !== 'all') {
+    params.barangay_id = Number(selectedBarangayIdForIndicator.value)
+  }
+
+  return params
+}
+
+const fetchOfficeEfficiencyDashboardData = async () => {
+  if (!selectedOffice.value) {
+    return {
+      monthlyScores: Array.from({ length: 12 }, () => 0),
+      sqdMap: {},
+      overallAverage: 0,
+      counts: { 1: 0, 2: 0 },
+      barangays: [],
+      selectedStillAvailable: true,
+      hasAssistanceServices: false,
+    }
+  }
+
+  const response = await api.get('/city-mayor/analytics/office-efficiency/dashboard-data', {
+    params: buildOfficeEfficiencyDashboardParams(),
+  })
+
+  const payload = response?.data?.data || {}
+  const assistancePayload = payload.assistance_indicator || {}
+  const rawCounts = assistancePayload.counts || {}
+
+  return {
+    monthlyScores: Array.isArray(payload.monthly_scores)
+      ? payload.monthly_scores.map((value) => Number(value ?? 0))
+      : Array.from({ length: 12 }, () => 0),
+    sqdMap: payload.sqd_percentages || {},
+    overallAverage: Number(payload.overall_sqd_average ?? 0),
+    counts: {
+      1: Number(rawCounts[1] ?? rawCounts['1'] ?? 0),
+      2: Number(rawCounts[2] ?? rawCounts['2'] ?? 0),
+    },
+    barangays: Array.isArray(assistancePayload.available_barangays)
+      ? assistancePayload.available_barangays.map((item) => ({
+          id: String(item.barangay_id),
+          name: item.barangay_name,
+        }))
+      : [],
+    selectedStillAvailable: assistancePayload.selected_still_available !== false,
+    hasAssistanceServices: Boolean(payload.has_assistance_services),
+  }
+}
+
+const fetchOfficePerformanceRankingData = async () => {
+  const response = await api.get('/city-mayor/analytics/office-efficiency/performance-ranking', {
+    params: buildOfficePerformanceRankingParams(),
+  })
+
+  const payload = response?.data?.data || {}
+  const rankingRows = Array.isArray(payload.ranking) ? payload.ranking : []
+
+  return rankingRows.map((item) => ({
+    rank: Number(item.rank ?? 0),
+    officeId: Number(item.office_id ?? 0),
+    officeName: String(item.office_name ?? ''),
+    officeAcronym: String(item.office_acronym ?? ''),
+    displayName: String(item.display_name ?? item.office_name ?? ''),
+    percentage: Number(item.percentage ?? 0),
+    rating: String(item.rating ?? 'Poor'),
+    color: String(item.color ?? '#EF4444'),
+  }))
+}
+
+const loadOfficePerformanceRanking = async () => {
+  const requestId = ++latestRankingRequestId.value
+
+  isLoadingPerformanceRanking.value = true
+
+  try {
+    const rankingData = await fetchOfficePerformanceRankingData()
+
+    if (requestId !== latestRankingRequestId.value) {
+      return
+    }
+
+    officePerformanceRankingData.value = rankingData
+  } catch (error) {
+    console.error('Error loading office performance ranking:', error)
+    if (requestId !== latestRankingRequestId.value) {
+      return
+    }
+    officePerformanceRankingData.value = []
+  } finally {
+    if (requestId === latestRankingRequestId.value) {
+      isLoadingPerformanceRanking.value = false
+    }
   }
 }
 
@@ -1011,6 +1280,7 @@ const loadThirdGraphOnly = async () => {
   }
 }
 
+
 const loadAllGraphs = async () => {
   const requestId = ++latestLoadRequestId.value
   latestThirdGraphRequestId.value += 1
@@ -1018,35 +1288,31 @@ const loadAllGraphs = async () => {
   if (!selectedOffice.value) {
     officeEfficiencyMonthlyScores.value = Array.from({ length: 12 }, () => 0)
     sqdPercentagesByCode.value = {}
-    selectedSqdPercentage.value = 0
     overallSqdAveragePercentage.value = 0
     selectedBarangayIdForIndicator.value = 'all'
     availableBarangaysForIndicator.value = []
     assistanceIndicatorCounts.value = { 1: 0, 2: 0 }
+    officeHasAssistanceServices.value = false
     return
   }
 
   isLoadingAnalytics.value = true
 
   try {
-    const [monthlyScores, secondGraphData, thirdData] = await Promise.all([
-      fetchOfficeEfficiencyGraphData(),
-      fetchSecondGraphData(),
-      fetchThirdGraphData(),
-    ])
+    const dashboardData = await fetchOfficeEfficiencyDashboardData()
 
     if (requestId !== latestLoadRequestId.value) {
       return
     }
 
-    officeEfficiencyMonthlyScores.value = monthlyScores
-    sqdPercentagesByCode.value = secondGraphData.sqdMap
-    selectedSqdPercentage.value = secondGraphData.selectedPercentage
-    overallSqdAveragePercentage.value = secondGraphData.overallAverage
-    assistanceIndicatorCounts.value = thirdData.counts
-    availableBarangaysForIndicator.value = thirdData.barangays
+    officeEfficiencyMonthlyScores.value = dashboardData.monthlyScores
+    sqdPercentagesByCode.value = dashboardData.sqdMap
+    overallSqdAveragePercentage.value = dashboardData.overallAverage
+    assistanceIndicatorCounts.value = dashboardData.counts
+    availableBarangaysForIndicator.value = dashboardData.barangays
+    officeHasAssistanceServices.value = dashboardData.hasAssistanceServices
 
-    if (!thirdData.selectedStillAvailable) {
+    if (!dashboardData.selectedStillAvailable) {
       selectedBarangayIdForIndicator.value = 'all'
     }
   } catch (error) {
@@ -1056,10 +1322,10 @@ const loadAllGraphs = async () => {
     }
     officeEfficiencyMonthlyScores.value = Array.from({ length: 12 }, () => 0)
     sqdPercentagesByCode.value = {}
-    selectedSqdPercentage.value = 0
     overallSqdAveragePercentage.value = 0
     assistanceIndicatorCounts.value = { 1: 0, 2: 0 }
     availableBarangaysForIndicator.value = []
+    officeHasAssistanceServices.value = false
   } finally {
     if (requestId === latestLoadRequestId.value) {
       isLoadingAnalytics.value = false
@@ -1132,34 +1398,28 @@ watch(selectedOffice, () => {
 watch(selectedDateRange, () => {
   if (isInitializing.value) return
   loadAllGraphs()
+  loadOfficePerformanceRanking()
 })
 
 watch(selectedDate, () => {
   if (isInitializing.value) return
   if (selectedDateRange.value !== 'daily') return
   loadAllGraphs()
+  loadOfficePerformanceRanking()
 })
 
 watch([selectedMonthIndex, selectedMonthYear], () => {
   if (isInitializing.value) return
   if (selectedDateRange.value !== 'monthly') return
   loadAllGraphs()
+  loadOfficePerformanceRanking()
 })
 
 watch(selectedYear, () => {
   if (isInitializing.value) return
   if (selectedDateRange.value !== 'yearly') return
   loadAllGraphs()
-})
-
-watch(selectedSqdForSatisfaction, () => {
-  if (isInitializing.value) return
-  const cached = sqdPercentagesByCode.value[selectedSqdForSatisfaction.value]
-  if (cached !== undefined) {
-    selectedSqdPercentage.value = Number(cached || 0)
-    return
-  }
-  fetchSelectedSqdForSecondGraph()
+  loadOfficePerformanceRanking()
 })
 
 watch(selectedBarangayIdForIndicator, () => {
@@ -1169,7 +1429,10 @@ watch(selectedBarangayIdForIndicator, () => {
 
 onMounted(async () => {
   await fetchOfficeOptions()
-  await loadAllGraphs()
+  await Promise.all([
+    loadAllGraphs(),
+    loadOfficePerformanceRanking(),
+  ])
   isInitializing.value = false
 })
 </script>
