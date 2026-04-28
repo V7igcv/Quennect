@@ -175,6 +175,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/evaluation/transaction/{queueId}', [EvaluationController::class, 'getTransactionForEvaluation']);
         Route::post('/evaluation/submit/{queueId}', [EvaluationController::class, 'submitEvaluation']);
         Route::get('/evaluation/results/{queueId}', [EvaluationController::class, 'getEvaluationResults']);
+        Route::post('/transaction/{queueId}/complete-without-evaluation', [EvaluationController::class, 'completeWithoutEvaluation']);
 
         // Assistance Types
         Route::get('/services/{serviceId}/assistance-types', [AssistanceTypeController::class, 'getByService']);

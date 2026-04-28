@@ -974,6 +974,15 @@ const openEvaluationModal = async (queueData) => {
     const response = await api.get(`/frontdesk/evaluation/transaction/${queueData.id}`)
     if (response.data.success) {
       const transaction = response.data.data
+      
+      // Check if evaluation is required for this office
+      if (response.data.requires_evaluation === false) {
+        // Skip evaluation, directly complete the transaction
+        await completeTransactionWithoutEvaluation(queueData.id)
+        return
+      }
+      
+      // Show evaluation modal as normal
       selectedQueueNumber.value = transaction.queue_number
       selectedCustomerName.value = transaction.client_name
       selectedContactNumber.value = transaction.contact_number
@@ -986,6 +995,29 @@ const openEvaluationModal = async (queueData) => {
     console.error('Error fetching transaction details:', error)
     alertTitle.value = 'Error'
     alertMessage.value = error.response?.data?.message || 'Error opening evaluation modal'
+    showAlertModal.value = true
+  }
+}
+
+// Add this new function
+const completeTransactionWithoutEvaluation = async (queueId) => {
+  try {
+    // You need to create this backend endpoint
+    const response = await api.post(`/frontdesk/transaction/${queueId}/complete-without-evaluation`)
+    
+    if (response.data.message) {
+      // Refresh counters and stats
+      await fetchCounters()
+      await fetchDashboardStats()
+      
+      alertTitle.value = 'Success'
+      alertMessage.value = 'Transaction completed successfully'
+      showAlertModal.value = true
+    }
+  } catch (error) {
+    console.error('Error completing transaction:', error)
+    alertTitle.value = 'Error'
+    alertMessage.value = error.response?.data?.message || 'Error completing transaction'
     showAlertModal.value = true
   }
 }

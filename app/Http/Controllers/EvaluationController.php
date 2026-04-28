@@ -94,6 +94,7 @@ class EvaluationController extends Controller
         try {
             $transaction = QueueTransaction::with([
                 'barangay',
+                'office', // Load the office relationship
                 'queueTransactionServices' => function ($query) {
                     $query->with('service.assistanceTypes');
                 }
@@ -116,6 +117,9 @@ class EvaluationController extends Controller
                 ], 400);
             }
 
+            // NEW: Check if this office requires evaluation
+            $requiresEvaluation = $transaction->office?->requires_evaluation ?? true;
+
             // Transform queue_transaction_services to include both service and pivot data
             $services = $transaction->queueTransactionServices->map(function ($queueTransactionService) {
                 $service = $queueTransactionService->service;
@@ -136,6 +140,7 @@ class EvaluationController extends Controller
 
             return response()->json([
                 'success' => true,
+                'requires_evaluation' => $requiresEvaluation, // Add this flag
                 'data' => [
                     'queue_id' => $transaction->id,
                     'queue_number' => $transaction->full_queue_number,
@@ -392,6 +397,60 @@ class EvaluationController extends Controller
             Log::error('Submit evaluation error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'Error submitting evaluation',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Complete transaction without evaluation
+     * 
+     * @param int $queueId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function completeWithoutEvaluation($queueId)
+    {
+        $user = Auth::user();
+
+        try {
+            DB::beginTransaction();
+
+            $transaction = QueueTransaction::where('id', $queueId)
+                ->where('office_id', $user->office_id)
+                ->where('status', 'SERVING')
+                ->first();
+
+            if (!$transaction) {
+                return response()->json([
+                    'message' => 'Transaction not found or not currently being served.'
+                ], 404);
+            }
+
+            // Update transaction status to COMPLETED
+            $transaction->status = 'COMPLETED';
+            $transaction->completed_at = now();
+            if ($transaction->called_at) {
+                $transaction->serving_time = (int) round($transaction->called_at->diffInMinutes($transaction->completed_at));
+            }
+            $transaction->save();
+
+            DB::commit();
+
+            $this->broadcastMonitorUpdate((int) $transaction->office_id);
+
+            return response()->json([
+                'message' => 'Transaction completed successfully',
+                'data' => [
+                    'queue_number' => $transaction->full_queue_number,
+                    'completed_at' => $transaction->completed_at->format('h:i A'),
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Complete without evaluation error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Error completing transaction',
                 'error' => $e->getMessage()
             ], 500);
         }
