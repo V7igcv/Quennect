@@ -17,7 +17,7 @@
         </p>
 
         <p class="text-2xl font-semibold" :class="numberColor">
-          {{ value }}{{ suffix }}
+          <span v-if="prefix">{{ prefix }}</span>{{ formattedValue }}<span v-if="suffix">{{ suffix }}</span>
         </p>
       </div>
 
@@ -27,17 +27,30 @@
 
 <script setup>
 import { Card, CardContent } from '@/components/ui/card'
+import { computed } from 'vue'
 
-defineProps({
+const props = defineProps({
   title: String,
   value: Number,
   icon: Object,
   iconBg: String,
   iconColor: String,
   numberColor: String,
+  prefix: {
+    type: String,
+    default: ''
+  },
   suffix: {
     type: String,
     default: ''
   }
+})
+
+// Add this computed property
+const formattedValue = computed(() => {
+  if (props.value === undefined || props.value === null) return '0'
+  
+  // Just add commas, no decimals
+  return props.value.toLocaleString('en-US')
 })
 </script>

@@ -28,6 +28,9 @@ use App\Http\Controllers\InternalEvaluationController;
 // Chat Controller
 use App\Http\Controllers\ChatController;
 
+// AICS Analytics Controller
+use App\Http\Controllers\AicsAnalyticsController;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -242,6 +245,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/office-efficiency/performance-ranking', [FrontdeskAnalyticsController::class, 'getOfficePerformanceRanking']);
         Route::get('/analytics/office-efficiency/export-graphs', [FrontdeskAnalyticsController::class, 'exportOfficeEfficiencyGraphs']);
         Route::get('/analytics/office-efficiency/export-graphs-pdf', [FrontdeskAnalyticsController::class, 'exportOfficeEfficiencyGraphsPdf']);
+    });
+
+    // ==================== CSWDO FOCAL ====================
+    Route::middleware('role:CSWDO FOCAL')->prefix('cswdo-focal')->group(function () {
+        // AICS Analytics
+        Route::get('/analytics/cards', [AicsAnalyticsController::class, 'getCardStats']);
+        Route::get('/analytics/assistance-distribution', [AicsAnalyticsController::class, 'getAssistanceDistribution']);
+        Route::get('/analytics/queue-summary', [AicsAnalyticsController::class, 'getQueueSummary']);
+        Route::get('/analytics/queue-summary/export', [AicsAnalyticsController::class, 'exportQueueSummary']);
     });
 
 });

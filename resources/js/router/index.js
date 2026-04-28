@@ -6,6 +6,7 @@ import KioskLayout from '../layouts/KioskLayout.vue'
 import FrontdeskLayout from '../layouts/FrontdeskLayout.vue'
 import SuperadminLayout from '../layouts/SuperadminLayout.vue'
 import CityMayorLayout from '../layouts/CityMayorLayout.vue'
+import CswdoLayout from '../layouts/CswdoLayout.vue'
 
 const getHomePathForRole = (role) => {
   if (role === 'SUPERADMIN') return '/superadmin'
@@ -147,6 +148,20 @@ const routes = [
         path: 'office-service-efficiency',
         name: 'city-mayor.office-service-efficiency',
         component: () => import('../pages/citymayor/OfficeServiceEfficiency.vue')
+      }
+    ]
+  },
+
+  // CSWDO Focal routes (protected - CSWDO FOCAL only)
+  {
+    path: '/cswdo-focal',
+    component: CswdoLayout,
+    meta: { requiresAuth: true, role: 'CSWDO FOCAL' },
+    children: [
+      {
+        path: '',
+        name: 'cswdo.aics-analytics',
+        component: () => import('../pages/cswdo/AicsAnalytics.vue')
       }
     ]
   },
