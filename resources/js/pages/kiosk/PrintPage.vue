@@ -124,7 +124,7 @@
           </h3>
           <button 
             @click="closeMap"
-            class="text-gray-500 hover:text-gray-700 text-xl transition"
+            class="text-gray-500 hover:text -gray-700 text-xl transition"
           >
             ✕
           </button>

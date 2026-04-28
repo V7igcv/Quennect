@@ -27,6 +27,7 @@ class QueueTransaction extends Model
         'called_at',
         'completed_at',
         'skipped_at',
+        'backlog_at', // ✅ NEW
         'average_satisfaction_rating',
         'waiting_time',
         'serving_time',
@@ -40,6 +41,7 @@ class QueueTransaction extends Model
         'called_at' => 'datetime',
         'completed_at' => 'datetime',
         'skipped_at' => 'datetime',
+        'backlog_at' => 'datetime', // ✅ NEW
         'assistance_provided_at' => 'datetime',
         'status' => TransactionStatus::class,  // ✅ Enum casting
     ];
@@ -170,6 +172,20 @@ class QueueTransaction extends Model
     public function scopeSkipped($query)
     {
         return $query->where('status', TransactionStatus::SKIPPED);
+    }
+
+    // ✅ NEW
+    public function scopeBacklog($query)
+    {
+        return $query->where('status', TransactionStatus::BACKLOG);
+    }
+
+    // ✅ NEW — today's backlog only
+    public function scopeTodayBacklog($query)
+    {
+        return $query
+            ->where('status', TransactionStatus::BACKLOG)
+            ->whereDate('backlog_at', today());
     }
 
     public function scopePriority($query)

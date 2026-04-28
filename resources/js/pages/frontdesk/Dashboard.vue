@@ -303,6 +303,7 @@
             </p>
 
             <!-- Buttons (only show if serving a queue) -->
+            <!-- ✅ CHANGED: Added Backlog button alongside Complete and Skip -->
             <div v-if="counter.current_queue" class="flex gap-2">
               <Button 
                 size="sm" 
@@ -321,6 +322,17 @@
               >
                 <X class="w-4 h-4" />
                 Skip
+              </Button>
+
+              <!-- ✅ NEW: Backlog button -->
+              <Button 
+                size="sm" 
+                class="flex-1 bg-[#D97706] hover:bg-[#B45309] text-white"
+                :disabled="isMovingToBacklog"
+                @click="openBacklogConfirmModal({ id: counter.current_queue.id, queueNumber: counter.current_queue.queue_number })"
+              >
+                <Archive class="w-4 h-4" />
+                Backlog
               </Button>
             </div>
           </div>
@@ -410,6 +422,33 @@
       </div>
     </div>
 
+    <!-- ✅ NEW: Backlog Confirmation Modal -->
+    <div v-if="showBacklogConfirmModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-60">
+      <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold mb-2">Move to Backlog?</h3>
+        <p class="text-gray-600 mb-4">
+          Move <span class="font-semibold">{{ backlogTargetQueueNumber }}</span> to the backlog? 
+          It will be removed from this counter and can be recalled later today.
+        </p>
+        <div class="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            :disabled="isMovingToBacklog"
+            @click="showBacklogConfirmModal = false"
+          >
+            Cancel
+          </Button>
+          <Button
+            class="text-white bg-[#D97706] hover:bg-[#B45309]"
+            :disabled="isMovingToBacklog"
+            @click="confirmMoveToBacklog"
+          >
+            {{ isMovingToBacklog ? 'Moving...' : 'Move to Backlog' }}
+          </Button>
+        </div>
+      </div>
+    </div>
+
     <!-- Alert Modal -->
     <div v-if="showAlertModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-60">
       <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -442,7 +481,8 @@ import api from '@/services/api'
 import StatCard from '@/components/common/StatCard.vue'
 import EvaluationModal from '@/components/modals/EvaluationModal.vue'
 
-import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone, ChevronDown, Loader2, Plus } from 'lucide-vue-next'
+// ✅ CHANGED: Added Archive icon import
+import { Clock, User, CheckCircle, XCircle, MoreHorizontal, X, Check, Megaphone, ChevronDown, Loader2, Plus, Archive } from 'lucide-vue-next'
 
 import {
   Table,
@@ -523,6 +563,12 @@ const queueActionConfirmMessage = ref('')
 const queueActionConfirmButtonLabel = ref('Confirm')
 const pendingQueueAction = ref(null)
 
+// ✅ NEW: Backlog state
+const showBacklogConfirmModal = ref(false)
+const isMovingToBacklog = ref(false)
+const backlogTargetQueueId = ref(null)
+const backlogTargetQueueNumber = ref('')
+
 // Methods
 const handleAlert = ({ title, message }) => {
   alertTitle.value = title
@@ -575,7 +621,6 @@ const scheduleRealtimeRefresh = () => {
     clearTimeout(realtimeRefreshTimeout.value)
   }
 
-  // Coalesce burst events into one refresh cycle.
   realtimeRefreshTimeout.value = setTimeout(async () => {
     realtimeRefreshTimeout.value = null
     await refreshDashboardRealtime()
@@ -638,13 +683,8 @@ const scheduleMidnightRefresh = () => {
   const delayMs = Math.max(nextMidnight.getTime() - now.getTime(), 0)
 
   midnightRefreshTimeout.value = setTimeout(async () => {
-    // First, auto-skip any stale queues from previous days
     await autoSkipStaleQueues()
-
-    // Then refresh dashboard data for the new day
     await refreshDashboardRealtime()
-
-    // Reschedule for the next midnight
     scheduleMidnightRefresh()
   }, delayMs)
 }
@@ -727,11 +767,9 @@ const callQueue = async (counterId) => {
     })
 
     if (response.data.message) {
-      // Remove the queue from the list and refresh
       queueEntries.value = queueEntries.value.filter(q => q.id !== selectedQueueForCall.value.id)
       totalRows.value = queueEntries.value.length
       
-      // Reset pagination if current page is now empty
       if (filteredQueueEntries.value.length === 0 && currentPage.value > 1) {
         currentPage.value -= 1
       }
@@ -740,7 +778,6 @@ const callQueue = async (counterId) => {
       showCounterDropdown.value = false
       selectedQueueForCall.value = null
       
-      // Refresh stats and counters
       await fetchDashboardStats()
       await fetchCounters()
     }
@@ -799,18 +836,14 @@ const skipQueue = async (queueId) => {
     const response = await api.post(`/frontdesk/queue/skip-from-table/${queueId}`)
 
     if (response.data.message) {
-      // Remove the queue from the list
       queueEntries.value = queueEntries.value.filter(q => q.id !== queueId)
       totalRows.value = queueEntries.value.length
       
-      // Reset pagination if current page is now empty
       if (filteredQueueEntries.value.length === 0 && currentPage.value > 1) {
         currentPage.value -= 1
       }
       
       updatePaginatedQueue()
-      
-      // Refresh stats
       await fetchDashboardStats()
     }
   } catch (error) {
@@ -864,7 +897,6 @@ const fetchCounters = async () => {
 }
 
 const addCounter = async () => {
-  // Calculate next counter number
   const nextCounterNumber = counters.value.length > 0
     ? Math.max(...counters.value.map(c => c.counter_number)) + 1
     : 1
@@ -875,7 +907,6 @@ const addCounter = async () => {
     })
 
     if (response.data.data) {
-      // Add the new counter to the list
       counters.value.push(response.data.data)
       showAddCounterModal.value = false
     }
@@ -886,9 +917,7 @@ const addCounter = async () => {
 }
 
 const toggleCounterStatus = async (counter) => {
-  // Check if counter is currently serving
   if (!counter.current_queue && counter.is_enabled) {
-    // Disable
     try {
       const response = await api.put(`/frontdesk/counters/${counter.id}/status`, {
         is_enabled: false
@@ -902,7 +931,6 @@ const toggleCounterStatus = async (counter) => {
       alert(error.response?.data?.message || 'Error updating counter')
     }
   } else if (!counter.is_enabled) {
-    // Enable
     try {
       const response = await api.put(`/frontdesk/counters/${counter.id}/status`, {
         is_enabled: true
@@ -927,7 +955,6 @@ const openDeleteConfirmModal = (counter) => {
     return
   }
 
-  // Check if counter is currently serving
   if (counter.current_queue) {
     alert('Cannot delete counter while it is serving a queue.')
     return
@@ -942,7 +969,6 @@ const deleteCounter = async () => {
 
   try {
     await api.delete(`/frontdesk/counters/${counterToDelete.value.id}`)
-    // Remove the counter from the list
     counters.value = counters.value.filter(c => c.id !== counterToDelete.value.id)
     showDeleteConfirmModal.value = false
     counterToDelete.value = null
@@ -957,9 +983,7 @@ const skipFromCounter = async (queueId) => {
     const response = await api.post(`/frontdesk/queue/skip-from-counter/${queueId}`)
 
     if (response.data.message) {
-      // Refresh counters to remove the queue from the counter
       await fetchCounters()
-      // Refresh stats
       await fetchDashboardStats()
     }
   } catch (error) {
@@ -970,7 +994,6 @@ const skipFromCounter = async (queueId) => {
 
 const openEvaluationModal = async (queueData) => {
   try {
-    // Fetch transaction details for evaluation
     const response = await api.get(`/frontdesk/evaluation/transaction/${queueData.id}`)
     if (response.data.success) {
       const transaction = response.data.data
@@ -998,7 +1021,6 @@ const handleEvaluationSubmit = async (formData) => {
     const likertAnswers = formData.likertRatings || {}
     const assistancePerService = formData.assistance_per_queue_transaction_service || []
 
-    // Format the data for the backend API
     const evaluationData = {
       session: {
         client_type: formData.client_type || null,
@@ -1025,11 +1047,9 @@ const handleEvaluationSubmit = async (formData) => {
     if (response.data.message) {
       const smsSent = Boolean(response.data?.data?.sms_sent)
 
-      // Success - refresh counters and stats
       await fetchCounters()
       await fetchDashboardStats()
       
-      // Reset modal state
       selectedQueueId.value = null
       selectedQueueNumber.value = ''
       selectedCustomerName.value = ''
@@ -1047,6 +1067,52 @@ const handleEvaluationSubmit = async (formData) => {
     console.error('Error submitting evaluation:', error)
     alertTitle.value = 'Error'
     alertMessage.value = error.response?.data?.message || 'Error submitting evaluation'
+    showAlertModal.value = true
+  }
+}
+
+// ✅ NEW: Open the backlog confirmation modal
+const openBacklogConfirmModal = ({ id, queueNumber }) => {
+  backlogTargetQueueId.value = id
+  backlogTargetQueueNumber.value = queueNumber
+  showBacklogConfirmModal.value = true
+}
+
+// ✅ NEW: Confirm and execute the backlog action
+const confirmMoveToBacklog = async () => {
+  if (!backlogTargetQueueId.value || isMovingToBacklog.value) return
+
+  isMovingToBacklog.value = true
+
+  try {
+    await moveToBacklog(backlogTargetQueueId.value)
+    showBacklogConfirmModal.value = false
+    backlogTargetQueueId.value = null
+    backlogTargetQueueNumber.value = ''
+  } finally {
+    isMovingToBacklog.value = false
+  }
+}
+
+// ✅ NEW: API call to move a transaction to backlog
+const moveToBacklog = async (transactionId) => {
+  try {
+    const response = await api.post(`/frontdesk/queue/backlog/${transactionId}`)
+
+    if (response.data.message) {
+      // Refresh counters (removes queue from counter card) and stats
+      await fetchCounters()
+      await fetchDashboardStats()
+
+      alertTitle.value = 'Moved to Backlog'
+      alertMessage.value = response.data.message || 'Transaction moved to backlog successfully.'
+      showAlertModal.value = true
+    }
+  } catch (error) {
+    console.error('Error moving queue to backlog:', error)
+
+    alertTitle.value = 'Error'
+    alertMessage.value = error.response?.data?.message || 'Failed to move transaction to backlog.'
     showAlertModal.value = true
   }
 }
