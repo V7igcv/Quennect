@@ -8,4 +8,5 @@ enum TransactionStatus: string
     case SERVING = 'SERVING';
     case COMPLETED = 'COMPLETED';
     case SKIPPED = 'SKIPPED';
+    case BACKLOG   = 'BACKLOG';
 }

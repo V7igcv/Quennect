@@ -101,12 +101,12 @@ class EvaluationController extends Controller
             ])
                 ->where('id', $queueId)
                 ->where('office_id', $user->office_id)
-                ->where('status', 'SERVING')
+                ->whereIn('status', ['SERVING', 'BACKLOG'])  // ✅ FIXED: Allow both SERVING and BACKLOG
                 ->first();
 
             if (!$transaction) {
                 return response()->json([
-                    'message' => 'Transaction not found or not currently being served.'
+                    'message' => 'Transaction not found or not in a state that can be evaluated.'
                 ], 404);
             }
 
@@ -192,15 +192,15 @@ class EvaluationController extends Controller
         try {
             DB::beginTransaction();
 
-            // Find the transaction
+            // ✅ FIXED: Allow both SERVING and BACKLOG statuses
             $transaction = QueueTransaction::where('id', $queueId)
                 ->where('office_id', $user->office_id)
-                ->where('status', 'SERVING')
+                ->whereIn('status', ['SERVING', 'BACKLOG'])
                 ->first();
 
             if (!$transaction) {
                 return response()->json([
-                    'message' => 'Transaction not found or not currently being served.'
+                    'message' => 'Transaction not found or not in a state that can be evaluated.'
                 ], 404);
             }
 
@@ -313,9 +313,20 @@ class EvaluationController extends Controller
             // Update transaction status to COMPLETED
             $transaction->status = 'COMPLETED';
             $transaction->completed_at = now();
+            
+            // Calculate serving time based on when it was called or created
             if ($transaction->called_at) {
                 $transaction->serving_time = (int) round($transaction->called_at->diffInMinutes($transaction->completed_at));
+            } elseif ($transaction->created_at) {
+                // For backlog transactions without called_at
+                $transaction->serving_time = (int) round($transaction->created_at->diffInMinutes($transaction->completed_at));
             }
+            
+            // Clear counter assignment if it exists
+            if ($transaction->counter_id) {
+                $transaction->counter_id = null;
+            }
+            
             $transaction->average_satisfaction_rating = $averageRating;
             
             // Save per-queue-transaction-service assistance records

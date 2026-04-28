@@ -7,6 +7,7 @@ use App\Http\Controllers\CounterController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\AssistanceTypeController;
 use App\Http\Controllers\MonitorController;
+use App\Http\Controllers\BacklogController; // ✅ NEW
 
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\ServiceController;
@@ -139,6 +140,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // Dashboard
         Route::get('/dashboard-stats', [FrontdeskController::class, 'getDashboardStats']);
 
+        // ==================== BACKLOG ROUTES ====================
+        Route::get('/backlog', [BacklogController::class, 'getBacklog']);
+        Route::post('/backlog/skip/{id}', [BacklogController::class, 'skipFromBacklog']);
+
         // CSM Analytics
         Route::get('/analytics/csm/overview', [CsmAnalyticsController::class, 'getOverviewStats']);
         Route::get('/analytics/csm/citizen-charter', [CsmAnalyticsController::class, 'getCitizenCharterCounts']);
@@ -154,7 +159,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/counters', [CounterController::class, 'store']);
         Route::put('/counters/{id}/status', [CounterController::class, 'updateStatus']);
         Route::delete('/counters/{id}', [CounterController::class, 'destroy']);
-        
+
         // Queue
         Route::get('/queue-table', [FrontdeskController::class, 'getQueueTable']);
         Route::post('/queue/call/{queueId}', [FrontdeskController::class, 'callQueue']);
@@ -162,13 +167,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/queue/skip-from-counter/{queueId}', [FrontdeskController::class, 'skipFromCounter']);
         Route::post('/queue/complete/{queueId}', [FrontdeskController::class, 'completeTransaction']);
         Route::post('/queue/auto-skip-stale', [FrontdeskController::class, 'autoSkipStaleQueues']);
+        Route::post('/queue/backlog/{id}', [BacklogController::class, 'moveToBacklog']);
 
-        // Counters
-        Route::get('/counters', [CounterController::class, 'index']);
-        Route::get('/counters/available', [CounterController::class, 'getAvailableCounters']);
-        Route::post('/counters', [CounterController::class, 'store']);
-        Route::put('/counters/{id}/status', [CounterController::class, 'updateStatus']);
-        Route::delete('/counters/{id}', [CounterController::class, 'destroy']);
+        // ✅ Transaction Details (for evaluation modal)
+        Route::get('/transactions/{queueId}', [FrontdeskController::class, 'getTransactionDetails']);
 
         // Evaluation
         Route::get('/evaluation/questions', [EvaluationController::class, 'getQuestions']);

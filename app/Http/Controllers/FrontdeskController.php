@@ -177,7 +177,7 @@ class FrontdeskController extends Controller
             // Check if counter exists, is enabled, and belongs to the user's office
             $counter = Counter::where('id', $request->counter_id)
                 ->where('office_id', $user->office_id)
-                ->where('is_enabled', true)  // Changed from 'status' to 'is_enabled'
+                ->where('is_enabled', true)
                 ->first();
 
             if (!$counter) {
@@ -393,7 +393,7 @@ class FrontdeskController extends Controller
     }
 
     /**
-     * Complete a queue transaction (move from SERVING to COMPLETED)
+     * Complete a queue transaction (move from SERVING or BACKLOG to COMPLETED)
      * 
      * @param int $queueId
      * @return \Illuminate\Http\JsonResponse
@@ -405,25 +405,37 @@ class FrontdeskController extends Controller
         try {
             DB::beginTransaction();
 
-            // Find the queue transaction that is currently being served
+            // Find the queue transaction that is either currently being served OR in backlog
             $queue = QueueTransaction::where('id', $queueId)
                 ->where('office_id', $user->office_id)
-                ->where('status', 'SERVING')
+                ->whereIn('status', ['SERVING', 'BACKLOG'])
                 ->first();
 
             if (!$queue) {
                 return response()->json([
-                    'message' => 'Queue not found or not currently being served.'
+                    'message' => 'Queue not found or not in a state that can be completed (must be SERVING or BACKLOG).'
                 ], 404);
             }
 
+            // Store original status for reference
+            $originalStatus = $queue->status;
+            
             // Update queue transaction
             $queue->status = 'COMPLETED';
             $queue->completed_at = now();
             
-            // Calculate and store serving time
-            if ($queue->called_at) {
+            // Calculate and store serving time based on when it was called or created
+            if ($originalStatus === 'SERVING' && $queue->called_at) {
+                // If it was being served, calculate from called_at to completed_at
                 $queue->serving_time = (int) round($queue->called_at->diffInMinutes($queue->completed_at));
+            } elseif ($originalStatus === 'BACKLOG' && $queue->created_at) {
+                // If it was backlog, calculate from created_at to completed_at
+                $queue->serving_time = (int) round($queue->created_at->diffInMinutes($queue->completed_at));
+            }
+            
+            // Clear counter assignment if it exists
+            if ($queue->counter_id) {
+                $queue->counter_id = null;
             }
             
             $queue->save();
@@ -438,7 +450,9 @@ class FrontdeskController extends Controller
                     'queue_number' => $queue->full_queue_number,
                     'client_name' => $queue->client_name,
                     'contact_number' => $queue->contact_number,
-                    'completed_at' => $queue->completed_at->format('h:i A')
+                    'original_status' => $originalStatus,
+                    'completed_at' => $queue->completed_at->format('h:i A'),
+                    'serving_time_minutes' => $queue->serving_time
                 ]
             ]);
 
@@ -446,6 +460,79 @@ class FrontdeskController extends Controller
             DB::rollBack();
             return response()->json([
                 'message' => 'Error completing transaction',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get transaction details by ID
+     * 
+     * @param int $queueId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getTransactionDetails($queueId)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+            
+            if (!$user->office_id) {
+                return response()->json([
+                    'message' => 'User is not assigned to any office.'
+                ], 403);
+            }
+
+            $transaction = QueueTransaction::with(['services', 'counter'])
+                ->where('id', $queueId)
+                ->where('office_id', $user->office_id)
+                ->first();
+
+            if (!$transaction) {
+                return response()->json([
+                    'message' => 'Transaction not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $transaction->id,
+                    'queue_number' => $transaction->full_queue_number,
+                    'client_name' => $transaction->client_name,
+                    'contact_number' => $transaction->contact_number,
+                    'status' => $transaction->status,
+                    'is_priority' => $transaction->is_priority,
+                    'queue_date' => $transaction->queue_date,
+                    'created_at' => $transaction->created_at ? $transaction->created_at->format('Y-m-d H:i:s') : null,
+                    'called_at' => $transaction->called_at ? $transaction->called_at->format('Y-m-d H:i:s') : null,
+                    'completed_at' => $transaction->completed_at ? $transaction->completed_at->format('Y-m-d H:i:s') : null,
+                    'skipped_at' => $transaction->skipped_at ? $transaction->skipped_at->format('Y-m-d H:i:s') : null,
+                    'waiting_time' => $transaction->waiting_time,
+                    'serving_time' => $transaction->serving_time,
+                    'services' => $transaction->services->map(function($service) {
+                        return [
+                            'id' => $service->id,
+                            'name' => $service->service_name,
+                            'code' => $service->service_code
+                        ];
+                    }),
+                    'counter' => $transaction->counter ? [
+                        'id' => $transaction->counter->id,
+                        'counter_number' => $transaction->counter->counter_number
+                    ] : null
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Get transaction details error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Error fetching transaction details',
                 'error' => $e->getMessage()
             ], 500);
         }

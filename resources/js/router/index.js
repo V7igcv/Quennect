@@ -28,12 +28,12 @@ const routes = [
     component: KioskLayout,
     children: [
       {
-        path: 'intro',           // Intro video page
+        path: 'intro',
         name: 'kiosk.intro',
         component: () => import('../pages/kiosk/IntroVideoPage.vue')
       },
       {
-        path: 'welcome',         // Welcome page after intro
+        path: 'welcome',
         name: 'kiosk.welcome',
         component: () => import('../pages/kiosk/Welcome.vue')
       },
@@ -100,6 +100,12 @@ const routes = [
         path: 'chat',
         name: 'frontdesk.chat',
         component: () => import('../pages/frontdesk/ChatModule.vue')
+      },
+      // ✅ NEW
+      {
+        path: 'backlog',
+        name: 'frontdesk.backlog',
+        component: () => import('../pages/frontdesk/Backlog.vue')
       }
     ]
   },
@@ -181,7 +187,7 @@ const routes = [
         const user = authService.getCurrentUser()
         return getHomePathForRole(user?.role)
       }
-      return '/kiosk/intro'     // Redirect to intro video page for non-authenticated users
+      return '/kiosk/intro'
     }
   }
 ]
@@ -191,41 +197,33 @@ const router = createRouter({
   routes
 })
 
-// Navigation Guard - Updated (no next() callback)
+// Navigation Guard
 router.beforeEach((to, from) => {
   const isAuthenticated = authService.isAuthenticated()
   const user = authService.getCurrentUser()
   
-  // Debug logging
   console.log('Navigation to:', to.path)
   console.log('Auth status:', isAuthenticated)
   console.log('User:', user)
   
-  // Handle routes that require guest access (login page)
   if (to.meta.requiresGuest) {
     if (isAuthenticated) {
-      // If already logged in, redirect to appropriate dashboard
       return getHomePathForRole(user?.role)
     }
-    return true // Allow access
+    return true
   }
   
-  // Handle routes that require authentication
   if (to.meta.requiresAuth) {
     if (!isAuthenticated) {
-      // Not logged in, redirect to login
       return '/login'
     }
     
-    // Check role-based access
     const requiredRoles = Array.isArray(to.meta.role) ? to.meta.role : [to.meta.role].filter(Boolean)
     if (requiredRoles.length && !requiredRoles.includes(user?.role)) {
-      // User doesn't have required role, redirect to their appropriate dashboard
       return getHomePathForRole(user?.role)
     }
   }
   
-  // Allow navigation
   return true
 })
 
