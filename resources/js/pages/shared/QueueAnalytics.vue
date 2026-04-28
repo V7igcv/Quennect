@@ -673,7 +673,14 @@
                   {{ entry.status }}
                 </span>
               </TableCell>
-              <TableCell>{{ entry.completionTime }}</TableCell>
+              <TableCell>
+                <div class="space-y-1">
+                  <div>{{ entry.completionTime || 'N/A' }}</div>
+                  <div v-if="entry.completionTime && formatRelativeCompletionTime(entry.completionTime)" class="text-xs italic text-gray-500">
+                    {{ formatRelativeCompletionTime(entry.completionTime) }}
+                  </div>
+                </div>
+              </TableCell>
               <TableCell class="text-right">
                 <button
                   type="button"
@@ -791,8 +798,13 @@
               </p>
             </div>
             <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Completion Time</p>
-              <p class="mt-1 text-sm font-semibold text-gray-900">{{ selectedQueueEntry.completionTime || 'N/A' }}</p>
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Completion Date and Time</p>
+              <div class="mt-1 space-y-1">
+                <p class="text-sm font-semibold text-gray-900">{{ selectedQueueEntry.completionTime || 'N/A' }}</p>
+                <p v-if="selectedQueueEntry.completionTime && formatRelativeCompletionTime(selectedQueueEntry.completionTime)" class="text-xs italic text-gray-500">
+                  {{ formatRelativeCompletionTime(selectedQueueEntry.completionTime) }}
+                </p>
+              </div>
             </div>
             <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
               <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Average Satisfaction Rating</p>
@@ -1577,6 +1589,45 @@ const formatDate = (date) => {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+const formatRelativeCompletionTime = (completionTime) => {
+  const completionDate = new Date(completionTime)
+  if (Number.isNaN(completionDate.getTime())) {
+    return null
+  }
+
+  const now = new Date()
+  const diffMs = now.getTime() - completionDate.getTime()
+
+  if (diffMs < 0) {
+    return '0 hours ago'
+  }
+
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDaysTotal = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfCompletionDay = new Date(
+    completionDate.getFullYear(),
+    completionDate.getMonth(),
+    completionDate.getDate(),
+  )
+  const diffDays = Math.floor((startOfToday.getTime() - startOfCompletionDay.getTime()) / (1000 * 60 * 60 * 24))
+  const diffMonths = Math.floor(diffDaysTotal / 30)
+
+  const isSameCalendarDay = now.getFullYear() === completionDate.getFullYear()
+    && now.getMonth() === completionDate.getMonth()
+    && now.getDate() === completionDate.getDate()
+
+  if (isSameCalendarDay) {
+    return `${Math.max(1, diffHours)} hour${Math.max(1, diffHours) === 1 ? '' : 's'} ago`
+  }
+
+  if (diffMonths < 1) {
+    return `${Math.max(1, diffDays)} day${Math.max(1, diffDays) === 1 ? '' : 's'} ago`
+  }
+
+  return `${Math.max(1, diffMonths)} month${Math.max(1, diffMonths) === 1 ? '' : 's'} ago`
 }
 
 const getDateFilterParams = () => {

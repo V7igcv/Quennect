@@ -54,11 +54,11 @@ class SmsNotificationService
 
         if ($isPositive) {
             // Strongly Agree / Agree / Neutral
-            return "Salamat po, {$clientName}! Lubos po naming pinahahalagahan ang inyong positibong karanasan sa inyong transaksyon sa {$services}. Ang inyong feedback ay nagbibigay sa amin ng inspirasyon upang lalo pang pagbutihin ang serbisyo sa {$office}. Hanggang sa muli!";
+            return "Salamat po, {$clientName}! Lubos po naming pinahahalagahan ang inyong positibong karanasan sa inyong transaksyon sa {$services}. Ang inyong feedback ay nagbibigay sa amin ng inspirasyon upang lalo pang pagbutihin ang serbisyo sa {$office}. Hanggang sa muli!\n\nKung kayo po ay may mga reklamo, katanungan, komento, o mungkahi, maaari po kayong magpadala ng mensahe sa numerong 09928397023 o mag-email sa cgoligaoeodb@gmail.com. Maaari rin po ninyong bisitahin ang aming website sa https://ligaocity.albay.gov.ph/contact-us-2.";
         }
 
         // Strongly Disagree / Disagree / Not Applicable (or no computed rating)
-        return "Salamat po, {$clientName}, sa inyong pagbabahagi ng inyong karanasan sa inyong transaksyon sa {$services}. Sisiguruhin po naming gagalingan pa namin ang serbisyo sa {$office} sa susunod na pagkakataon. Hanggang sa muli!";
+        return "Salamat po, {$clientName}, sa inyong pagbabahagi ng inyong karanasan sa inyong transaksyon sa {$services}. Sisiguruhin po naming gagalingan pa namin ang serbisyo sa {$office} sa susunod na pagkakataon. Hanggang sa muli!\n\nKung kayo po ay may mga reklamo, katanungan, komento, o mungkahi, maaari po kayong magpadala ng mensahe sa numerong 09928397023 o mag-email sa cgoligaoeodb@gmail.com. Maaari rin po ninyong bisitahin ang aming website sa https://ligaocity.albay.gov.ph/contact-us-2.";
     }
 
     private function normalizePhoneNumber(string $contactNumber): ?string
