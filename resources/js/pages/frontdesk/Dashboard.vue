@@ -137,23 +137,20 @@
           </div>
 
           <!-- Pagination -->
-          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mt-3">
-
-            <!-- LEFT SIDE -->
-            <p class="text-sm text-gray-500">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-3">
+            <!-- LEFT SIDE - Row info -->
+            <p class="text-sm text-gray-500 whitespace-nowrap">
               {{ (currentPage - 1) * rowsPerPage + 1 }}–{{ Math.min(currentPage * rowsPerPage, totalRows) }} of {{ totalRows }} row(s) shown.
             </p>
 
-            <!-- RIGHT SIDE -->
-            <div class="flex flex-wrap items-center gap-4 sm:gap-6">
-
+            <!-- RIGHT SIDE - Pagination controls -->
+            <div class="flex items-center gap-4 sm:gap-6">
               <!-- Rows per page -->
               <div class="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
                 <span>Rows per page</span>
-
                 <div class="relative">
                   <select 
-                    class="appearance-none border rounded-md pl-2 pr-8 py-1 text-sm"
+                    class="appearance-none border rounded-md pl-2 pr-8 py-1 text-sm bg-white"
                     :value="rowsPerPage"
                     @change="changeRowsPerPage($event.target.value)"
                   >
@@ -171,28 +168,27 @@
               </p>
 
               <!-- Pagination Buttons -->
-              <Pagination>
-                <PaginationContent>
+              <div class="flex items-center gap-1">
+                <Pagination>
+                  <PaginationContent class="flex gap-1">
+                    <PaginationItem>
+                      <PaginationFirst @click="firstPage" :disabled="currentPage === 1" />
+                    </PaginationItem>
 
-                  <PaginationItem>
-                    <PaginationFirst @click="firstPage" :disabled="currentPage === 1" />
-                  </PaginationItem>
+                    <PaginationItem>
+                      <PaginationPrevious @click="previousPage" :disabled="currentPage === 1" />
+                    </PaginationItem>
 
-                  <PaginationItem>
-                    <PaginationPrevious @click="previousPage" :disabled="currentPage === 1" />
-                  </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext @click="nextPage" :disabled="currentPage === totalPages()" />
+                    </PaginationItem>
 
-                  <PaginationItem>
-                    <PaginationNext @click="nextPage" :disabled="currentPage === totalPages()" />
-                  </PaginationItem>
-
-                  <PaginationItem>
-                    <PaginationLast @click="lastPage" :disabled="currentPage === totalPages()" />
-                  </PaginationItem>
-
-                </PaginationContent>
-              </Pagination>
-
+                    <PaginationItem>
+                      <PaginationLast @click="lastPage" :disabled="currentPage === totalPages()" />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
             </div>
           </div>
 
