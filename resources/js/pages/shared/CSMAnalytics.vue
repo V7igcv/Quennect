@@ -320,12 +320,12 @@
                     Which of the following best describes your awareness of a CC?
                   </p>
                   <div class="space-y-5">
-                    <div v-for="(option, index) in ccData.awareness" :key="`awareness-${index}`" class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-                      <span class="text-sm font-semibold text-[#3F3F46]">Option {{ index + 1 }}</span>
+                    <div v-for="(option, index) in ccData.awareness" :key="`awareness-${index}`" class="flex items-center gap-1">
+                      <span class="w-20 text-sm font-semibold text-[#3F3F46]">Option {{ index + 1 }}</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger as-child>
-                            <div class="relative h-4 w-full cursor-help overflow-hidden rounded-full bg-[#D4D4D8]">
+                            <div class="relative h-4 flex-1 cursor-help overflow-hidden rounded-full bg-[#D4D4D8]">
                               <div
                                 class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
                                 :class="getBarShade('awareness', ccData.awareness, index)"
@@ -340,7 +340,7 @@
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <span class="text-sm font-bold text-[#52525B]">{{ option.percentage }}%</span>
+                      <span class="w-16 text-right text-sm font-bold text-[#52525B]">{{ option.percentage }}%</span>
                     </div>
                   </div>
                 </div>
@@ -351,25 +351,20 @@
                     <span class="text-lg font-bold tracking-tight text-[#3F3F46]">CC2</span>
                     <span class="rounded-full bg-[#F2D7BC] px-4 py-1 text-sm font-semibold text-[#6A4A2D]">Visibility</span>
                   </div>
-
                   <p class="text-sm leading-tight text-[#4B5563]">
                     If aware of CC, would you say that the CC of this office was...?
                   </p>
-
                   <div class="space-y-5">
                     <div 
                       v-for="(option, index) in ccData.visibility" 
                       :key="`visibility-${index}`" 
-                      class="grid grid-cols-[auto_1fr_auto] items-center gap-3"
+                      class="flex items-center gap-1"
                     >
-                      <span class="text-sm font-semibold text-[#3F3F46]">
-                        Option {{ index + 1 }}
-                      </span>
-
+                      <span class="w-20 text-sm font-semibold text-[#3F3F46]">Option {{ index + 1 }}</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger as-child>
-                            <div class="relative h-4 w-full cursor-help overflow-hidden rounded-full bg-[#D4D4D8]">
+                            <div class="relative h-4 flex-1 cursor-help overflow-hidden rounded-full bg-[#D4D4D8]">
                               <div
                                 class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
                                 :class="getBarShade('visibility', ccData.visibility, index)"
@@ -377,7 +372,6 @@
                               ></div>
                             </div>
                           </TooltipTrigger>
-
                           <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
                             <p class="font-semibold text-gray-900">{{ option.description }}</p>
                             <p class="mt-1 text-gray-600">Responses: <span class="font-semibold">{{ option.count }}</span></p>
@@ -385,10 +379,7 @@
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-
-                      <span class="text-sm font-bold text-[#52525B]">
-                        {{ option.percentage }}%
-                      </span>
+                      <span class="w-16 text-right text-sm font-bold text-[#52525B]">{{ option.percentage }}%</span>
                     </div>
                   </div>
                 </div>
@@ -397,29 +388,22 @@
                 <div class="space-y-5 md:pl-10 md:pt-0">
                   <div class="flex items-center justify-between gap-3">
                     <span class="text-lg font-bold tracking-tight text-[#3F3F46]">CC3</span>
-                    <span class="rounded-full bg-[#DCC9F3] px-4 py-1 text-sm font-semibold text-[#5C417A]">
-                      Helpfulness
-                    </span>
+                    <span class="rounded-full bg-[#DCC9F3] px-4 py-1 text-sm font-semibold text-[#5C417A]">Helpfulness</span>
                   </div>
-
                   <p class="text-sm leading-tight text-[#4B5563]">
                     If aware of CC, how much did the CC help you in your transactions?
                   </p>
-
                   <div class="space-y-5">
                     <div 
                       v-for="(option, index) in ccData.helpfulness" 
                       :key="`helpfulness-${index}`" 
-                      class="grid grid-cols-[auto_1fr_auto] items-center gap-3"
+                      class="flex items-center gap-1"
                     >
-                      <span class="text-sm font-semibold text-[#3F3F46]">
-                        Option {{ index + 1 }}
-                      </span>
-
+                      <span class="w-20 text-sm font-semibold text-[#3F3F46]">Option {{ index + 1 }}</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger as-child>
-                            <div class="relative h-4 w-full cursor-help overflow-hidden rounded-full bg-[#D4D4D8]">
+                            <div class="relative h-4 flex-1 cursor-help overflow-hidden rounded-full bg-[#D4D4D8]">
                               <div
                                 class="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
                                 :class="getBarShade('helpfulness', ccData.helpfulness, index)"
@@ -427,7 +411,6 @@
                               ></div>
                             </div>
                           </TooltipTrigger>
-
                           <TooltipContent class="min-w-36 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
                             <p class="font-semibold text-gray-900">{{ option.description }}</p>
                             <p class="mt-1 text-gray-600">Responses: <span class="font-semibold">{{ option.count }}</span></p>
@@ -435,10 +418,7 @@
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-
-                      <span class="text-sm font-bold text-[#52525B]">
-                        {{ option.percentage }}%
-                      </span>
+                      <span class="w-16 text-right text-sm font-bold text-[#52525B]">{{ option.percentage }}%</span>
                     </div>
                   </div>
                 </div>
