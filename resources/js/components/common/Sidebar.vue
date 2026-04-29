@@ -109,6 +109,10 @@
           <p class="text-sm text-[#474C55] truncate">CSWDO Focal</p>
         </template>
 
+        <template v-else-if="role === 'hrmo'">
+          <p class="text-sm text-[#474C55] truncate">HRMO Focal</p>
+        </template>
+
         <template v-else>
           <p class="text-sm text-[#474C55] truncate">City Mayor</p>
         </template>
@@ -158,7 +162,7 @@ export default {
     role: {
       type: String,
       default: 'frontdesk',
-      validator: (value) => ['frontdesk', 'superadmin', 'city_mayor', 'cswdo'].includes(value),
+      validator: (value) => ['frontdesk', 'superadmin', 'city_mayor', 'cswdo', 'hrmo'].includes(value),
     },
   },
   emits: ['toggle-collapse', 'logout'],
@@ -171,6 +175,15 @@ export default {
     const chatChannelName = ref(null)
 
     const navItems = computed(() => {
+      if (props.role === 'hrmo') {
+        return [
+          {
+            label: 'CSM Analytics',
+            path: '/hrmo-focal',
+            iconPath: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-4l-4 4v-4z',
+          }
+        ]
+      }
       if (props.role === 'cswdo') {
         return [
           {

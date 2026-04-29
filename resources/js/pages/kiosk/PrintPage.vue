@@ -343,7 +343,9 @@ const onMapError = () => {
 
 const finish = () => {
   clearInterval(countdownInterval)
-  localStorage.clear()
+  localStorage.removeItem('selectedOffice')
+  localStorage.removeItem('selectedServices')
+  localStorage.removeItem('clientDetails')
   router.push('/kiosk/welcome')
 }
 

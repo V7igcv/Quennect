@@ -335,6 +335,20 @@ const confirmAndProceed = () => {
 
 // Go back
 const goBack = () => {
-  router.push('/kiosk/service-selection')
+  form.value = {
+    full_name: '',
+    contact_number: '',
+    barangay_id: '',
+    lane_type: 'regular',
+    priority_sectors: [],
+    dpa_consent: false
+  }
+  localStorage.removeItem('clientDetails')
+
+  if (selectedOffice.value && selectedOffice.value.id) {
+    router.push({ path: '/kiosk/service-selection', query: { officeId: selectedOffice.value.id } })
+  } else {
+    router.push('/kiosk/service-selection')
+  }
 }
 </script>

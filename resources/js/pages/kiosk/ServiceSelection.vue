@@ -150,7 +150,18 @@ const sortedServices = computed(() => {
 
 // Fetch services
 const fetchServices = async () => {
-  if (!officeId) {
+  let activeOfficeId = officeId
+
+  // Get office from localStorage
+  const storedOffice = localStorage.getItem('selectedOffice')
+  if (storedOffice) {
+    selectedOffice.value = JSON.parse(storedOffice)
+    if (!activeOfficeId) {
+      activeOfficeId = selectedOffice.value.id
+    }
+  }
+
+  if (!activeOfficeId) {
     error.value = 'Walang napiling opisina.'
     loading.value = false
     return
@@ -160,14 +171,9 @@ const fetchServices = async () => {
   error.value = null
   
   try {
-    // Get office from localStorage
-    const storedOffice = localStorage.getItem('selectedOffice')
-    if (storedOffice) {
-      selectedOffice.value = JSON.parse(storedOffice)
-    }
     
     // Fetch services for this office
-    const response = await kioskApi.get(`/offices/${officeId}/services`)
+    const response = await kioskApi.get(`/offices/${activeOfficeId}/services`)
     services.value = response.data.data
     console.log('Services loaded:', services.value)
   } catch (err) {

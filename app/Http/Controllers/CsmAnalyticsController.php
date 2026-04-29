@@ -2362,10 +2362,10 @@ class CsmAnalyticsController extends Controller
 
     private function resolveOfficeId($user, array $validated): int
     {
-        if ($user->isSuperadmin() || $user->isCityMayor()) {
+        if ($user->isSuperadmin() || $user->isCityMayor() || $user->isHrmoFocal()) {
             if (empty($validated['office_id'])) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'office_id' => ['The office_id field is required for superadmin/city mayor analytics.'],
+                    'office_id' => ['The office_id field is required for superadmin/city mayor/hrmo analytics.'],
                 ]);
             }
 

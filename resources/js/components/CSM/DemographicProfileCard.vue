@@ -188,6 +188,13 @@ const normalizeCategoryForApi = (category) => {
 }
 
 const fetchDemographicData = async () => {
+  if (('office_id' in props.filterParams || props.filterParams.office_id === null) && !props.filterParams.office_id) {
+    chartData.value = []
+    totalResponses.value = 0
+    selectedCategory.value = 'Age'
+    return
+  }
+
   try {
     const response = await api.get(`${props.apiBasePath}/demographic-profile`, {
       params: {
@@ -215,7 +222,15 @@ const fetchDemographicData = async () => {
 }
 
 watch(
-  [() => props.serviceType, () => props.filterParams.period, () => props.filterParams.date, () => props.filterParams.month, () => props.filterParams.year, selectedCategory],
+  [
+    () => props.serviceType,
+    () => props.filterParams.period,
+    () => props.filterParams.date,
+    () => props.filterParams.month,
+    () => props.filterParams.year,
+    () => props.filterParams.office_id,
+    selectedCategory
+  ],
   () => {
     fetchDemographicData()
   },

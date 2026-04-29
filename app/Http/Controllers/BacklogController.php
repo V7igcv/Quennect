@@ -51,10 +51,25 @@ class BacklogController extends Controller
     {
         $officeId = auth()->user()->office_id;
 
-        $transactions = QueueTransaction::with(['services', 'barangay'])
+        $query = QueueTransaction::with(['services', 'barangay'])
             ->where('office_id', $officeId)
-            ->where('status', TransactionStatus::BACKLOG)
-            ->orderBy('backlog_at', 'asc')
+            ->whereNotNull('backlog_at');
+
+        $period = request('period', 'monthly');
+
+        if ($period === 'daily') {
+            $date = request('date', now()->toDateString());
+            $query->whereDate('created_at', $date);
+        } elseif ($period === 'monthly') {
+            $month = request('month', now()->month);
+            $year = request('year', now()->year);
+            $query->whereMonth('created_at', $month)->whereYear('created_at', $year);
+        } elseif ($period === 'yearly') {
+            $year = request('year', now()->year);
+            $query->whereYear('created_at', $year);
+        }
+
+        $transactions = $query->orderBy('backlog_at', 'asc')
             ->get()
             ->map(function($t) {
                 return [
@@ -64,7 +79,8 @@ class BacklogController extends Controller
                     'service_codes' => $t->services->pluck('service_code')->join(', '), // ✅ codes for display
                     'service_names' => $t->services->pluck('service_name')->join(', '), // ✅ full names for tooltip
                     'lane_type'     => $t->is_priority ? 'Priority' : 'Regular',
-                   'backlog_time' => $t->backlog_at?->format('M d, Y h:i A'), // 
+                    'backlog_time'  => $t->backlog_at?->format('M d, Y h:i A'),
+                    'status'        => $t->status->value ?? $t->status,
                 ];
             });
 

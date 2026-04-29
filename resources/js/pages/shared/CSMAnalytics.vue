@@ -711,16 +711,18 @@ import CsmMetricExplanation from '@/components/CSM/CsmMetricExplanation.vue'
 
 const route = useRoute()
 const userRole = computed(() => route.meta?.role)
-const hasOfficeFilter = computed(() => ['SUPERADMIN', 'CITY MAYOR'].includes(userRole.value))
-const canExportCsm = computed(() => userRole.value === 'OFFICE FRONTDESK')
+const hasOfficeFilter = computed(() => ['SUPERADMIN', 'CITY MAYOR', 'HRMO FOCAL'].includes(userRole.value))
+const canExportCsm = computed(() => ['OFFICE FRONTDESK', 'HRMO FOCAL'].includes(userRole.value))
 const csmBasePath = computed(() => {
   if (userRole.value === 'CITY MAYOR') return '/city-mayor/analytics/csm'
   if (userRole.value === 'SUPERADMIN') return '/superadmin/analytics/csm'
+  if (userRole.value === 'HRMO FOCAL') return '/hrmo-focal/analytics/csm'
   return '/frontdesk/analytics/csm'
 })
 const officeOptionsPath = computed(() => {
   if (userRole.value === 'CITY MAYOR') return '/city-mayor/user-management/offices'
   if (userRole.value === 'SUPERADMIN') return '/superadmin/user-management/offices'
+  if (userRole.value === 'HRMO FOCAL') return '/hrmo-focal/user-management/offices'
   return ''
 })
 

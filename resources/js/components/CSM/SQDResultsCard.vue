@@ -179,6 +179,14 @@ const getPercentageColorClass = (percentage) => {
 }
 
 const fetchSqdData = async () => {
+  if (('office_id' in props.filterParams || props.filterParams.office_id === null) && !props.filterParams.office_id) {
+    chartData.value = defaultDistribution()
+    totalResponses.value = 0
+    overallPercentage.value = 0
+    sqdDescription.value = ''
+    return
+  }
+
   try {
     const response = await api.get(`${props.apiBasePath}/sqd-results`, {
       params: {
@@ -208,7 +216,15 @@ const fetchSqdData = async () => {
 }
 
 watch(
-  [() => props.serviceType, () => props.filterParams.period, () => props.filterParams.date, () => props.filterParams.month, () => props.filterParams.year, selectedSQD],
+  [
+    () => props.serviceType, 
+    () => props.filterParams.period, 
+    () => props.filterParams.date, 
+    () => props.filterParams.month, 
+    () => props.filterParams.year, 
+    () => props.filterParams.office_id,
+    selectedSQD
+  ],
   () => {
     fetchSqdData()
   },

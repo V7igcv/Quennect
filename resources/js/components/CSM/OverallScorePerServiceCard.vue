@@ -194,6 +194,13 @@ const getRatingText = (percentage) => {
 }
 
 const fetchOverallScore = async () => {
+  if (('office_id' in props.filterParams || props.filterParams.office_id === null) && !props.filterParams.office_id) {
+    chartData.value = []
+    serviceTotalLabel.value = 'Service Total'
+    serviceTotalPercentage.value = 0
+    return
+  }
+
   try {
     const response = await api.get(`${props.apiBasePath}/overall-score-per-service`, {
       params: {
@@ -215,7 +222,14 @@ const fetchOverallScore = async () => {
 }
 
 watch(
-  [() => props.serviceType, () => props.filterParams.period, () => props.filterParams.date, () => props.filterParams.month, () => props.filterParams.year],
+  [
+    () => props.serviceType,
+    () => props.filterParams.period,
+    () => props.filterParams.date,
+    () => props.filterParams.month,
+    () => props.filterParams.year,
+    () => props.filterParams.office_id
+  ],
   () => {
     fetchOverallScore()
   },

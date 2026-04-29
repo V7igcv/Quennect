@@ -129,6 +129,8 @@ export default {
             router.push('/city-mayor')
           } else if (user.role === 'CSWDO FOCAL') {
             router.push('/cswdo-focal')
+          } else if (user.role === 'HRMO FOCAL') {
+            router.push('/hrmo-focal')
           } else {
             error.value = 'Invalid user role'
           }

@@ -7,10 +7,13 @@ import FrontdeskLayout from '../layouts/FrontdeskLayout.vue'
 import SuperadminLayout from '../layouts/SuperadminLayout.vue'
 import CityMayorLayout from '../layouts/CityMayorLayout.vue'
 import CswdoLayout from '../layouts/CswdoLayout.vue'
+import HrmoLayout from '../layouts/HrmoLayout.vue'
 
 const getHomePathForRole = (role) => {
   if (role === 'SUPERADMIN') return '/superadmin'
   if (role === 'CITY MAYOR') return '/city-mayor'
+  if (role === 'CSWDO FOCAL') return '/cswdo-focal'
+  if (role === 'HRMO FOCAL') return '/hrmo-focal'
   return '/frontdesk'
 }
 
@@ -168,6 +171,20 @@ const routes = [
         path: '',
         name: 'cswdo.aics-analytics',
         component: () => import('../pages/cswdo/AicsAnalytics.vue')
+      }
+    ]
+  },
+  
+  // HRMO Focal routes (protected - HRMO FOCAL only)
+  {
+    path: '/hrmo-focal',
+    component: HrmoLayout,
+    meta: { requiresAuth: true, role: 'HRMO FOCAL' },
+    children: [
+      {
+        path: '',
+        name: 'hrmo.csm-analytics',
+        component: () => import('../pages/shared/CSMAnalytics.vue')
       }
     ]
   },

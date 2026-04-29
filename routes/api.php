@@ -259,4 +259,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/queue-summary/export', [AicsAnalyticsController::class, 'exportQueueSummary']);
     });
 
+    // ==================== HRMO FOCAL ====================
+    Route::middleware('role:HRMO FOCAL')->prefix('hrmo-focal')->group(function () {
+        Route::get('/user-management/offices', [UserManagementController::class, 'offices']);
+        Route::get('/analytics/csm/overview', [CsmAnalyticsController::class, 'getOverviewStats']);
+        Route::get('/analytics/csm/citizen-charter', [CsmAnalyticsController::class, 'getCitizenCharterCounts']);
+        Route::get('/analytics/csm/sqd-results', [CsmAnalyticsController::class, 'getSqdResults']);
+        Route::get('/analytics/csm/demographic-profile', [CsmAnalyticsController::class, 'getDemographicProfile']);
+        Route::get('/analytics/csm/overall-score-per-service', [CsmAnalyticsController::class, 'getOverallScorePerService']);
+        Route::post('/analytics/csm/export', [CsmAnalyticsController::class, 'exportTables']);
+        Route::post('/analytics/csm/export-graphs', [CsmAnalyticsController::class, 'exportGraphs']);
+    });
+
 });

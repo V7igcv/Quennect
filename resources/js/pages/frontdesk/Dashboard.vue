@@ -77,7 +77,24 @@
                 <TableRow v-for="queue in filteredQueueEntries" :key="queue.id">
                   <TableCell>{{ queue.queue_number }}</TableCell>
                   <TableCell>{{ queue.client_name }}</TableCell>
-                  <TableCell>{{ queue.services }}</TableCell>
+                  <TableCell>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger as-child>
+                          <span class="cursor-default truncate block max-w-[200px]">
+                            {{ queue.service_codes || queue.services || 'N/A' }}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent class="max-w-xs whitespace-pre-line text-white">
+                          <p class="font-semibold text-white mb-1">Service name(s)</p>
+                          <p v-if="!queue.service_names && !queue.services" class="text-gray-100 text-xs">No service names available</p>
+                          <ul v-else class="list-disc list-inside text-xs text-gray-100 space-y-0.5">
+                            <li v-for="(name, idx) in (queue.service_names ? queue.service_names.split(', ') : queue.services.split(', '))" :key="idx">{{ name }}</li>
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableCell>
                   <TableCell>{{ queue.lane_type }}</TableCell>
                   <TableCell>{{ queue.time }}</TableCell>
 
@@ -492,6 +509,13 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table'
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 import { Button } from '@/components/ui/button'
 

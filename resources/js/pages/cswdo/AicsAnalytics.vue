@@ -995,9 +995,10 @@ const formatRelativeCompletionTime = (completionTime) => {
   const diffMs = nowDate.getTime() - completionDate.getTime()
 
   if (diffMs < 0) {
-    return '0 hours ago'
+    return '0 minutes ago'
   }
 
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
   const diffDaysTotal = Math.floor(diffMs / (1000 * 60 * 60 * 24))
   const startOfToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate())
@@ -1014,6 +1015,9 @@ const formatRelativeCompletionTime = (completionTime) => {
     && nowDate.getDate() === completionDate.getDate()
 
   if (isSameCalendarDay) {
+    if (diffHours < 1) {
+      return `${Math.max(1, diffMinutes)} minute${Math.max(1, diffMinutes) === 1 ? '' : 's'} ago`
+    }
     return `${Math.max(1, diffHours)} hour${Math.max(1, diffHours) === 1 ? '' : 's'} ago`
   }
 

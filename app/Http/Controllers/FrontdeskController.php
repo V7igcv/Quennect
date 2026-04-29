@@ -110,7 +110,7 @@ class FrontdeskController extends Controller
             $today = $this->queueService->getTodayDate();
 
             $queueEntries = QueueTransaction::with(['services' => function($query) {
-                    $query->select('services.id', 'services.service_code');
+                    $query->select('services.id', 'services.service_code', 'services.service_name');
                 }])
                 ->where('office_id', $user->office_id)
                 ->whereDate('queue_date', $today)
@@ -122,6 +122,7 @@ class FrontdeskController extends Controller
                         'id' => $queue->id,
                         'queue_number' => $queue->full_queue_number,
                         'services' => $queue->services->pluck('service_code')->implode(', '),
+                        'service_names' => $queue->services->pluck('service_name')->implode(', '),
                         'lane_type' => $queue->is_priority ? 'Priority' : 'Regular',
                         'time' => $queue->created_at->format('h:i A'),
                         'client_name' => $queue->client_name,

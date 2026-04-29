@@ -87,12 +87,22 @@ class User extends Authenticatable
         return $this->hasRole('CITY MAYOR');
     }
 
+    public function isCswdoFocal(): bool
+    {
+        return $this->hasRole('CSWDO FOCAL');
+    }
+
+    public function isHrmoFocal(): bool
+    {
+        return $this->hasRole('HRMO FOCAL');
+    }
+
     /**
      * Check if user can access a specific office
      */
     public function canAccessOffice(Office $office): bool
     {
-        if ($this->isSuperadmin() || $this->isCityMayor()) {
+        if ($this->isSuperadmin() || $this->isCityMayor() || $this->isHrmoFocal()) {
             return true;
         }
         
