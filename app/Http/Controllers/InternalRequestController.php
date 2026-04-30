@@ -228,27 +228,33 @@ class InternalRequestController extends Controller
                         'updated_at' => now(),
                     ]);
                 }
-                
-                // Notification for REQUESTING OFFICE (self)
-                $this->createNotification(
-                    $transaction,
-                    $user->office_id,
-                    'Request Submitted',
-                    "Your request (#{$transaction->transaction_id}) has been submitted successfully.",
-                    'request_created_self'
-                );
-                
-                // Notification for RECEIVING OFFICE
-                $this->createNotification(
-                    $transaction,
-                    $validated['to_office_id'],
-                    'New Request Received',
-                    "New request (#{$transaction->transaction_id}) from {$user->office->office_name}",
-                    'request_created_receiver'
-                );
-                
+
                 return $transaction;
             });
+
+            // Fire notifications AFTER the DB transaction commits so a Pusher
+            // network hiccup never rolls back the saved record.
+            try {
+                // Notification for REQUESTING OFFICE (self)
+                $this->createNotification(
+                    $internalTransaction,
+                    $user->office_id,
+                    'Request Submitted',
+                    "Your request (#{$internalTransaction->transaction_id}) has been submitted successfully.",
+                    'request_created_self'
+                );
+
+                // Notification for RECEIVING OFFICE
+                $this->createNotification(
+                    $internalTransaction,
+                    $validated['to_office_id'],
+                    'New Request Received',
+                    "New request (#{$internalTransaction->transaction_id}) from {$user->office->office_name}",
+                    'request_created_receiver'
+                );
+            } catch (\Exception $notifEx) {
+                Log::warning('store: notification failed for ' . $internalTransaction->transaction_id . ': ' . $notifEx->getMessage());
+            }
             
             return response()->json([
                 'success' => true,
@@ -340,7 +346,10 @@ class InternalRequestController extends Controller
                     'accepted_at' => now(),
                     'processed_by' => $user->id,
                 ]);
-                
+            });
+
+            // Fire notification AFTER commit so a Pusher failure doesn't roll back the status update
+            try {
                 $this->createNotification(
                     $internalTransaction,
                     $internalTransaction->from_office_id,
@@ -348,7 +357,9 @@ class InternalRequestController extends Controller
                     "Your request (#{$internalTransaction->transaction_id}) has been accepted and is now being processed.",
                     'accepted'
                 );
-            });
+            } catch (\Exception $notifEx) {
+                Log::warning('accept: notification failed for ' . $internalTransaction->transaction_id . ': ' . $notifEx->getMessage());
+            }
             
             return response()->json([
                 'success' => true,
@@ -399,7 +410,10 @@ class InternalRequestController extends Controller
                     'denied_at' => now(),
                     'processed_by' => $user->id,
                 ]);
-                
+            });
+
+            // Fire notification AFTER commit so a Pusher failure doesn't roll back the status update
+            try {
                 $this->createNotification(
                     $internalTransaction,
                     $internalTransaction->from_office_id,
@@ -407,7 +421,9 @@ class InternalRequestController extends Controller
                     "Your request (#{$internalTransaction->transaction_id}) has been denied. Reason: {$validated['denial_reason']}",
                     'denied'
                 );
-            });
+            } catch (\Exception $notifEx) {
+                Log::warning('deny: notification failed for ' . $internalTransaction->transaction_id . ': ' . $notifEx->getMessage());
+            }
             
             return response()->json([
                 'success' => true,
@@ -458,7 +474,10 @@ class InternalRequestController extends Controller
                     'completed_at' => now(),
                     'processed_by' => $user->id,
                 ]);
-                
+            });
+
+            // Fire notification AFTER commit so a Pusher failure doesn't roll back the status update
+            try {
                 $this->createNotification(
                     $internalTransaction,
                     $internalTransaction->from_office_id,
@@ -466,7 +485,9 @@ class InternalRequestController extends Controller
                     "Your request (#{$internalTransaction->transaction_id}) has been completed. Note: {$validated['completion_notes']}",
                     'completed'
                 );
-            });
+            } catch (\Exception $notifEx) {
+                Log::warning('complete: notification failed for ' . $internalTransaction->transaction_id . ': ' . $notifEx->getMessage());
+            }
             
             return response()->json([
                 'success' => true,

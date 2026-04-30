@@ -45,7 +45,7 @@ class AicsAnalyticsController extends Controller
             ->where('qt.status', TransactionStatus::COMPLETED->value)
             ->select(DB::raw('COALESCE(SUM(sa.assistance_provided), 0) as total'));
 
-        $this->applyDateFilterToColumn($assistanceQuery, $period, $date, $month, $year, 'qt.queue_date');
+        $this->applyDateFilterToColumn($assistanceQuery, $period, $date, $month, $year, 'qt.completed_at');
 
         $totalAssistance = $assistanceQuery->first()?->total ?? 0;
 
@@ -124,7 +124,7 @@ class AicsAnalyticsController extends Controller
             ->where('qt.status', TransactionStatus::COMPLETED->value)
             ->where('qts.service_id', self::AICS_SERVICE_ID);
 
-        $this->applyDateFilterToColumn($baseQuery, $period, $date, $month, $year, 'qt.queue_date');
+        $this->applyDateFilterToColumn($baseQuery, $period, $date, $month, $year, 'qt.completed_at');
 
         if ($barangayId !== null) {
             $baseQuery->where('qt.barangay_id', $barangayId);
@@ -192,7 +192,7 @@ class AicsAnalyticsController extends Controller
             ->where('qts.service_id', self::AICS_SERVICE_ID)
             ->whereNotNull('qt.barangay_id');
 
-        $this->applyDateFilterToColumn($query, $period, $date, $month, $year, 'qt.queue_date');
+        $this->applyDateFilterToColumn($query, $period, $date, $month, $year, 'qt.completed_at');
 
         return $query
             ->selectRaw('b.id as barangay_id')
@@ -702,10 +702,10 @@ class AicsAnalyticsController extends Controller
     private function applyDateFilter($query, string $period, Carbon $date, int $month, int $year)
     {
         return match ($period) {
-            'daily' => $query->whereDate('queue_transactions.queue_date', $date),
-            'monthly' => $query->whereMonth('queue_transactions.queue_date', $month)
-                ->whereYear('queue_transactions.queue_date', $year),
-            'yearly' => $query->whereYear('queue_transactions.queue_date', $year),
+            'daily' => $query->whereDate('queue_transactions.completed_at', $date),
+            'monthly' => $query->whereMonth('queue_transactions.completed_at', $month)
+                ->whereYear('queue_transactions.completed_at', $year),
+            'yearly' => $query->whereYear('queue_transactions.completed_at', $year),
             default => $query,
         };
     }

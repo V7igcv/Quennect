@@ -2065,7 +2065,7 @@ class CsmAnalyticsController extends Controller
 
                     $this->applyDateConstraintToJoin(
                         join: $join,
-                        column: 'qt.queue_date',
+                        column: 'qt.completed_at',
                         period: $period,
                         date: $date,
                         month: $month,
@@ -2086,7 +2086,7 @@ class CsmAnalyticsController extends Controller
 
                     $this->applyDateConstraintToJoin(
                         join: $join,
-                        column: 'it.transaction_date',
+                        column: 'it.evaluated_at',
                         period: $period,
                         date: $date,
                         month: $month,
@@ -2171,17 +2171,17 @@ class CsmAnalyticsController extends Controller
         int $year
     ): void {
         if ($period === 'monthly') {
-            $join->whereYear($column, '=', $year)
-                ->whereMonth($column, '=', $month);
+            $join->whereRaw("EXTRACT(YEAR FROM {$column}) = ?", [$year])
+                 ->whereRaw("EXTRACT(MONTH FROM {$column}) = ?", [$month]);
             return;
         }
 
         if ($period === 'yearly') {
-            $join->whereYear($column, '=', $year);
+            $join->whereRaw("EXTRACT(YEAR FROM {$column}) = ?", [$year]);
             return;
         }
 
-        $join->whereDate($column, '=', $date->toDateString());
+        $join->whereRaw("DATE({$column}) = ?", [$date->toDateString()]);
     }
 
     private function computeCcMetric(
@@ -2390,12 +2390,12 @@ class CsmAnalyticsController extends Controller
     ): Builder|\Illuminate\Database\Query\Builder {
         return match ($period) {
             'monthly' => $query
-                ->whereYear('queue_date', $year)
-                ->whereMonth('queue_date', $month),
+                ->whereRaw("EXTRACT(YEAR FROM qt.completed_at) = ?", [$year])
+                ->whereRaw("EXTRACT(MONTH FROM qt.completed_at) = ?", [$month]),
             'yearly' => $query
-                ->whereYear('queue_date', $year),
+                ->whereRaw("EXTRACT(YEAR FROM qt.completed_at) = ?", [$year]),
             default => $query
-                ->whereDate('queue_date', $date->toDateString()),
+                ->whereRaw("DATE(qt.completed_at) = ?", [$date->toDateString()]),
         };
     }
 
@@ -2408,12 +2408,12 @@ class CsmAnalyticsController extends Controller
     ): Builder|\Illuminate\Database\Query\Builder {
         return match ($period) {
             'monthly' => $query
-                ->whereYear('transaction_date', $year)
-                ->whereMonth('transaction_date', $month),
+                ->whereRaw("EXTRACT(YEAR FROM it.evaluated_at) = ?", [$year])
+                ->whereRaw("EXTRACT(MONTH FROM it.evaluated_at) = ?", [$month]),
             'yearly' => $query
-                ->whereYear('transaction_date', $year),
+                ->whereRaw("EXTRACT(YEAR FROM it.evaluated_at) = ?", [$year]),
             default => $query
-                ->whereDate('transaction_date', $date->toDateString()),
+                ->whereRaw("DATE(it.evaluated_at) = ?", [$date->toDateString()]),
         };
     }
 
@@ -2751,8 +2751,8 @@ class CsmAnalyticsController extends Controller
                 ->join('services as s', 's.id', '=', 'qts.service_id')
                 ->whereNotNull('er.queue_transaction_id')
                 ->where('qt.office_id', $officeId)
-                ->where('qt.queue_date', '>=', $startDate)
-                ->where('qt.queue_date', '<', $endDate)
+                ->whereRaw("qt.completed_at >= ?", [$startDate])
+                ->whereRaw("qt.completed_at < ?", [$endDate])
                 ->where('s.service_type', 'External');
         }
 
@@ -2766,8 +2766,8 @@ class CsmAnalyticsController extends Controller
                     $q->where('it.office_id', $officeId)
                       ->orWhere('it.to_office_id', $officeId);
                 })
-                ->where('it.transaction_date', '>=', $startDate)
-                ->where('it.transaction_date', '<', $endDate)
+                ->whereRaw("it.evaluated_at >= ?", [$startDate])
+                ->whereRaw("it.evaluated_at < ?", [$endDate])
                 ->where('s.service_type', 'Internal');
         }
 
@@ -2886,8 +2886,8 @@ class CsmAnalyticsController extends Controller
                 ->whereNotNull('es.queue_transaction_id')
                 ->where('qt.office_id', $officeId)
                 ->where('qt.status', 'COMPLETED')
-                ->where('qt.queue_date', '>=', $startDate)
-                ->where('qt.queue_date', '<', $endDate)
+                ->whereRaw("qt.completed_at >= ?", [$startDate])
+                ->whereRaw("qt.completed_at < ?", [$endDate])
                 ->where('s.service_type', 'External');
         }
 
@@ -2902,8 +2902,8 @@ class CsmAnalyticsController extends Controller
                       ->orWhere('it.to_office_id', $officeId);
                 })
                 ->where('it.status', 'COMPLETED')
-                ->where('it.transaction_date', '>=', $startDate)
-                ->where('it.transaction_date', '<', $endDate)
+                ->whereRaw("it.evaluated_at >= ?", [$startDate])
+                ->whereRaw("it.evaluated_at < ?", [$endDate])
                 ->where('s.service_type', 'Internal');
         }
 
@@ -2991,8 +2991,8 @@ class CsmAnalyticsController extends Controller
                 ->where('qt.office_id', $officeId)
                 ->where('qt.status', 'COMPLETED')
                 ->where('s.service_type', 'External')
-                ->where('qt.queue_date', '>=', $startDate)
-                ->where('qt.queue_date', '<', $endDate);
+                ->whereRaw("qt.completed_at >= ?", [$startDate])
+                ->whereRaw("qt.completed_at < ?", [$endDate]);
         }
 
         if ($source === 'internal') {
@@ -3006,8 +3006,8 @@ class CsmAnalyticsController extends Controller
                 })
                 ->where('it.status', 'COMPLETED')
                 ->where('s.service_type', 'Internal')
-                ->where('it.transaction_date', '>=', $startDate)
-                ->where('it.transaction_date', '<', $endDate);
+                ->whereRaw("it.evaluated_at >= ?", [$startDate])
+                ->whereRaw("it.evaluated_at < ?", [$endDate]);
         }
 
         return $query
@@ -3239,8 +3239,8 @@ class CsmAnalyticsController extends Controller
                 ->whereNotNull('er.queue_transaction_id')
                 ->where('qt.office_id', $officeId)
                 ->where('qt.status', 'COMPLETED')
-                ->where('qt.queue_date', '>=', $startDate)
-                ->where('qt.queue_date', '<', $endDate)
+                ->whereRaw("qt.completed_at >= ?", [$startDate])
+                ->whereRaw("qt.completed_at < ?", [$endDate])
                 ->where('s.service_type', 'External');
         }
 
@@ -3255,8 +3255,8 @@ class CsmAnalyticsController extends Controller
                       ->orWhere('it.to_office_id', $officeId);
                 })
                 ->where('it.status', 'COMPLETED')
-                ->where('it.transaction_date', '>=', $startDate)
-                ->where('it.transaction_date', '<', $endDate)
+                ->whereRaw("it.evaluated_at >= ?", [$startDate])
+                ->whereRaw("it.evaluated_at < ?", [$endDate])
                 ->where('s.service_type', 'Internal');
         }
 
@@ -3287,8 +3287,8 @@ class CsmAnalyticsController extends Controller
                 ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
                 ->where('qt.office_id', $officeId)
                 ->where('qt.status', 'COMPLETED')
-                ->where('qt.queue_date', '>=', $startDate)
-                ->where('qt.queue_date', '<', $endDate)
+                ->whereRaw("qt.completed_at >= ?", [$startDate])
+                ->whereRaw("qt.completed_at < ?", [$endDate])
                 ->where('s.service_type', 'External')
                 ->whereExists(function ($subQuery) {
                     $subQuery->selectRaw('1')
@@ -3307,8 +3307,8 @@ class CsmAnalyticsController extends Controller
                       ->orWhere('it.to_office_id', $officeId);
                 })
                 ->where('it.status', 'COMPLETED')
-                ->where('it.transaction_date', '>=', $startDate)
-                ->where('it.transaction_date', '<', $endDate)
+                ->whereRaw("it.evaluated_at >= ?", [$startDate])
+                ->whereRaw("it.evaluated_at < ?", [$endDate])
                 ->where('s.service_type', 'Internal')
                 ->whereExists(function ($subQuery) {
                     $subQuery->selectRaw('1')

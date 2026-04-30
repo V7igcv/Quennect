@@ -52,6 +52,7 @@ class InternalTransaction extends Model
         
         // Evaluation
         'average_satisfaction_rating',
+        'evaluated_at',
     ];
 
     protected $casts = [
@@ -64,6 +65,7 @@ class InternalTransaction extends Model
         'denied_at' => 'datetime',
         'overdue_at' => 'datetime',
         'processed_at' => 'datetime',
+        'evaluated_at' => 'datetime',
         'average_satisfaction_rating' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

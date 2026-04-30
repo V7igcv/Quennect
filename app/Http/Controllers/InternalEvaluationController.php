@@ -212,25 +212,27 @@ class InternalEvaluationController extends Controller
             }
 
             $internalTransaction->average_satisfaction_rating = $averageRating;
+            $internalTransaction->evaluated_at = now();
             $internalTransaction->save();
 
-            // Notify the requester office that the evaluation was completed
-            $requesterOfficeId = $internalTransaction->from_office_id;
-            $requesterUsers = User::where('office_id', $requesterOfficeId)->get();
-
-            foreach ($requesterUsers as $user) {
-                $notification = InternalRequestNotification::create([
-                    'internal_transaction_id' => $internalTransaction->id,
-                    'user_id' => $user->id,
-                    'title' => 'Evaluation Completed',
-                    'message' => "The service evaluation for your request (#{$internalTransaction->transaction_id}) has been submitted successfully.",
-                    'type' => 'evaluation_completed',
-                ]);
-
-                event(new InternalRequestNotificationCreated($notification));
-            }
-
             DB::commit();
+
+            // Fire notification AFTER commit so a Pusher failure doesn't roll back the evaluation
+            try {
+                foreach ($requesterUsers as $user) {
+                    $notification = InternalRequestNotification::create([
+                        'internal_transaction_id' => $internalTransaction->id,
+                        'user_id' => $user->id,
+                        'title' => 'Evaluation Completed',
+                        'message' => "The service evaluation for your request (#{$internalTransaction->transaction_id}) has been submitted successfully.",
+                        'type' => 'evaluation_completed',
+                    ]);
+
+                    event(new InternalRequestNotificationCreated($notification));
+                }
+            } catch (\Exception $notifEx) {
+                Log::warning('submitEvaluation: notification failed for ' . $internalTransaction->transaction_id . ': ' . $notifEx->getMessage());
+            }
             
             return response()->json([
                 'success' => true,

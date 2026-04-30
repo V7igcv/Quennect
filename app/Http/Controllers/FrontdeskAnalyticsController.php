@@ -2026,7 +2026,7 @@ class FrontdeskAnalyticsController extends Controller
             ->where('s.service_type', 'External')
             ->where('s.provides_assistance', true);
 
-        $this->applyDateFilterToColumn($baseQuery, $period, $date, $month, $year, 'qt.queue_date');
+        $this->applyDateFilterToColumn($baseQuery, $period, $date, $month, $year, 'qt.completed_at');
 
         if ($barangayId !== null) {
             $baseQuery->where('qt.barangay_id', $barangayId);
@@ -2097,7 +2097,7 @@ class FrontdeskAnalyticsController extends Controller
             ->where('s.provides_assistance', true)
             ->whereNotNull('qt.barangay_id');
 
-        $this->applyDateFilterToColumn($query, $period, $date, $month, $year, 'qt.queue_date');
+        $this->applyDateFilterToColumn($query, $period, $date, $month, $year, 'qt.completed_at');
 
         return $query
             ->selectRaw('qt.barangay_id as barangay_id')
@@ -2206,17 +2206,17 @@ class FrontdeskAnalyticsController extends Controller
     ) {
         return match ($period) {
             'monthly' => $query
-                ->whereYear('queue_date', $year)
-                ->whereMonth('queue_date', $month),
+                ->whereRaw("EXTRACT(YEAR FROM COALESCE(completed_at, skipped_at)) = ?", [$year])
+                ->whereRaw("EXTRACT(MONTH FROM COALESCE(completed_at, skipped_at)) = ?", [$month]),
             'yearly' => $query
-                ->whereYear('queue_date', $year),
+                ->whereRaw("EXTRACT(YEAR FROM COALESCE(completed_at, skipped_at)) = ?", [$year]),
             default => $query
-                ->whereDate('queue_date', $date->toDateString()),
+                ->whereRaw("DATE(COALESCE(completed_at, skipped_at)) = ?", [$date->toDateString()]),
         };
     }
 
     /**
-     * Apply date filter to a specific date column (for joined/aliased query builders).
+     * Apply date filter to joined/aliased query builders using qt.completed_at / qt.skipped_at.
      */
     private function applyDateFilterToColumn(
         $query,
@@ -2224,22 +2224,22 @@ class FrontdeskAnalyticsController extends Controller
         Carbon $date,
         int $month,
         int $year,
-        string $dateColumn
+        string $dateColumn = 'qt.completed_at'
     ) {
         return match ($period) {
             'monthly' => $query
-                ->whereYear($dateColumn, $year)
-                ->whereMonth($dateColumn, $month),
+                ->whereRaw("EXTRACT(YEAR FROM COALESCE(qt.completed_at, qt.skipped_at)) = ?", [$year])
+                ->whereRaw("EXTRACT(MONTH FROM COALESCE(qt.completed_at, qt.skipped_at)) = ?", [$month]),
             'yearly' => $query
-                ->whereYear($dateColumn, $year),
+                ->whereRaw("EXTRACT(YEAR FROM COALESCE(qt.completed_at, qt.skipped_at)) = ?", [$year]),
             default => $query
-                ->whereDate($dateColumn, $date->toDateString()),
+                ->whereRaw("DATE(COALESCE(qt.completed_at, qt.skipped_at)) = ?", [$date->toDateString()]),
         };
     }
 
     /**
-     * Apply date filter for assistance analytics using either queue date or
-     * assistance provided timestamp to avoid excluding valid assistance rows.
+     * Apply date filter for assistance analytics using either the transaction's
+     * resolution date (completed_at) or assistance_provided_at.
      */
     private function applyAssistanceDateFilter(
         $query,
@@ -2252,22 +2252,22 @@ class FrontdeskAnalyticsController extends Controller
             'monthly' => $query->where(function ($subQuery) use ($year, $month) {
                 $subQuery
                     ->where(function ($q) use ($year, $month) {
-                        $q->whereYear('qt.queue_date', $year)
-                            ->whereMonth('qt.queue_date', $month);
+                        $q->whereRaw("EXTRACT(YEAR FROM qt.completed_at) = ?", [$year])
+                          ->whereRaw("EXTRACT(MONTH FROM qt.completed_at) = ?", [$month]);
                     })
                     ->orWhere(function ($q) use ($year, $month) {
                         $q->whereYear('sa.assistance_provided_at', $year)
-                            ->whereMonth('sa.assistance_provided_at', $month);
+                          ->whereMonth('sa.assistance_provided_at', $month);
                     });
             }),
             'yearly' => $query->where(function ($subQuery) use ($year) {
                 $subQuery
-                    ->whereYear('qt.queue_date', $year)
+                    ->whereRaw("EXTRACT(YEAR FROM qt.completed_at) = ?", [$year])
                     ->orWhereYear('sa.assistance_provided_at', $year);
             }),
             default => $query->where(function ($subQuery) use ($date) {
                 $subQuery
-                    ->whereDate('qt.queue_date', $date->toDateString())
+                    ->whereRaw("DATE(qt.completed_at) = ?", [$date->toDateString()])
                     ->orWhereDate('sa.assistance_provided_at', $date->toDateString());
             }),
         };
