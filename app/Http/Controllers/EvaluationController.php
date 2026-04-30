@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\MonitorUpdated;
 use App\Models\EvaluationQuestion;
+use App\Enums\TransactionStatus;
 use App\Models\EvaluationResponse;
 use App\Models\EvaluationSession;
 use App\Models\QueueTransaction;
@@ -204,6 +205,8 @@ class EvaluationController extends Controller
                 ], 404);
             }
 
+            $originalStatus = $transaction->status;
+
             // Check if evaluation already exists
             if ($transaction->hasEvaluation()) {
                 return response()->json([
@@ -314,12 +317,13 @@ class EvaluationController extends Controller
             $transaction->status = 'COMPLETED';
             $transaction->completed_at = now();
             
-            // Calculate serving time based on when it was called or created
-            if ($transaction->called_at) {
-                $transaction->serving_time = (int) round($transaction->called_at->diffInMinutes($transaction->completed_at));
-            } elseif ($transaction->created_at) {
-                // For backlog transactions without called_at
-                $transaction->serving_time = (int) round($transaction->created_at->diffInMinutes($transaction->completed_at));
+            // Calculate and store serving time based on when it was called or backlogged
+            if ($originalStatus === TransactionStatus::SERVING && $transaction->called_at) {
+                // If it was being served, calculate from called_at to completed_at
+                $transaction->serving_time = round($transaction->called_at->diffInSeconds($transaction->completed_at) / 60, 2);
+            } elseif ($originalStatus === TransactionStatus::BACKLOG && $transaction->called_at && $transaction->backlog_at) {
+                // If it was backlog, calculate from called_at to backlog_at
+                $transaction->serving_time = round($transaction->called_at->diffInSeconds($transaction->backlog_at) / 60, 2);
             }
             
             // Clear counter assignment if it exists
@@ -437,11 +441,18 @@ class EvaluationController extends Controller
                 ], 404);
             }
 
+            $originalStatus = $transaction->status;
+
             // Update transaction status to COMPLETED
             $transaction->status = 'COMPLETED';
             $transaction->completed_at = now();
-            if ($transaction->called_at) {
-                $transaction->serving_time = (int) round($transaction->called_at->diffInMinutes($transaction->completed_at));
+            // Calculate and store serving time based on when it was called or backlogged
+            if ($originalStatus === TransactionStatus::SERVING && $transaction->called_at) {
+                // If it was being served, calculate from called_at to completed_at
+                $transaction->serving_time = round($transaction->called_at->diffInSeconds($transaction->completed_at) / 60, 2);
+            } elseif ($originalStatus === TransactionStatus::BACKLOG && $transaction->called_at && $transaction->backlog_at) {
+                // If it was backlog, calculate from called_at to backlog_at
+                $transaction->serving_time = round($transaction->called_at->diffInSeconds($transaction->backlog_at) / 60, 2);
             }
             $transaction->save();
 

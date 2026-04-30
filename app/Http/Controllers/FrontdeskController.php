@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\MonitorUpdated;
 use App\Models\QueueTransaction;
 use App\Models\Counter;
+use App\Enums\TransactionStatus;
 use App\Services\MonitorDataService;
 use App\Services\QueueService;
 use Illuminate\Http\Request;
@@ -207,7 +208,7 @@ class FrontdeskController extends Controller
             
             // Calculate and store waiting time
             if ($queue->created_at) {
-                $queue->waiting_time = (int) round($queue->created_at->diffInMinutes($queue->called_at));
+                $queue->waiting_time = round($queue->created_at->diffInSeconds($queue->called_at) / 60, 2);
             }
             
             $queue->save();
@@ -425,13 +426,13 @@ class FrontdeskController extends Controller
             $queue->status = 'COMPLETED';
             $queue->completed_at = now();
             
-            // Calculate and store serving time based on when it was called or created
-            if ($originalStatus === 'SERVING' && $queue->called_at) {
+            // Calculate and store serving time based on when it was called or backlogged
+            if ($originalStatus === TransactionStatus::SERVING && $queue->called_at) {
                 // If it was being served, calculate from called_at to completed_at
-                $queue->serving_time = (int) round($queue->called_at->diffInMinutes($queue->completed_at));
-            } elseif ($originalStatus === 'BACKLOG' && $queue->created_at) {
-                // If it was backlog, calculate from created_at to completed_at
-                $queue->serving_time = (int) round($queue->created_at->diffInMinutes($queue->completed_at));
+                $queue->serving_time = round($queue->called_at->diffInSeconds($queue->completed_at) / 60, 2);
+            } elseif ($originalStatus === TransactionStatus::BACKLOG && $queue->called_at && $queue->backlog_at) {
+                // If it was backlog, calculate from called_at to backlog_at
+                $queue->serving_time = round($queue->called_at->diffInSeconds($queue->backlog_at) / 60, 2);
             }
             
             // Clear counter assignment if it exists

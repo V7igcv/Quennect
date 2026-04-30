@@ -225,25 +225,60 @@ class QueueTransaction extends Model
     }
 
     /**
-     * Calculate waiting time in minutes
+     * Get waiting time in minutes
      */
     public function getWaitingTimeAttribute()
     {
+        if (isset($this->attributes['waiting_time']) && !is_null($this->attributes['waiting_time'])) {
+            return (float) $this->attributes['waiting_time'];
+        }
+
         if ($this->called_at && $this->created_at) {
-            return $this->created_at->diffInMinutes($this->called_at);
+            return round($this->created_at->diffInSeconds($this->called_at) / 60, 2);
         }
         return null;
     }
 
+    public function getWaitingTimeFormattedAttribute()
+    {
+        return self::formatDuration($this->waiting_time);
+    }
+
     /**
-     * Calculate serving time in minutes
+     * Get serving time in minutes
      */
     public function getServingTimeAttribute()
     {
+        if (isset($this->attributes['serving_time']) && !is_null($this->attributes['serving_time'])) {
+            return (float) $this->attributes['serving_time'];
+        }
+
         if ($this->completed_at && $this->called_at) {
-            return $this->called_at->diffInMinutes($this->completed_at);
+            return round($this->called_at->diffInSeconds($this->completed_at) / 60, 2);
         }
         return null;
+    }
+
+    public function getServingTimeFormattedAttribute()
+    {
+        return self::formatDuration($this->serving_time);
+    }
+
+    /**
+     * Format minutes into true decimal M.MM min or H.HH hr
+     */
+    public static function formatDuration($minutes)
+    {
+        if ($minutes === null) return null;
+        
+        $minutes = (float) $minutes;
+        
+        if ($minutes >= 60) {
+            $hours = $minutes / 60;
+            return number_format($hours, 2) . " hr";
+        } else {
+            return number_format($minutes, 2) . " min";
+        }
     }
 
     /**

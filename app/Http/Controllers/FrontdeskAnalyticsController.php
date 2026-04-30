@@ -107,8 +107,8 @@ class FrontdeskAnalyticsController extends Controller
                     'total_clients' => $totalClients,
                     'total_served' => $totalServed,
                     'total_skipped' => $totalSkipped,
-                    'average_waiting_time' => round((float) ($averageWaitingTime ?? 0), 2),
-                    'average_service_time' => round((float) ($averageServiceTime ?? 0), 2),
+                    'average_waiting_time' => QueueTransaction::formatDuration($averageWaitingTime),
+                    'average_service_time' => QueueTransaction::formatDuration($averageServiceTime),
                 ],
                 'filter' => $this->buildFilterPayload($period, $date, (int) $month, (int) $year),
             ]);
@@ -842,12 +842,8 @@ class FrontdeskAnalyticsController extends Controller
                     'priority_sectors' => $prioritySectors->all(),
                     'status' => $isSkipped ? 'Skipped' : 'Completed',
                     'completion_time' => $completionTime?->format('M d, Y h:i A'),
-                    'waiting_time' => $transaction->waiting_time === null
-                        ? null
-                        : round((float) $transaction->waiting_time, 2),
-                    'service_time' => $transaction->serving_time === null
-                        ? null
-                        : round((float) $transaction->serving_time, 2),
+                    'waiting_time' => $transaction->waiting_time_formatted,
+                    'service_time' => $transaction->serving_time_formatted,
                     'average_satisfaction_rating' => $isSkipped
                         ? '-'
                         : $this->mapAverageSatisfactionLabel($transaction->average_satisfaction_rating),
@@ -1919,12 +1915,8 @@ class FrontdeskAnalyticsController extends Controller
                                 $transaction->barangay?->barangay_name,
                                 $laneType,
                                 $completionDateTime?->format('M d, Y h:i A'),
-                                $transaction->waiting_time === null
-                                    ? null
-                                    : round((float) $transaction->waiting_time, 2),
-                                $transaction->serving_time === null
-                                    ? null
-                                    : round((float) $transaction->serving_time, 2),
+                                $transaction->waiting_time_formatted,
+                                $transaction->serving_time_formatted,
                             ];
 
                             // Conditionally add assistance columns

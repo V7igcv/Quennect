@@ -577,13 +577,13 @@
             <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
               <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Waiting Time</p>
               <p class="mt-1 text-sm font-semibold text-gray-900">
-                {{ selectedQueueEntry.averageWaitingTime != null ? `${selectedQueueEntry.averageWaitingTime} min` : 'N/A' }}
+                {{ selectedQueueEntry.averageWaitingTime || 'N/A' }}
               </p>
             </div>
             <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
               <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Service Time</p>
               <p class="mt-1 text-sm font-semibold text-gray-900">
-                {{ selectedQueueEntry.averageServingTime != null ? `${selectedQueueEntry.averageServingTime} min` : 'N/A' }}
+                {{ selectedQueueEntry.averageServingTime || 'N/A' }}
               </p>
             </div>
           </div>

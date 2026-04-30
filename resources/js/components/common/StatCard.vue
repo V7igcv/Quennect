@@ -31,7 +31,7 @@ import { computed } from 'vue'
 
 const props = defineProps({
   title: String,
-  value: Number,
+  value: [String, Number],
   icon: Object,
   iconBg: String,
   iconColor: String,
@@ -50,7 +50,11 @@ const props = defineProps({
 const formattedValue = computed(() => {
   if (props.value === undefined || props.value === null) return '0'
   
-  // Just add commas, no decimals
-  return props.value.toLocaleString('en-US')
+  if (typeof props.value === 'string') return props.value
+
+  return props.value.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  })
 })
 </script>
