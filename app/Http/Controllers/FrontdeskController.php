@@ -47,6 +47,9 @@ class FrontdeskController extends Controller
                 ], 403);
             }
 
+            // Clean up stale queues (Waiting/Skipped) on every dashboard load
+            $this->queueService->cleanupStaleQueues($user->office_id);
+
             $today = $this->queueService->getTodayDate();
 
             $stats = [

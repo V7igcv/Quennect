@@ -98,33 +98,30 @@ class QueueService
 
     /**
      * Clean up any stale serving queues from previous days
-     * This can be run via a scheduled job or on system startup
+     * This is ran after a day change is detected, or on dashboard load to ensure no old queues are left in WAITING or SERVING status
      */
-    public function cleanupStaleQueues()
+    public function cleanupStaleQueues($officeId = null)
     {
-        $yesterday = now()->subDay()->toDateString();
-
-        // Find any queues that are still WAITING or SERVING from yesterday
-        $staleQueues = QueueTransaction::whereDate('queue_date', '<', now()->toDateString())
-            ->whereIn('status', ['WAITING', 'SERVING'])
-            ->get();
+        $query = QueueTransaction::whereDate('queue_date', '<', now()->toDateString())
+            ->whereIn('status', ['WAITING', 'SERVING']);
+        
+        if ($officeId) {
+            $query->where('office_id', $officeId);
+        }
+        
+        $staleQueues = $query->get();
 
         foreach ($staleQueues as $queue) {
-            // For waiting queues, mark as skipped
-            if ($queue->status === 'WAITING') {
-                $queue->status = 'SKIPPED';
-                $queue->skipped_at = now();
-            }
+            $queue->status = 'SKIPPED';
+            $queue->skipped_at = now();
             
-            // For serving queues, mark as completed (or skipped, depending on your business logic)
-            if ($queue->status === 'SERVING') {
-                $queue->status = 'COMPLETED'; // or 'SKIPPED' - discuss with your team
-                $queue->completed_at = now();
+            if ($queue->counter_id) {
+                $queue->counter_id = null;
             }
             
             $queue->save();
             
-            Log::info("Cleaned up stale queue: {$queue->full_queue_number} from {$queue->queue_date}");
+            Log::info("Cleaned up stale queue for office {$queue->office_id}: {$queue->full_queue_number}");
         }
 
         return count($staleQueues);
