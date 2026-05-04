@@ -49,6 +49,8 @@
         <router-view />
       </main>
 
+      <SessionExpiredModal :visible="showSessionExpiredModal" @login="handleLogout" />
+
       <div v-if="showLogoutConfirmModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-60 px-4">
         <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
           <h3 class="text-lg font-semibold mb-2">Log out?</h3>
@@ -83,13 +85,16 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Header from '../components/common/Header.vue'
 import Sidebar from '../components/common/Sidebar.vue'
+import SessionExpiredModal from '../components/modals/SessionExpiredModal.vue'
 import { authService } from '../services/auth'
+import { useIdleSessionTimeout } from '../composables/useIdleSessionTimeout'
 
 export default {
   name: 'CityMayorLayout',
   components: {
     Header,
     Sidebar,
+    SessionExpiredModal,
   },
   setup() {
     const router = useRouter()
@@ -97,6 +102,7 @@ export default {
     const mobileSidebarOpen = ref(false)
     const isRefreshing = ref(false)
     const showLogoutConfirmModal = ref(false)
+    const showSessionExpiredModal = ref(false)
     const isLoggingOut = ref(false)
 
     const currentUser = ref(authService.getCurrentUser())
@@ -124,6 +130,13 @@ export default {
 
     onMounted(() => {
       fetchUserData()
+    })
+
+    useIdleSessionTimeout({
+      timeout: 30 * 60 * 1000,
+      onExpire: () => {
+        showSessionExpiredModal.value = true
+      },
     })
 
     const toggleSidebar = () => {
@@ -155,6 +168,7 @@ export default {
       } finally {
         isLoggingOut.value = false
         showLogoutConfirmModal.value = false
+        showSessionExpiredModal.value = false
       }
     }
 
@@ -163,6 +177,7 @@ export default {
       mobileSidebarOpen,
       isRefreshing,
       showLogoutConfirmModal,
+      showSessionExpiredModal,
       isLoggingOut,
       currentUser,
       toggleSidebar,

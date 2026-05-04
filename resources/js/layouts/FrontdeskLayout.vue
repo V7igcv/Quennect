@@ -64,6 +64,8 @@
       </main>
 
       <!-- Logout Modal -->
+      <SessionExpiredModal :visible="showSessionExpiredModal" @login="handleLogout" />
+
       <div v-if="showLogoutConfirmModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-60 px-4">
         <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
           <h3 class="text-lg font-semibold mb-2">Log out?</h3>
@@ -98,13 +100,16 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Header from '../components/common/Header.vue'
 import Sidebar from '../components/common/Sidebar.vue'
+import SessionExpiredModal from '../components/modals/SessionExpiredModal.vue'
 import { authService } from '../services/auth'
+import { useIdleSessionTimeout } from '../composables/useIdleSessionTimeout'
 
 export default {
   name: 'FrontdeskLayout',
   components: {
     Header,
-    Sidebar
+    Sidebar,
+    SessionExpiredModal,
   },
   setup() {
     const router = useRouter()
@@ -113,6 +118,7 @@ export default {
     const mobileSidebarOpen = ref(false)
     const isRefreshing = ref(false)
     const showLogoutConfirmModal = ref(false)
+    const showSessionExpiredModal = ref(false)
     const isLoggingOut = ref(false)
 
     // Check if current route is chat
@@ -162,6 +168,13 @@ export default {
     onMounted(() => {
       fetchUserData()
     })
+
+    useIdleSessionTimeout({
+      timeout: 30 * 60 * 1000,
+      onExpire: () => {
+        showSessionExpiredModal.value = true
+      },
+    })
     
     const toggleSidebar = () => {
       sidebarCollapsed.value = !sidebarCollapsed.value
@@ -192,6 +205,7 @@ export default {
       } finally {
         isLoggingOut.value = false
         showLogoutConfirmModal.value = false
+        showSessionExpiredModal.value = false
       }
     }
     
@@ -200,6 +214,7 @@ export default {
       mobileSidebarOpen,
       isRefreshing,
       showLogoutConfirmModal,
+      showSessionExpiredModal,
       isLoggingOut,
       currentUser,
       officeId,
