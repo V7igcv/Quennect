@@ -24,9 +24,9 @@
         Ilagay ang iyong buong pangalan, numero ng cellphone, at barangay. Piliin kung ikaw ay Regular o kabilang sa Priority sector. Kung Priority, pakipili ang uri ng priority.
       </p>
 
-      <!-- Form Container with White Background -->
+      <!-- Form Container -->
       <div class="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-6">
-        <form @submit.prevent="showConfirmationModal" class="space-y-6">
+        <form @submit.prevent="handleNextClick" class="space-y-6">
           
           <!-- Pangalan -->
           <div>
@@ -80,7 +80,6 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                aria-hidden="true"
               >
                 <path d="m6 9 6 6 6-6" />
               </svg>
@@ -113,7 +112,7 @@
             </div>
           </div>
 
-          <!-- Priority Sectors (shown only if Priority is selected) -->
+          <!-- Priority Sectors -->
           <div v-if="form.lane_type === 'priority'">
             <label class="block text-base font-semibold text-gray-700 mb-3">Priority Sector:</label>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -134,22 +133,6 @@
             <p v-if="errors.priority_sectors" class="text-red-500 text-xs mt-2">{{ errors.priority_sectors }}</p>
           </div>
 
-          <!-- DPA Consent Checkbox -->
-          <div class="pt-4 border-t border-gray-200">
-            <label class="flex items-start space-x-3 cursor-pointer">
-              <input 
-                type="checkbox" 
-                v-model="form.dpa_consent"
-                class="w-5 h-5 text-[#0F5C5C] focus:ring-[#0F5C5C] rounded mt-0.5"
-              >
-              <span class="text-sm text-gray-700 leading-relaxed">
-                Pumapayag ako na gamitin ng opisina ang aking personal na impormasyon para sa layunin ng queuing system at transaksyon alinsunod sa 
-                <span class="font-semibold">Data Privacy Act of 2012 (Republic Act No. 10173)</span>.
-              </span>
-            </label>
-            <p v-if="errors.dpa_consent" class="text-red-500 text-xs mt-2">{{ errors.dpa_consent }}</p>
-          </div>
-
         </form>
       </div>
     </div>
@@ -157,12 +140,19 @@
     <!-- Footer -->
     <KioskFooter 
       @back="goBack"
-      @next="showConfirmationModal"
+      @next="handleNextClick"
       :nextVisible="true"
       :nextDisabled="!isFormValid"
     />
 
-    <!-- Confirmation Modal -->
+    <!-- ✅ DPA Modal (shows first) -->
+    <DpaModal
+      :show="showDpaModal"
+      @close="showDpaModal = false"
+      @agree="onDpaAgreed"
+    />
+
+    <!-- ✅ Confirmation Modal (shows after DPA is agreed) -->
     <ConfirmationModal 
       :show="showConfirmation"
       :details="confirmationDetails"
@@ -181,6 +171,7 @@ import { useRouter } from 'vue-router'
 import KioskHeader from '../../components/kiosk/KioskHeader.vue'
 import KioskFooter from '../../components/kiosk/KioskFooter.vue'
 import ConfirmationModal from '../../components/kiosk/ConfirmationModal.vue'
+import DpaModal from '../../components/modals/DpaModal.vue'   // ✅ new import
 import kioskApi from '../../services/kioskApi'
 
 const router = useRouter()
@@ -188,9 +179,9 @@ const barangays = ref([])
 const prioritySectors = ref([])
 const selectedOffice = ref(null)
 const selectedServices = ref([])
+const showDpaModal = ref(false)       // ✅ new
 const showConfirmation = ref(false)
 
-// Form data
 const form = ref({
   full_name: '',
   contact_number: '',
@@ -202,40 +193,24 @@ const form = ref({
 
 const errors = ref({})
 
-// Check if form is valid for enabling next button
+// ✅ DPA consent no longer required here — it's handled via modal
 const isFormValid = computed(() => {
-  // Check if DPA consent is checked
-  if (!form.value.dpa_consent) return false
-  
-  // Check required fields
   if (!form.value.full_name || !form.value.full_name.trim()) return false
   if (!form.value.contact_number || !form.value.contact_number.trim()) return false
   if (!form.value.barangay_id) return false
-  
-  // Check priority sectors if lane_type is priority
   if (form.value.lane_type === 'priority' && (!form.value.priority_sectors || form.value.priority_sectors.length === 0)) return false
-  
   return true
 })
 
-// Confirmation details
 const confirmationDetails = computed(() => ({
   office: selectedOffice.value,
   services: selectedServices.value,
   client: form.value
 }))
 
-// Helper function to get barangay name
-const getBarangayName = (barangay) => {
-  return barangay.barangay_name || barangay.name || 'Unknown'
-}
+const getBarangayName = (barangay) => barangay.barangay_name || barangay.name || 'Unknown'
+const getSectorName = (sector) => sector.sector_name || sector.name || 'Unknown'
 
-// Helper function to get sector name
-const getSectorName = (sector) => {
-  return sector.sector_name || sector.name || 'Unknown'
-}
-
-// Get selected office and services from localStorage
 onMounted(() => {
   const office = localStorage.getItem('selectedOffice')
   const services = localStorage.getItem('selectedServices')
@@ -256,84 +231,70 @@ onMounted(() => {
   fetchPrioritySectors()
 })
 
-// Fetch barangays
 const fetchBarangays = async () => {
   try {
     const response = await kioskApi.get('/barangays')
-    if (response.data && response.data.data) {
-      barangays.value = response.data.data
-    } else if (Array.isArray(response.data)) {
-      barangays.value = response.data
-    }
+    barangays.value = response.data?.data ?? (Array.isArray(response.data) ? response.data : [])
   } catch (error) {
     console.error('Error fetching barangays:', error)
   }
 }
 
-// Fetch priority sectors
 const fetchPrioritySectors = async () => {
   try {
     const response = await kioskApi.get('/priority-sectors')
-    if (response.data && response.data.data) {
-      prioritySectors.value = response.data.data
-    } else if (Array.isArray(response.data)) {
-      prioritySectors.value = response.data
-    }
+    prioritySectors.value = response.data?.data ?? (Array.isArray(response.data) ? response.data : [])
   } catch (error) {
     console.error('Error fetching priority sectors:', error)
   }
 }
 
-// Compute selected services names for display
 const selectedServicesNames = computed(() => {
-  if (!selectedServices.value || selectedServices.value.length === 0) return ''
+  if (!selectedServices.value?.length) return ''
   return selectedServices.value.map(s => `${s.name} (${s.code})`).join(', ')
 })
 
-// Validate form
 const validateForm = () => {
   const newErrors = {}
   
-  if (!form.value.full_name || !form.value.full_name.trim()) {
+  if (!form.value.full_name?.trim())
     newErrors.full_name = 'Paki-input ang iyong pangalan.'
-  }
   
-  if (!form.value.contact_number || !form.value.contact_number.trim()) {
+  if (!form.value.contact_number?.trim())
     newErrors.contact_number = 'Paki-input ang iyong contact number.'
-  } else if (!/^(09|\+639)\d{9}$/.test(form.value.contact_number)) {
+  else if (!/^(09|\+639)\d{9}$/.test(form.value.contact_number))
     newErrors.contact_number = 'Gumamit ng tamang format: 09123456789 o +639123456789.'
-  }
   
-  if (!form.value.barangay_id) {
+  if (!form.value.barangay_id)
     newErrors.barangay_id = 'Pumili ng iyong barangay.'
-  }
   
-  if (form.value.lane_type === 'priority' && (!form.value.priority_sectors || form.value.priority_sectors.length === 0)) {
+  if (form.value.lane_type === 'priority' && !form.value.priority_sectors?.length)
     newErrors.priority_sectors = 'Pumili ng kahit isang priority sector.'
-  }
-  
-  if (!form.value.dpa_consent) {
-    newErrors.dpa_consent = 'Kailangan mong pumayag sa Data Privacy Act para magpatuloy.'
-  }
   
   errors.value = newErrors
   return Object.keys(newErrors).length === 0
 }
 
-// Show confirmation modal
-const showConfirmationModal = () => {
+// ✅ Step 1: Validate form → show DPA modal
+const handleNextClick = () => {
   if (!validateForm()) return
+  showDpaModal.value = true
+}
+
+// ✅ Step 2: User agrees to DPA → set consent + show Confirmation modal
+const onDpaAgreed = () => {
+  form.value.dpa_consent = true
+  showDpaModal.value = false
   showConfirmation.value = true
 }
 
-// Confirm and proceed to print page
+// ✅ Step 3: User confirms details → save and proceed
 const confirmAndProceed = () => {
   localStorage.setItem('clientDetails', JSON.stringify(form.value))
   showConfirmation.value = false
   router.push('/kiosk/print')
 }
 
-// Go back
 const goBack = () => {
   form.value = {
     full_name: '',
@@ -345,7 +306,7 @@ const goBack = () => {
   }
   localStorage.removeItem('clientDetails')
 
-  if (selectedOffice.value && selectedOffice.value.id) {
+  if (selectedOffice.value?.id) {
     router.push({ path: '/kiosk/service-selection', query: { officeId: selectedOffice.value.id } })
   } else {
     router.push('/kiosk/service-selection')
