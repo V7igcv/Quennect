@@ -31,7 +31,7 @@
         <div class="flex flex-col items-center space-y-2">
           <div class="w-50 h-50 bg-gray-200 rounded-full flex items-center justify-center shadow-lg animate-float">
             <img 
-              src="/storage/logos/Ligao City Seal.png"
+              src="/storage/images/Ligao City Seal.png"
               alt="Ligao City Seal"
               class="w-56 h-56 object-contain glow-blink"
             />

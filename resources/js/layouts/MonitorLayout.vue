@@ -23,7 +23,7 @@
     <header class="bg-[#0F5C5C] text-white px-4 sm:px-6 lg:px-8 py-4 shadow-lg">
       <div class="max-w-screen-2xl mx-auto flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div class="flex items-center gap-3">
-          <img src="/storage/logos/Ligao City Seal.png" alt="Quennect Logo" class="h-12 w-12 rounded-full bg-white/10 p-1" />
+          <img src="/storage/images/Quennect_Logo_grey.png" alt="Quennect Logo" class="h-12 w-12 rounded-full bg-white/10 p-1" />
           <div>
             <h1 class="text-xl sm:text-2xl font-bold leading-tight">Quennect</h1>
             <p class="text-xs sm:text-sm text-white/85">LGU Ligao General Queuing System</p>

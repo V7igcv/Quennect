@@ -400,7 +400,7 @@
         <div class="report">
             <div class="header">
                 <div class="header-left">
-                    <img src="{{ asset('storage/logos/Ligao City Seal.png') }}" alt="Ligao City Seal" class="header-logo">
+                    <img src="{{ asset('storage/images/Ligao City Seal.png') }}" alt="Ligao City Seal" class="header-logo">
                     <div class="header-text">
                         <p class="header-kicker">Republic of the Philippines</p>
                         <p class="header-subkicker">City Government of Ligao</p>

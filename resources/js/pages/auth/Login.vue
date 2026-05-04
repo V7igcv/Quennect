@@ -11,8 +11,8 @@
     <div class="relative z-10 bg-white/70 p-15 rounded-xl shadow-xl w-130">
       <!-- Header with Logo -->
       <div class="text-center mb-8">
-        <div class="h-20 w-20 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
-          <img src="/storage/logos/Ligao City Seal.png" 
+        <div class="h-20 w-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+          <img src="/storage/images/Quennect_Logo.png" 
           class="h-20 w-20 rounded-full object-contain"
           alt="Ligao Logo">
         </div>
@@ -56,7 +56,8 @@
               @click="togglePasswordVisibility"
               class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-600 hover:text-[#474C55] focus:outline-none cursor-pointer"
             >
-              <font-awesome-icon :icon="['far', showPassword ? 'eye-slash' : 'eye']" class="w-5 h-5" />
+              <Eye v-if="!showPassword" class="w-5 h-5" />
+              <EyeOff v-else class="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -89,9 +90,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authService } from '../../services/auth'
+import { Eye, EyeOff } from 'lucide-vue-next'
 
 export default {
   name: 'Login',
+  components: { Eye, EyeOff },
   setup() {
     const router = useRouter()
     

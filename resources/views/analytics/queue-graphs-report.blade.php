@@ -432,7 +432,7 @@
             <div class="header">
                 <div class="header-left">
                     <img
-                        src="{{ asset('storage/logos/Ligao City Seal.png') }}"
+                        src="{{ asset('storage/images/Ligao City Seal.png') }}"
                         alt="Ligao City Seal"
                         class="header-logo"
                     >

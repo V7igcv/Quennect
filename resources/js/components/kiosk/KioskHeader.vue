@@ -3,8 +3,8 @@
     <div class="flex items-center">
       <!-- Logo/Seal -->
       <img 
-        src="/storage/logos/Ligao City Seal.png"
-        alt="Ligao City Seal" 
+        src="/storage/images/Quennect_Logo.png"
+        alt="Quennect Logo" 
         class="h-10 w-14 h-14 object-contain mr-3"
       >
       

@@ -12,9 +12,9 @@
         :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-40 opacity-100'"
       >
         <img
-          src="/storage/logos/Ligao City Seal.png"
+          src="/storage/images/Quennect_Logo.png"
           class="w-12 h-12 rounded-full object-contain shrink-0"
-          alt="Ligao Logo"
+          alt="Quennect Logo"
         >
         <h2 class="font-bold text-xl whitespace-nowrap text-[#1F4E79]">Quennect</h2>
       </div>

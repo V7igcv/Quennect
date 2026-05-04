@@ -32,7 +32,7 @@
         <div class="flex flex-col items-center justify-center mb-8">
           <div class="w-24 h-24 mb-2">
             <img 
-              src="/storage/logos/Ligao City Seal.png" 
+              src="/storage/images/Ligao City Seal.png" 
               alt="Ligao City Seal" 
               class="w-full h-full object-contain"
             >

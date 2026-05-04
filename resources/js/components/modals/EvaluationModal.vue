@@ -15,7 +15,7 @@
       <div class="flex justify-center items-center pb-4">
         <!-- System Logo -->
         <img 
-          src="/storage/logos/Ligao City Seal.png" 
+          src="/storage/images/Ligao City Seal.png" 
           class="w-14 h-14 rounded-full object-contain flex-shrink-0"
           alt="Ligao Logo"
         >
