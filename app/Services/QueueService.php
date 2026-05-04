@@ -113,7 +113,10 @@ class QueueService
 
         foreach ($staleQueues as $queue) {
             $queue->status = 'SKIPPED';
-            $queue->skipped_at = now();
+            // Set skipped_at to 1 minute before midnight of queue_date
+            // Format: Y-m-d 23:59:00
+            $skippedDateTime = \Carbon\Carbon::parse($queue->queue_date)->setTime(23, 59, 0);
+            $queue->skipped_at = $skippedDateTime;
             
             if ($queue->counter_id) {
                 $queue->counter_id = null;
