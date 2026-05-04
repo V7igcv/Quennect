@@ -521,7 +521,7 @@
             </button>
           </div>
           <p class="text-gray-600 text-sm leading-relaxed">
-            Select the data dimensions you wish to download as tables. The system will compile a structured data table based on your selection and will be exported as an excel file.
+            Select the data dimensions you wish to download as tables. The system will compile a structured data table based on your selection and will be exported as an excel file. The generated Excel file will reflect the data corresponding to the selected date filter.
           </p>
         </div>
 
