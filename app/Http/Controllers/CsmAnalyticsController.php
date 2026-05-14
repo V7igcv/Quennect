@@ -1344,58 +1344,41 @@ class CsmAnalyticsController extends Controller
         int $month,
         int $year
     ): float {
-        $externalResponsesQuery = DB::table('queue_transaction_services as qts')
+        $externalMetricsQuery = DB::table('queue_transaction_services as qts')
             ->join('services as s', 's.id', '=', 'qts.service_id')
             ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
+            ->leftJoin('evaluation_sessions as es', 'es.queue_transaction_id', '=', 'qt.id')
             ->where('qt.office_id', $officeId)
-            ->where('s.service_type', 'External')
-            ->whereExists(function ($subQuery) {
-                $subQuery->selectRaw('1')
-                    ->from('evaluation_sessions as es')
-                    ->whereColumn('es.queue_transaction_id', 'qt.id');
-            });
-
-        $this->applyQueueDateFilter($externalResponsesQuery, $period, $date, $month, $year);
-        $externalResponses = (int) $externalResponsesQuery->count('qts.id');
-
-        $internalResponsesQuery = DB::table('queue_transaction_services as qts')
-            ->join('services as s', 's.id', '=', 'qts.service_id')
-            ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
-                        ->where(function ($q) use ($officeId) {
-                                $q->where('it.office_id', $officeId)
-                                    ->orWhere('it.to_office_id', $officeId);
-                        })
-            ->where('s.service_type', 'Internal')
-            ->whereExists(function ($subQuery) {
-                $subQuery->selectRaw('1')
-                    ->from('evaluation_sessions as es')
-                    ->whereColumn('es.internal_transaction_id', 'it.id');
-            });
-
-        $this->applyInternalDateFilter($internalResponsesQuery, $period, $date, $month, $year);
-        $internalResponses = (int) $internalResponsesQuery->count('qts.id');
-
-        $externalTransactionsQuery = DB::table('queue_transaction_services as qts')
-            ->join('services as s', 's.id', '=', 'qts.service_id')
-            ->join('queue_transactions as qt', 'qt.id', '=', 'qts.queue_transaction_id')
-            ->where('qt.office_id', $officeId)
-            ->where('qt.status', 'COMPLETED')
             ->where('s.service_type', 'External');
 
-        $this->applyQueueDateFilter($externalTransactionsQuery, $period, $date, $month, $year);
-        $externalTransactions = (int) $externalTransactionsQuery->count('qts.id');
+        $this->applyQueueDateFilter($externalMetricsQuery, $period, $date, $month, $year);
 
-        $internalTransactionsQuery = DB::table('queue_transaction_services as qts')
+        $externalMetrics = $externalMetricsQuery
+            ->selectRaw('COUNT(DISTINCT qts.id) as total_transactions')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN es.id IS NOT NULL THEN qts.id END) as total_responses')
+            ->first();
+
+        $internalMetricsQuery = DB::table('queue_transaction_services as qts')
             ->join('services as s', 's.id', '=', 'qts.service_id')
             ->join('internal_transactions as it', 'it.id', '=', 'qts.internal_transaction_id')
+            ->leftJoin('evaluation_sessions as es', 'es.internal_transaction_id', '=', 'it.id')
             ->where(function ($q) use ($officeId) {
                 $q->where('it.office_id', $officeId)
-                  ->orWhere('it.to_office_id', $officeId);
+                    ->orWhere('it.to_office_id', $officeId);
             })
             ->where('s.service_type', 'Internal');
 
-        $this->applyInternalDateFilter($internalTransactionsQuery, $period, $date, $month, $year);
-        $internalTransactions = (int) $internalTransactionsQuery->count('qts.id');
+        $this->applyInternalDateFilter($internalMetricsQuery, $period, $date, $month, $year);
+
+        $internalMetrics = $internalMetricsQuery
+            ->selectRaw('COUNT(DISTINCT qts.id) as total_transactions')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN es.id IS NOT NULL THEN qts.id END) as total_responses')
+            ->first();
+
+        $externalResponses = (int) ($externalMetrics->total_responses ?? 0);
+        $externalTransactions = (int) ($externalMetrics->total_transactions ?? 0);
+        $internalResponses = (int) ($internalMetrics->total_responses ?? 0);
+        $internalTransactions = (int) ($internalMetrics->total_transactions ?? 0);
 
         $responses = $externalResponses + $internalResponses;
         $transactions = $externalTransactions + $internalTransactions;

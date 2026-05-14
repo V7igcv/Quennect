@@ -37,22 +37,41 @@ class InternalRequestController extends Controller
                 $sentQuery->whereBetween('transaction_date', [$startDate, $endDate]);
             }
             
+            // Fetch all stats in single aggregation queries instead of cloning 6+ times
+            $receivedStats = (clone $receivedQuery)
+                ->selectRaw('COUNT(*) as total')
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending", [InternalTransaction::STATUS_PENDING])
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as on_process", [InternalTransaction::STATUS_ON_PROCESS])
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed", [InternalTransaction::STATUS_COMPLETED])
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as denied", [InternalTransaction::STATUS_DENIED])
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as overdue", [InternalTransaction::STATUS_OVERDUE])
+                ->first();
+
+            $sentStats = (clone $sentQuery)
+                ->selectRaw('COUNT(*) as total')
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending", [InternalTransaction::STATUS_PENDING])
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as on_process", [InternalTransaction::STATUS_ON_PROCESS])
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed", [InternalTransaction::STATUS_COMPLETED])
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as denied", [InternalTransaction::STATUS_DENIED])
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as overdue", [InternalTransaction::STATUS_OVERDUE])
+                ->first();
+            
             $stats = [
                 'received' => [
-                    'pending' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_PENDING)->count(),
-                    'on_process' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_ON_PROCESS)->count(),
-                    'completed' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_COMPLETED)->count(),
-                    'denied' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_DENIED)->count(),
-                    'overdue' => (clone $receivedQuery)->where('status', InternalTransaction::STATUS_OVERDUE)->count(),
-                    'total' => (clone $receivedQuery)->count(),
+                    'pending' => (int) ($receivedStats->pending ?? 0),
+                    'on_process' => (int) ($receivedStats->on_process ?? 0),
+                    'completed' => (int) ($receivedStats->completed ?? 0),
+                    'denied' => (int) ($receivedStats->denied ?? 0),
+                    'overdue' => (int) ($receivedStats->overdue ?? 0),
+                    'total' => (int) ($receivedStats->total ?? 0),
                 ],
                 'sent' => [
-                    'pending' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_PENDING)->count(),
-                    'on_process' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_ON_PROCESS)->count(),
-                    'completed' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_COMPLETED)->count(),
-                    'denied' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_DENIED)->count(),
-                    'overdue' => (clone $sentQuery)->where('status', InternalTransaction::STATUS_OVERDUE)->count(),
-                    'total' => (clone $sentQuery)->count(),
+                    'pending' => (int) ($sentStats->pending ?? 0),
+                    'on_process' => (int) ($sentStats->on_process ?? 0),
+                    'completed' => (int) ($sentStats->completed ?? 0),
+                    'denied' => (int) ($sentStats->denied ?? 0),
+                    'overdue' => (int) ($sentStats->overdue ?? 0),
+                    'total' => (int) ($sentStats->total ?? 0),
                 ]
             ];
             

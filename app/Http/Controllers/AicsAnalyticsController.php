@@ -158,18 +158,15 @@ class AicsAnalyticsController extends Controller
             ->values()
             ->all();
 
-        $summaryRow = (clone $baseQuery)
-            ->selectRaw('COUNT(DISTINCT qt.id) as total_clients')
-            ->selectRaw('COALESCE(SUM(sa.assistance_provided), 0) as total_assistance')
-            ->first();
+        $summary = [
+            'total_clients' => collect($distribution)->sum('total_clients'),
+            'total_assistance' => round(collect($distribution)->sum('total_assistance'), 2),
+        ];
 
         return [
             'has_assistance_services' => true,
             'distribution' => $distribution,
-            'summary' => [
-                'total_clients' => (int) ($summaryRow->total_clients ?? 0),
-                'total_assistance' => round((float) ($summaryRow->total_assistance ?? 0), 2),
-            ],
+            'summary' => $summary,
         ];
     }
 

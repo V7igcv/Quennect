@@ -82,24 +82,20 @@ class FrontdeskAnalyticsController extends Controller
                 (int) $year
             );
 
-            $totalClients = (clone $filteredQuery)->count();
+            // Fetch all stats in a single query using raw SQL aggregations
+            $stats = (clone $filteredQuery)
+                ->selectRaw('COUNT(*) as total_clients')
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as total_served", [TransactionStatus::COMPLETED->value])
+                ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as total_skipped", [TransactionStatus::SKIPPED->value])
+                ->selectRaw('AVG(CASE WHEN waiting_time IS NOT NULL THEN waiting_time ELSE NULL END) as average_waiting_time')
+                ->selectRaw("AVG(CASE WHEN serving_time IS NOT NULL AND status = ? THEN serving_time ELSE NULL END) as average_service_time", [TransactionStatus::COMPLETED->value])
+                ->first();
 
-            $totalServed = (clone $filteredQuery)
-                ->where('status', TransactionStatus::COMPLETED->value)
-                ->count();
-
-            $totalSkipped = (clone $filteredQuery)
-                ->where('status', TransactionStatus::SKIPPED->value)
-                ->count();
-
-            $averageWaitingTime = (clone $filteredQuery)
-                ->whereNotNull('waiting_time')
-                ->avg('waiting_time');
-
-            $averageServiceTime = (clone $filteredQuery)
-                ->whereNotNull('serving_time')
-                ->where('status', TransactionStatus::COMPLETED->value)
-                ->avg('serving_time');
+            $totalClients = (int) ($stats->total_clients ?? 0);
+            $totalServed = (int) ($stats->total_served ?? 0);
+            $totalSkipped = (int) ($stats->total_skipped ?? 0);
+            $averageWaitingTime = (float) ($stats->average_waiting_time ?? 0);
+            $averageServiceTime = (float) ($stats->average_service_time ?? 0);
 
             return response()->json([
                 'success' => true,
@@ -181,47 +177,39 @@ class FrontdeskAnalyticsController extends Controller
                 $year
             );
 
+            // Fetch satisfaction data once instead of cloning 6 times
+            $satisfactionData = (clone $filteredQueueTransactionsQuery)
+                ->select('average_satisfaction_rating')
+                ->whereNotNull('average_satisfaction_rating')
+                ->orWhereNull('average_satisfaction_rating')
+                ->pluck('average_satisfaction_rating')
+                ->toArray();
+
+            // Process in memory instead of querying 6+ times
             $distribution = [
                 [
                     'label' => 'Strongly Disagree',
-                    'value' => (clone $filteredQueueTransactionsQuery)
-                        ->whereNotNull('average_satisfaction_rating')
-                        ->whereRaw('ROUND(average_satisfaction_rating) = 1')
-                        ->count(),
+                    'value' => collect($satisfactionData)->filter(fn ($rating) => !is_null($rating) && round($rating) === 1)->count(),
                 ],
                 [
                     'label' => 'Disagree',
-                    'value' => (clone $filteredQueueTransactionsQuery)
-                        ->whereNotNull('average_satisfaction_rating')
-                        ->whereRaw('ROUND(average_satisfaction_rating) = 2')
-                        ->count(),
+                    'value' => collect($satisfactionData)->filter(fn ($rating) => !is_null($rating) && round($rating) === 2)->count(),
                 ],
                 [
                     'label' => 'Neither',
-                    'value' => (clone $filteredQueueTransactionsQuery)
-                        ->whereNotNull('average_satisfaction_rating')
-                        ->whereRaw('ROUND(average_satisfaction_rating) = 3')
-                        ->count(),
+                    'value' => collect($satisfactionData)->filter(fn ($rating) => !is_null($rating) && round($rating) === 3)->count(),
                 ],
                 [
                     'label' => 'Agree',
-                    'value' => (clone $filteredQueueTransactionsQuery)
-                        ->whereNotNull('average_satisfaction_rating')
-                        ->whereRaw('ROUND(average_satisfaction_rating) = 4')
-                        ->count(),
+                    'value' => collect($satisfactionData)->filter(fn ($rating) => !is_null($rating) && round($rating) === 4)->count(),
                 ],
                 [
                     'label' => 'Strongly Agree',
-                    'value' => (clone $filteredQueueTransactionsQuery)
-                        ->whereNotNull('average_satisfaction_rating')
-                        ->whereRaw('ROUND(average_satisfaction_rating) = 5')
-                        ->count(),
+                    'value' => collect($satisfactionData)->filter(fn ($rating) => !is_null($rating) && round($rating) === 5)->count(),
                 ],
                 [
                     'label' => 'Not Applicable',
-                    'value' => (clone $filteredQueueTransactionsQuery)
-                        ->whereNull('average_satisfaction_rating')
-                        ->count(),
+                    'value' => collect($satisfactionData)->filter(fn ($rating) => is_null($rating))->count(),
                 ],
             ];
 
@@ -420,50 +408,42 @@ class FrontdeskAnalyticsController extends Controller
                 $year
             );
 
-            $totalClients = (clone $filteredTransactionsQuery)->count();
+            // Fetch all transactions once with eager loaded relationships instead of cloning 6 times
+            $allTransactions = (clone $filteredTransactionsQuery)
+                ->with('prioritySectors')
+                ->get();
 
+            $totalClients = $allTransactions->count();
+
+            // Process in-memory using collections instead of multiple DB queries
             $distribution = [
                 [
                     'name' => 'Regular',
-                    'value' => (clone $filteredTransactionsQuery)
-                        ->where('is_priority', false)
-                        ->count(),
+                    'value' => $allTransactions->filter(fn ($t) => !$t->is_priority)->count(),
                 ],
                 [
                     'name' => 'Senior Citizen',
-                    'value' => (clone $filteredTransactionsQuery)
-                        ->whereHas('prioritySectors', function (Builder $query) {
-                            $query->where('sector_name', 'Senior Citizen');
-                        })
-                        ->distinct('queue_transactions.id')
-                        ->count('queue_transactions.id'),
+                    'value' => $allTransactions->filter(fn ($t) => 
+                        $t->prioritySectors->contains('sector_name', 'Senior Citizen')
+                    )->count(),
                 ],
                 [
                     'name' => 'Pregnant',
-                    'value' => (clone $filteredTransactionsQuery)
-                        ->whereHas('prioritySectors', function (Builder $query) {
-                            $query->where('sector_name', 'Pregnant');
-                        })
-                        ->distinct('queue_transactions.id')
-                        ->count('queue_transactions.id'),
+                    'value' => $allTransactions->filter(fn ($t) => 
+                        $t->prioritySectors->contains('sector_name', 'Pregnant')
+                    )->count(),
                 ],
                 [
                     'name' => 'PWD',
-                    'value' => (clone $filteredTransactionsQuery)
-                        ->whereHas('prioritySectors', function (Builder $query) {
-                            $query->where('sector_name', 'PWD');
-                        })
-                        ->distinct('queue_transactions.id')
-                        ->count('queue_transactions.id'),
+                    'value' => $allTransactions->filter(fn ($t) => 
+                        $t->prioritySectors->contains('sector_name', 'PWD')
+                    )->count(),
                 ],
                 [
                     'name' => 'Member of Indigenous People',
-                    'value' => (clone $filteredTransactionsQuery)
-                        ->whereHas('prioritySectors', function (Builder $query) {
-                            $query->where('sector_name', 'Member of Indigenous People');
-                        })
-                        ->distinct('queue_transactions.id')
-                        ->count('queue_transactions.id'),
+                    'value' => $allTransactions->filter(fn ($t) => 
+                        $t->prioritySectors->contains('sector_name', 'Member of Indigenous People')
+                    )->count(),
                 ],
             ];
 
