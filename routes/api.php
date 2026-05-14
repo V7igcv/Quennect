@@ -40,35 +40,39 @@ use App\Http\Controllers\AicsAnalyticsController;
 
 // ==================== PUBLIC ROUTES ====================
 
-// Offices
-Route::get('/offices', [OfficeController::class, 'index']);
-Route::get('/offices/{office}', [OfficeController::class, 'show']);
+Route::middleware('throttle:30,1')->group(function () {
+    // Offices
+    Route::get('/offices', [OfficeController::class, 'index']);
+    Route::get('/offices/{office}', [OfficeController::class, 'show']);
 
-// External Services (kiosk)
-Route::get('/offices/{office}/services', [ServiceController::class, 'getByOffice']);
-Route::get('/services/{service}', [ServiceController::class, 'show']);
+    // External Services (kiosk)
+    Route::get('/offices/{office}/services', [ServiceController::class, 'getByOffice']);
+    Route::get('/services/{service}', [ServiceController::class, 'show']);
 
-// ✅ INTERNAL SERVICES (ginawa kong public para gumana sa internal transactions UI)
-Route::get('/internal/offices/{office}/services', [ServiceController::class, 'getInternalServices']);
+    // ✅ INTERNAL SERVICES (ginawa kong public para gumana sa internal transactions UI)
+    Route::get('/internal/offices/{office}/services', [ServiceController::class, 'getInternalServices']);
 
-// Supporting data
-Route::get('/barangays', [BarangayController::class, 'index']);
-Route::get('/priority-sectors', [PrioritySectorController::class, 'index']);
+    // Supporting data
+    Route::get('/barangays', [BarangayController::class, 'index']);
+    Route::get('/priority-sectors', [PrioritySectorController::class, 'index']);
+});
 
-// Queue
-Route::post('/queue', [QueueController::class, 'store']);
-Route::get('/queue/{queueNumber}', [QueueController::class, 'show']);
-Route::get('/offices/{office}/queue/today', [QueueController::class, 'getTodayQueue']);
+Route::middleware('throttle:20,1')->group(function () {
+    // Queue
+    Route::post('/queue', [QueueController::class, 'store']);
+    Route::get('/queue/{queueNumber}', [QueueController::class, 'show']);
+    Route::get('/offices/{office}/queue/today', [QueueController::class, 'getTodayQueue']);
 
-// Print
-Route::patch('/queue/{id}/printed', [PrintController::class, 'markAsPrinted']);
+    // Print
+    Route::patch('/queue/{id}/printed', [PrintController::class, 'markAsPrinted']);
+});
 
 // Login
 Route::post('/login', [AuthController::class, 'login'])
-    ->middleware('throttle:20,1');
+    ->middleware('throttle:10,1');
 
 // Monitor
-Route::prefix('monitor')->group(function () {
+Route::prefix('monitor')->middleware('throttle:60,1')->group(function () {
     Route::get('/office/{officeId}', [MonitorController::class, 'getMonitorData']);
     Route::get('/office/{officeId}/details', [MonitorController::class, 'getOfficeDetails']);
     Route::get('/office/{officeId}/current-serving', [MonitorController::class, 'getCurrentServing']);
