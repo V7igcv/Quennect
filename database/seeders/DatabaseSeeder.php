@@ -18,13 +18,27 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         $this->call([
+            // Basic data with no dependencies
             BarangaySeeder::class,
             PrioritySectorSeeder::class,
             EvaluationQuestionSeeder::class,
-            OfficeSeeder::class, // This will also seed services and counters
-            UpdateOfficesSeeder::class, // NEW seeder for updates
-            AssistanceTypeSeeder::class, // Assistance types for AICS service
+            
+            // Roles must be created before UserSeeder
             RoleSeeder::class,
+            
+            // Offices must be created before everything that depends on offices
+            OfficeSeeder::class,
+            
+            // Services depend on OfficeSeeder (must run before AssistanceTypeSeeder)
+            ServiceSeeder::class,
+            
+            // Counters depend on OfficeSeeder
+            CounterSeeder::class,
+            
+            // Assistance types depend on ServiceSeeder (service_id FK)
+            AssistanceTypeSeeder::class,
+            
+            // Users must run last (depends on RoleSeeder and OfficeSeeder)
             UserSeeder::class,
         ]);
     }

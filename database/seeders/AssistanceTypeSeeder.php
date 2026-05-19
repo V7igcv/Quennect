@@ -2,9 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\AssistanceType;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class AssistanceTypeSeeder extends Seeder
 {
@@ -42,12 +41,16 @@ class AssistanceTypeSeeder extends Seeder
         ];
 
         foreach ($assistanceTypes as $assistanceType) {
-            AssistanceType::firstOrCreate(
+            DB::table('assistance_types')->updateOrInsert(
                 [
                     'service_id' => $assistanceType['service_id'],
                     'assistance_name' => $assistanceType['assistance_name'],
                 ],
-                $assistanceType
+                [
+                    'service_id' => $assistanceType['service_id'],
+                    'assistance_name' => $assistanceType['assistance_name'],
+                    'updated_at' => now(),
+                ]
             );
         }
     }
